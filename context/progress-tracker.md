@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 5 — Dashboard
-**Last completed:** 16 Recent Activity — Real Data
-**Next:** 17 Analytics Charts — PostHog Data
+**Last completed:** 17 Adzuna Multi-Location Duplicate Fix
+**Next:** 18 Analytics Charts — PostHog Data
 
 ---
 
@@ -45,6 +45,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] 15 Stats Bar — Real Data
 - [x] 16 Recent Activity — Real Data
 - [ ] 17 Analytics Charts — PostHog Data
+- [x] 18 Adzuna Multi-Location Duplicate Fix
 
 ---
 
@@ -109,6 +110,51 @@ Update this file after every completed feature. Any AI agent reading this should
 - **The banned palette was still being compiled into the shipped CSS — root cause found.** Chasing why the built stylesheet contained `.bg-white`, `.text-white`, `.border-black`, `.text-zinc-900` and `.bg-purple-500` when no source file used them, the answer was Tailwind v4's automatic content detection. It scans the whole project, and `context/ui-rules.md`, `context/ui-tokens.md`, `AGENTS.md` and this file all quote those classes *as counter-examples* in the Do-Nots sections. Tailwind cannot tell documentation from code, so every banned class we had written down was being emitted as a live rule — the rule was being violated by the rule's own documentation. Fixed at the source with `@import "tailwindcss" source(none)` and explicit `@source` directives for `app`, `components` and `lib` (`globals.css`). All nine offending rules are gone from the bundle and the stylesheet shrank 69,667 → 65,297 bytes. The three directories are exhaustive: `actions` and `agent` contain no `className`, and nothing outside `app`/`components` renders markup. This is documented in `ui-rules.md` with the specific warning that a component directory added later will silently lose all styling.
 - **Dead-class audit replaced with a parser that proves itself first.** The previous check reported 46–170 "no-op" classes depending on how it was written, which is a sign the checker was wrong rather than the code. Root causes: substring matching treats `.bg-violet-panel` as `bg-violet`; CSS escapes (`.sm\:px-6`, `.gap-1\.5`, `.w-\[800px\]`) must be reconstructed before comparison; `:where(...)` wrappers and `\\:`-escaped variant colons need unwrapping; and grouped selectors need splitting. The final parser builds the exact CSS-escaped selector for each source token and validates itself against 18 known-present control classes before reporting anything — it now passes all 18 and reports **0 of 614** class tokens as dead. A genuinely dead class would be silent at runtime, so this is the check that would have caught the earlier `bg-violet` / `ring-violet` / `border-violet` no-ops.
 - **11 unreferenced design tokens removed.** `--color-error-foreground`, `info-dark`, `info-foreground`, `linkedin`, `linkedin-light`, `linkedin-foreground`, `overlay`, `overlay-dark`, `surface-muted`, `text-black` and `text-darker` had zero references in any component, CSS rule or `var()` call — the LinkedIn group in particular became dead when the footer social icons moved to `fill="currentColor"`, and the overlay pair duplicated `ink`'s value under a second name. Removing them took the theme from 84 to **73 colour tokens**; every remaining token is verified reachable from compiled CSS or source. `context/ui-tokens.md` was resynced from the live `@theme` again and still matches exactly in both directions.
+
+- **The landing page showed 7 identical job cards for one requisition. Root cause: Adzuna
+  multi-location postings, not a parsing failure.** Live API evidence — 20 raw `developer`
+  results contained only **8 distinct postings**. Adzuna returns one requisition posted to N
+  sites as N separate ads (`id`, `latitude`/`longitude` and a per-location *machine-predicted*
+  salary all differ — `salary_is_predicted: "1"`), while `title`, `company.display_name` and
+  `description` are **byte-identical**. A SimVentions "Mid-to-Senior Software Developer" req
+  appeared 7 times across 7 Virginia counties, all showing the same 500-char description, so
+  no amount of parsing or trimming could have separated them. Verified `description` equality
+  programmatically rather than by eye. Two smaller defects surfaced in the same payload:
+  aggregators append branding to the company name (`"SimVentions, Inc - Glassdoor ✪ 4.6"`), and
+  a single predicted figure arrives as `salary_min === salary_max`, which rendered as the
+  nonsense range `$184k – $184k`.
+
+  **Fix, in `lib/adzuna.ts`** — `dedupeAdzunaJobs()` collapses the copies on a fingerprint of
+  normalized title + company + the first 200 chars of description, keeping the copy with the
+  highest `salary_max ?? salary_min` so the surviving card shows the best stated figure rather
+  than whichever location ranked first. It is applied **inside `searchJobs()`**, so both
+  `/api/public/jobs` and the authenticated `/api/agent/find` benefit — the latter previously
+  wrote 7 near-identical `jobs` rows per requisition and spent Gemini tokens scoring the same
+  description 7 times. `cleanCompanyName()` strips the trailing ` - <aggregator>` and
+  `✪ rating` segments, but **only** when the remainder matches a known board name
+  (`glassdoor|indeed|linkedin|…`), so legitimate names are left intact — verified against
+  `American Honda Motor Co., Inc.`, `Johnson Controls` and `Wilmington Trust`, which all pass
+  through unchanged. It is also applied to the Gemini scoring prompt in
+  `app/api/agent/find/route.ts` so the aggregator name cannot bias a match score.
+
+  **Over-fetching.** Because dedupe shrinks the page, `/api/public/jobs` now requests
+  `RESULTS_PER_PAGE * 4` (capped at Adzuna's 50) and trims to 12 *after* dedupe. Measured
+  distinct counts from 48 raw results: `developer` 28, `software engineer` 34, `react` 22,
+  `data analyst` 25 — always enough to fill 12 cards. `formatSalary` collapses
+  `min === max` to a single value.
+
+  **Residual, and why it is not a bug.** After dedupe, 20 raw → 8 distinct and 50 raw → 30.
+  The `Delivery Consultant - Application Development` pair that still shows twice is two
+  genuinely different requisitions — `"…aws proserve"` vs `"…aws wwps proserve"`, different
+  titles, posted days apart. A 200-char description fingerprint is deliberately the trade-off:
+  it catches exact multi-location duplicates without merging two real jobs that happen to share
+  a boilerplate AWS description prefix. Raising it would need a real similarity metric, not a
+  longer slice.
+
+  **Verified:** live `/api/public/jobs` returns 12 cards with **0** duplicate
+  company+title+description tuples; 0 `Glassdoor` strings and 0 `$Xk – $Xk` ranges in the
+  rendered homepage HTML. `npx tsc --noEmit` clean, `npm run lint` 0 errors / 0 warnings,
+  `npm run build` passes all 22 routes.
 
 ---
 

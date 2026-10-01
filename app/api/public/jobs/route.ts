@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { searchJobs, type AdzunaJob } from "@/lib/adzuna";
+import { searchJobs, cleanCompanyName, type AdzunaJob } from "@/lib/adzuna";
 import type { PublicJob } from "@/types";
 
 export type PublicJobsResponse = {
@@ -10,6 +10,10 @@ export type PublicJobsResponse = {
 };
 
 const RESULTS_PER_PAGE = 12;
+// Adzuna repeats a single multi-location requisition once per site, so a 12-result page
+// can collapse to as few as 3 distinct jobs. Over-fetch, then trim after dedupe.
+const ADZUNA_FETCH_MULTIPLIER = 4;
+const MAX_ADZUNA_FETCH = 50;
 const QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_QUERY_LENGTH = 80;
 const VALID_FILTERS = new Set(["all", "remote", "fulltime", "salary150"]);
@@ -25,6 +29,12 @@ function formatSalary(job: AdzunaJob): string {
 
   const short = (value: number) =>
     value >= 1000 ? `$${Math.round(value / 1000)}k` : `$${value}`;
+
+  // Adzuna returns a single machine-predicted figure as min === max, which rendered as
+  // "$184k – $184k". Collapse that to one value.
+  if (min != null && max != null && min === max) {
+    return short(min);
+  }
 
   if (min != null && max != null) {
     return `${short(min)} – ${short(max)}`;
@@ -48,7 +58,7 @@ function toPublicJob(job: AdzunaJob): PublicJob {
   return {
     id: job.id,
     title: job.title,
-    company: job.company?.display_name ?? "Unknown company",
+    company: cleanCompanyName(job.company?.display_name ?? "") || "Unknown company",
     location: job.location?.display_name ?? "Remote",
     salary: formatSalary(job),
     contractType: formatContractType(job),
@@ -99,7 +109,10 @@ export async function GET(req: NextRequest) {
     const keywords = [query, filter === "remote" ? "remote" : ""].filter(Boolean).join(" ");
 
     const jobs = await searchJobs(keywords || "developer", "", "us", {
-      resultsPerPage: RESULTS_PER_PAGE,
+      resultsPerPage: Math.min(
+        RESULTS_PER_PAGE * ADZUNA_FETCH_MULTIPLIER,
+        MAX_ADZUNA_FETCH,
+      ),
       ...(filter === "fulltime" ? { contractType: "full_time" as const } : {}),
       ...(filter === "salary150" ? { salaryMin: 150000, sortBy: "salary" as const } : {}),
     });

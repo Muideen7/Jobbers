@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
-import { searchJobs } from "@/lib/adzuna";
+import { searchJobs, cleanCompanyName } from "@/lib/adzuna";
 import { generateJson } from "@/lib/llm";
 import { trackPostHogEvent } from "@/lib/posthog-server";
 import { MATCH_THRESHOLD } from "@/lib/utils";
@@ -38,7 +38,7 @@ async function scoreJobsBatch(
       (j, i) =>
         `Job ${i + 1} (id: "${j.id}"):
 Title: ${j.title}
-Company: ${j.company.display_name}
+Company: ${cleanCompanyName(j.company.display_name)}
 Description: ${j.description}`,
     )
     .join("\n\n");
@@ -176,7 +176,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     });
 
-    const adzunaJobs = await searchJobs(jobTitle.trim(), location.trim());
+    const adzunaJobs = await searchJobs(jobTitle.trim(), location.trim(), "us", {
+      resultsPerPage: 30,
+    });
 
     if (adzunaJobs.length === 0) {
       await insforge.database
@@ -216,7 +218,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         source_url: job.redirect_url,
         external_apply_url: job.redirect_url,
         title: job.title,
-        company: job.company.display_name,
+        company: cleanCompanyName(job.company.display_name),
         location: job.location.display_name,
         salary:
           job.salary_min != null

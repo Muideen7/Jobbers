@@ -20,6 +20,92 @@ export type AdzunaSearchOptions = {
   sortBy?: "date" | "salary";
 };
 
+/**
+ * Adzuna multi-location postings: one requisition posted to N sites is returned as N
+ * separate ads, each with its own id, lat/long and a per-location salary guess, but with
+ * an identical title, company and description. Twenty raw results can be eight real jobs.
+ */
+const DESCRIPTION_FINGERPRINT_CHARS = 200;
+
+function normalizeForFingerprint(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function fingerprint(job: AdzunaJob): string {
+  return [
+    normalizeForFingerprint(job.title),
+    normalizeForFingerprint(job.company?.display_name ?? ""),
+    normalizeForFingerprint(job.description ?? "").slice(
+      0,
+      DESCRIPTION_FINGERPRINT_CHARS,
+    ),
+  ].join("|");
+}
+
+/**
+ * Aggregators append their own branding to the company name ("SimVentions, Inc -
+ * Glassdoor ✪ 4.6"). The rating suffix and the trailing " - <source>" segment are not
+ * part of the employer name and would otherwise leak into the UI and into Gemini
+ * scoring prompts as if they were part of the company.
+ */
+export function cleanCompanyName(displayName: string): string {
+  const withoutRating = displayName.replace(/\s*[✪★]\s*\d+(?:\.\d+)?\s*$/, "").trim();
+
+  if (!withoutRating.includes(" - ")) {
+    return withoutRating;
+  }
+
+  const segments = withoutRating.split(" - ");
+  const head = segments[0].trim();
+
+  // Only strip a suffix when the remainder looks like an aggregator/board name rather
+  // than a legal or trading name that legitimately contains a hyphen.
+  const remainderLooksLikeSource = segments
+    .slice(1)
+    .join(" - ")
+    .split(/[\s,]+/)
+    .some((word) =>
+      /glassdoor|indeed|linkedin|ziprecruiter|monster|glassdoor|job|source|board|careers?/i.test(
+        word,
+      ),
+    );
+
+  return remainderLooksLikeSource && head.length > 0 ? head : withoutRating;
+}
+
+/**
+ * Collapses multi-location duplicates into a single representative ad, preferring the
+ * copy with the highest stated salary so the card shows the best available figure
+ * rather than whichever location happened to rank first.
+ */
+export function dedupeAdzunaJobs(jobs: AdzunaJob[]): AdzunaJob[] {
+  const best = new Map<string, AdzunaJob>();
+
+  for (const job of jobs) {
+    const key = fingerprint(job);
+    const incumbent = best.get(key);
+
+    if (!incumbent) {
+      best.set(key, job);
+      continue;
+    }
+
+    const incumbentSalary = incumbent.salary_max ?? incumbent.salary_min ?? 0;
+    const challengerSalary = job.salary_max ?? job.salary_min ?? 0;
+
+    if (challengerSalary > incumbentSalary) {
+      best.set(key, job);
+    }
+  }
+
+  return [...best.values()];
+}
+
 export async function searchJobs(
   jobTitle: string,
   location: string,
@@ -67,5 +153,5 @@ export async function searchJobs(
   }
 
   const data = (await response.json()) as { results?: AdzunaJob[] };
-  return data.results ?? [];
+  return dedupeAdzunaJobs(data.results ?? []);
 }
