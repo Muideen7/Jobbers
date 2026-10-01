@@ -1,0 +1,293 @@
+@import "tailwindcss" source(none);
+
+@source "../app";
+@source "../components";
+@source "../lib";
+
+@theme {
+  --font-sans: "Mona Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Neutrals follow the Jobbers zinc scale. */
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f4f4f5;
+  --color-surface-tertiary: #fafafa;
+
+  --color-border: #e4e4e7;
+  --color-border-light: #f4f4f5;
+  --color-border-muted: #d4d4d8;
+
+  --color-text-primary: #18181b;
+  --color-text-secondary: #71717a;
+  --color-text-muted: #a1a1aa;
+  --color-text-strong: #52525b;
+  --color-text-faint: #d4d4d8;
+  --color-text-dark: #3f3f46;
+  --color-text-darkest: #27272a;
+  --color-text-slate: #27272a;
+  --color-text-slate-medium: #71717a;
+  --color-chart-axis: #a1a1aa;
+
+  /* Brand purple, used sparingly for AI and emphasis moments. */
+  --color-accent: #6e56cf;
+  --color-accent-dark: #5a45b8;
+  --color-accent-light: #eeeafc;
+  --color-accent-muted: #f5f3fd;
+  /* Used for text on dark CTA backgrounds. */
+  --color-accent-foreground: #ffffff;
+
+  /* Dark panels (how-it-works, footer, chart surfaces). */
+  --color-inverse: #2d2f33;
+  --color-inverse-deep: #242629;
+  --color-inverse-sunken: #1c1e22;
+  --color-inverse-foreground: #ffffff;
+  --color-inverse-muted: #a1a1aa;
+  /* Primary action surface: near-black pills and buttons. */
+  --color-ink: #18181b;
+  --color-ink-hover: #000000;
+  /* Warm secondary used in the AI matcher and bento cards. */
+  --color-peach: #fff6ec;
+  --color-rose-soft: #fdf2f4;
+  --color-rose: #f43f5e;
+  --color-rose-strong: #e11d48;
+
+  /* Violet decorative set for the hero and AI matcher glows. */
+  --color-violet-glow: #f3e8ff;
+  --color-violet-border: #e9d5ff;
+  --color-violet-panel: #ede9fe;
+
+  /* Decorative accents: skill bars, star rating, peach card edge. */
+  --color-skill-slate: #334155;
+  --color-skill-lime: #84cc16;
+  --color-skill-sky: #0284c7;
+  --color-amber: #f59e0b;
+  --color-amber-deep: #78350f;
+  --color-orange: #ea580c;
+
+  /* Peach gradient stops for the hero preview and stat cards. */
+  --color-peach-soft: #f8e5d6;
+  --color-peach-deep: #edd4c1;
+  --color-peach-line: #fed7aa;
+
+  /* Lavender gradient stops for the hero preview. */
+  --color-lavender: #ece8fe;
+  --color-lavender-soft: #f7f5ff;
+
+  /* Cool grays used in the landing illustrations and skyline art. */
+  --color-art-line: #f1f5f9;
+  --color-art-fill: #e2e8f0;
+  --color-art-fill-strong: #cbd5e1;
+  --color-brand-navy: #1e3a8a;
+
+  /* Pastel card backgrounds for live opportunity results. */
+  --color-pastel-blue: #eef4ff;
+  --color-pastel-mint: #eefbf3;
+  --color-pastel-pink: #fdf2f8;
+  --color-pastel-lilac: #f6f0ff;
+  --color-pastel-cream: #fff7ed;
+  --color-pastel-aqua: #f0fdfa;
+
+  --color-success: #10b981;
+  --color-success-alt: #00bc7d;
+  --color-success-dark: #007a55;
+  --color-success-darker: #009966;
+  --color-success-light: #d0fae5;
+  --color-success-lightest: #ecfdf5;
+  --color-success-foreground: #007a55;
+
+  --color-info: #1972f5;
+  --color-info-medium: #2b7fff;
+  --color-info-light: #dbeafe;
+  --color-info-lightest: #eff6ff;
+  --color-info-muted: #94a2c5;
+
+  --color-warning: #ff8904;
+  --color-warning-foreground: #ffffff;
+
+  --color-error: #ef4444;
+
+  /* Portrait/image scrim, layered over next/image in WallOfLove. */
+  --color-scrim: #000000;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 1px 2px rgb(24 24 27 / 0.04), 0 8px 24px rgb(24 24 27 / 0.04);
+}
+
+:root {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--color-background);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+.landing-hero-glow {
+  background-color: var(--color-surface);
+  background-image:
+    radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--color-accent-light) 90%, transparent) 0%,
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 50% 55%,
+      color-mix(in srgb, var(--color-info-light) 80%, transparent) 0%,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 82% 18%,
+      color-mix(in srgb, var(--color-info-lightest) 90%, transparent) 0%,
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      color-mix(in srgb, var(--color-accent-light) 72%, transparent) 0%,
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 35% 88%,
+      color-mix(in srgb, var(--color-accent-muted) 90%, transparent) 0%,
+      transparent 25%
+    );
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  border-radius: var(--radius-full);
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+  letter-spacing: -0.011em;
+  white-space: nowrap;
+  text-align: center;
+  border: 1px solid transparent;
+  transition:
+    transform 200ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--color-ink);
+  color: var(--color-accent-foreground);
+  box-shadow:
+    0 1px 2px rgb(24 24 27 / 0.12),
+    0 8px 20px rgb(24 24 27 / 0.1);
+}
+
+.btn-primary:hover {
+  background: var(--color-ink-hover);
+  box-shadow:
+    0 2px 4px rgb(24 24 27 / 0.16),
+    0 14px 30px rgb(24 24 27 / 0.16);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-muted);
+  box-shadow: 0 1px 2px rgb(24 24 27 / 0.04);
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface-secondary);
+  border-color: var(--color-text-muted);
+  transform: translateY(-2px);
+}
+
+.btn-sm {
+  min-height: 2.5rem;
+  padding: 0.5rem 1.125rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------ scroll links */
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Offset anchor targets so the sticky navbar does not cover them. Both the
+   landing navbar (h-16 sm:h-20) and the app navbar (sticky h-16) need this. */
+section[id],
+[id] {
+  scroll-margin-top: 5.5rem;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Every interactive element should advertise that it is clickable. */
+a[href],
+button,
+summary,
+[role="button"],
+[role="tab"] {
+  cursor: pointer;
+}
+
+a,
+button,
+summary,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: var(--color-accent-light);
+  color: var(--color-text-primary);
+}
