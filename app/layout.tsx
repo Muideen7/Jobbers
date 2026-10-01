@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Mona_Sans } from "next/font/google";
 
-import { PostHogProvider } from "@/components/layout/PostHogProvider";
-
 import "./globals.css";
 
 const monaSans = Mona_Sans({
@@ -74,7 +72,6 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         {children}
-        <PostHogProvider />
       </body>
     </html>
   );
