@@ -35,7 +35,7 @@ export function Faq() {
                 href="/login"
                 className="btn btn-secondary btn-sm mt-2 cursor-pointer"
               >
-                Get started free
+                Get started
               </Link>
             </div>
           </div>

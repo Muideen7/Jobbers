@@ -9,14 +9,6 @@ export function Hero() {
   return (
     <section id="hero" className="w-full pt-10 pb-16 md:pt-14 md:pb-24 overflow-hidden">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center mb-6">
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-accent-muted border border-accent-light text-xs sm:text-sm font-medium text-accent shadow-2xs">
-            <span className="font-semibold">100% free</span>
-            <span className="w-1 h-1 rounded-full bg-accent/50" />
-            <span className="text-text-strong">No credit card required</span>
-          </div>
-        </div>
-
         <div className="text-center max-w-4xl mx-auto space-y-4">
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[72px] font-bold text-text-primary tracking-tight leading-[1.08]">
             Stop scrolling job boards.
@@ -34,7 +26,7 @@ export function Hero() {
               href="/login"
               className="btn btn-primary"
             >
-              Start for free
+              Get started
             </Link>
             <Link
               href="/find-jobs"

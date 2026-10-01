@@ -23,7 +23,7 @@ const footerColumns: ReadonlyArray<{
       { href: "/profile", label: "Resume & cover letters" },
       { href: "/find-jobs", label: "Browse matched jobs" },
       { href: "/find-jobs", label: "Company research" },
-      { href: "/login", label: "Get started free" },
+      { href: "/login", label: "Get started" },
     ],
   },
   {
@@ -82,7 +82,7 @@ export function LandingFooter() {
 
           <p className="text-text-faint text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
             Build your profile, upload your resume, and start seeing scored matches in minutes.
-            Free to start, and nothing is ever applied to on your behalf without you.
+            Nothing is ever applied to on your behalf without you.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
@@ -90,7 +90,7 @@ export function LandingFooter() {
               href="/login"
               className="btn btn-primary"
             >
-              Start for free
+              Get started
             </Link>
             <Link
               href="/find-jobs"
