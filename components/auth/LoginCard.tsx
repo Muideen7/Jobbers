@@ -1,4 +1,6 @@
-import { GitBranch, Globe, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+
+import { CompanyLogo } from "@/components/homepage/Logos";
 
 const errorMessages: Record<string, string> = {
   callback: "We could not finish signing you in. Please try again.",
@@ -62,7 +64,7 @@ export function LoginCard({ error }: Props) {
                 type="submit"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <Globe aria-hidden className="h-5 w-5 text-accent" />
+                <CompanyLogo type="google" className="h-5 w-5 shrink-0" />
                 Continue with Google
               </button>
             </form>
@@ -71,7 +73,7 @@ export function LoginCard({ error }: Props) {
                 type="submit"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <GitBranch aria-hidden className="h-5 w-5 text-text-primary" />
+                <CompanyLogo type="github" className="h-5 w-5 shrink-0" />
                 Continue with GitHub
               </button>
             </form>
