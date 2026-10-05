@@ -21,7 +21,7 @@ After building any component — update this file with the component name, file 
 ### Login Card
 
 File: components/auth/LoginCard.tsx
-Last updated: 2026-06-03
+Last updated: 2026-10-05
 
 | Property         | Class                                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
@@ -33,7 +33,16 @@ Last updated: 2026-06-03
 | Spacing          | Outer `mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1440px] items-center justify-center px-4 py-12 sm:px-6 lg:px-8`, panels `p-8 sm:p-10`, actions `mt-8 grid gap-3` |
 | Hover state      | Provider form buttons use `hover:bg-surface-secondary`; focus uses `focus-visible:outline-accent`        |
 | Shadow           | `shadow-card` on the outer auth shell                                                                   |
-| Accent usage     | `text-accent` on the InsForge security badge icon and Google provider icon                              |
+| Accent usage     | `text-accent` on the InsForge security badge icon only                                                     |
+
+**Provider icons — use `CompanyLogo`, not lucide.** The Google and GitHub buttons render
+`<CompanyLogo type="google" />` and `<CompanyLogo type="github" />` from
+`components/homepage/Logos.tsx` at `h-5 w-5 shrink-0`. Do **not** substitute a lucide glyph
+(`Globe`, `GitBranch`) or hand-roll an inline path: those are generic symbols, not the brands, and
+Google's mark is genuinely four-colour so a monochrome path would be a different logo rather than a
+tint of the real one. Google carries its own brand hex fills and ignores `currentColor`; GitHub is
+`fill="currentColor"` and therefore inherits the button's `text-text-primary`, which is why neither
+button needs a colour utility on the icon itself.
 
 **Pattern notes:**
 Auth screens use a two-panel shell: a left explanatory panel with the established landing glow treatment and a right focused action panel. Provider actions are token-driven bordered form buttons with lucide icons and no hardcoded provider colors.

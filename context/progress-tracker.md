@@ -464,3 +464,59 @@ grepped source text.
 
 **Still needs a human:** log out and back in once after deploy to confirm the httpOnly
 access-token cookie behaves on a real session — no live InsForge session is available locally.
+
+## Handoff — OAuth Provider Icons Were Not The Real Brands (2026-10-05)
+
+### Done
+
+The two provider buttons on `/login` drew **generic lucide glyphs**, not the brands they sign you
+in with: Google rendered `<Globe />` (a globe, shared with every other OAuth provider) and GitHub
+rendered `<GitBranch />` (a git-branch diagram, which is Git's icon, not GitHub's). Both buttons now
+render the real marks via the existing `CompanyLogo`:
+
+```tsx
+<CompanyLogo type="google" className="h-5 w-5 shrink-0" />  // Continue with Google
+<CompanyLogo type="github" className="h-5 w-5 shrink-0" />  // Continue with GitHub
+```
+
+`CompanyLogo` in `components/homepage/Logos.tsx` already had correct marks for both, so this is a
+reuse rather than new artwork — no new SVG path data was introduced, and `Globe` / `GitBranch` are
+no longer imported.
+
+### Why not just recolour the lucide icons
+
+Two of the reasons matter enough to record:
+
+1. **A tint of a wrong shape is still a wrong logo.** Recolouring `<Globe />` blue would not make it
+   Google's mark; the silhouette is not Google's. Google's mark is also genuinely four-colour, so
+   the "make it a single path in `currentColor`" shortcut produces a *different logo*, not a themed
+   one. `Logos.tsx` already carries that reasoning in a comment on the Google branch, and it returns
+   early with explicit brand fills before `companyFills` is consulted — which is why
+   `companyFills.google` is `""` and yet Google still renders in colour.
+2. **GitHub needed no new colour at all.** `companyFills.github` is `currentColor`, so the Octocat
+   inherits the button's `text-text-primary`. Dropping the icon's own `text-text-primary` (and the
+   Google button's `text-accent`) is what keeps the ink consistent with the button label rather than
+   hardcoding it twice.
+
+`shrink-0` was added so the `h-5 w-5` mark cannot be squeezed by the flex button at narrow widths.
+
+### Trade-off worth knowing
+
+`CompanyLogo` lives under `components/homepage/` and is now imported from `components/auth/`. That is
+a cross-feature import, permitted by the architecture rules — `components/` is UI-only with no data
+fetching, and the one hard boundary (`/agent` never imports from `/components`) does not apply here.
+The alternative is promoting the brand marks to a shared `components/brand/` and re-pointing the five
+homepage call sites; that is the tidier end state if this file keeps growing, and it is the change I
+would make before adding a third provider.
+
+`context/ui-registry.md` now records the provider-icon rule so a future edit does not reintroduce
+`Globe` / `GitBranch`.
+
+### Verification
+
+`npx tsc --noEmit` 0 errors · `npx eslint .` 0 errors · `npm test` 33/33 · `npm run build` passes
+(22 routes).
+
+**Still needs a human:** eyeball `/login` in both colour schemes. The GitHub mark is `currentColor`,
+so it is correct by construction, but the Google mark's four brand hexes are fixed and are the one
+thing here that will not adapt to a dark-theme surface on its own.
