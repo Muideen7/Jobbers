@@ -7,7 +7,10 @@ const errorMessages: Record<string, string> = {
 };
 
 type Props = {
-  error?: string;
+  // `| undefined` is explicit because the caller forwards a searchParam that is
+  // absent on a clean /login, and exactOptionalPropertyTypes distinguishes an
+  // omitted key from one explicitly set to undefined.
+  error?: string | undefined;
 };
 
 export function LoginCard({ error }: Props) {

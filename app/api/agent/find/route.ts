@@ -50,13 +50,15 @@ Description: ${j.description}`,
     desired_roles: profile.job_titles_seeking,
   });
 
-  const unscored: ScoredResult[] = jobs.map((j) => ({
-    jobId: j.id,
+  const zeroScore = (jobId: string): ScoredResult => ({
+    jobId,
     matchScore: 0,
     matchReason: "Score unavailable",
     matchedSkills: [],
     missingSkills: [],
-  }));
+  });
+
+  const unscored: ScoredResult[] = jobs.map((j) => zeroScore(j.id));
 
   let parsed: { results?: ScoredResult[] };
 
@@ -90,11 +92,16 @@ ${jobList}`,
     return unscored;
   }
 
-  return jobs.map((job, i) => {
+  // Prefer the jobId match, fall back to positional order (Gemini is told to
+  // return them in order), then to this job's zero score. Iterating `unscored`
+  // rather than indexing it in parallel with `jobs` removes the last
+  // unchecked-index read: `fallback` is the element, so it cannot be undefined.
+  return unscored.map((fallback, i) => {
     const scored =
-      parsed.results?.find((r) => r.jobId === job.id) ?? parsed.results?.[i];
+      parsed.results?.find((r) => r.jobId === fallback.jobId) ??
+      parsed.results?.at(i);
 
-    return scored ?? unscored[i];
+    return scored ?? fallback;
   });
 }
 

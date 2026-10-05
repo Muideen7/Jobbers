@@ -4,6 +4,12 @@ import type { RequestCookies } from "next/dist/server/web/spec-extension/cookies
 import { updateSession } from "@insforge/sdk/ssr";
 import type { CookieOptions, CookieStore } from "@insforge/sdk/ssr";
 
+import { AUTH_COOKIE_SETTINGS } from "@/lib/auth-cookies";
+import {
+  buildContentSecurityPolicy,
+  createNonce,
+} from "@/lib/security-headers";
+
 function createCookieStoreAdapter(
   cookies: RequestCookies | ResponseCookies,
 ): CookieStore {
@@ -48,31 +54,61 @@ function createCookieStoreAdapter(
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  const response = NextResponse.next({ request });
+  // Every route this proxy owns is dynamically rendered, so a per-request
+  // nonce can be injected into the HTML. Next.js reads it back out of the CSP
+  // request header during SSR and stamps it on its own framework scripts, the
+  // page bundles and its inline flight payload — so nothing here needs to be
+  // nonced by hand.
+  const nonce = createNonce();
+  const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
+
+  const requestHeaders = new Headers(request.headers);
+  // Next.js extracts the nonce from the CSP header itself; x-nonce is only for
+  // a Server Component that needs to pass it to a <Script nonce> directly.
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  response.headers.set("Content-Security-Policy", contentSecurityPolicy);
+
+  // Redirect responses are not documents, but carrying the policy keeps the
+  // header set uniform on every route this proxy touches.
+  const withSecurityHeaders = (redirect: NextResponse): NextResponse => {
+    redirect.headers.set("Content-Security-Policy", contentSecurityPolicy);
+    return redirect;
+  };
 
   let session;
   try {
     session = await updateSession({
+      ...AUTH_COOKIE_SETTINGS,
       requestCookies: createCookieStoreAdapter(request.cookies),
       responseCookies: createCookieStoreAdapter(response.cookies),
     });
   } catch (error) {
     // updateSession throws (rather than returning an error) when the InsForge
-    // env vars are missing. Fail open to the login page with a real message
+    // env vars are missing. Fail closed to the login page with a real message
     // instead of returning an unhandled 500 on every matched route.
     console.error("[proxy] updateSession", error);
-    return NextResponse.redirect(new URL("/login?error=server", request.url));
+    return withSecurityHeaders(
+      NextResponse.redirect(new URL("/login?error=server", request.url)),
+    );
   }
 
   if (!session.accessToken) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return withSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   return response;
 }
 
 export const config = {
+  // Must stay a static literal: Next.js parses `config` at build time, so it
+  // cannot be derived from PROXY_OWNED_ROUTE_PREFIXES. tests/security-headers
+  // .test.ts asserts the two lists stay identical.
   matcher: ["/dashboard/:path*", "/profile/:path*", "/find-jobs/:path*"],
 };

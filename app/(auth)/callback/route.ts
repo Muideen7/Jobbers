@@ -5,6 +5,7 @@ import {
   setAuthCookies,
 } from "@insforge/sdk/ssr";
 
+import { AUTH_COOKIE_SETTINGS } from "@/lib/auth-cookies";
 import { getInsforgeEnv } from "@/lib/insforge-server";
 
 const verifierCookieName = "jobbers_oauth_code_verifier";
@@ -61,11 +62,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const redirectPath = await getRedirectPath(data.user.id, data.accessToken);
     const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    // The one-time authorization code arrives on the query string of this URL.
+    // Without this the same-origin redirect below hands the full query to
+    // /profile as a Referer, which lands in request logs and in PostHog's
+    // $referrer on the resulting pageview.
+    response.headers.set("Referrer-Policy", "no-referrer");
     response.cookies.delete(verifierCookieName);
-    setAuthCookies(response.cookies, {
+    // The SDK guards with `if (tokens.refreshToken)`, so an absent refresh token
+    // and an explicit `undefined` behave identically. Building the object this
+    // way keeps the key off entirely rather than assigning `undefined`, which
+    // exactOptionalPropertyTypes rejects.
+    const tokens: Parameters<typeof setAuthCookies>[1] = {
       accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-    });
+    };
+
+    if (data.refreshToken) {
+      tokens.refreshToken = data.refreshToken;
+    }
+
+    setAuthCookies(response.cookies, tokens, AUTH_COOKIE_SETTINGS);
 
     return response;
   } catch (error) {

@@ -80,6 +80,34 @@ export function CompanyLogo({
     );
   }
 
+  // The Google mark is genuinely four colours — a single monochrome path would be a
+  // different logo, not a tint of the real one — so it is built from the official
+  // four-segment path set rather than reusing the single `google` path above.
+  const isGoogle = type.toLowerCase() === "google";
+
+  if (isGoogle) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="#4285F4"
+          d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.63v3.02h3.86c2.26-2.09 3.56-5.17 3.56-8.89z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3.02c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.28v3.1C3.26 21.31 7.3 24 12 24z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M5.27 14.28c-.25-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28V6.62H1.28C.46 8.21 0 9.98 0 12s.45 3.79 1.28 5.38l3.99-3.1z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.43-3.43C17.95 1.19 15.24 0 12 0 7.3 0 3.26 2.64 1.28 6.62l3.99 3.1C6.22 6.87 8.87 4.75 12 4.75z"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
       <path d={path} fill={fill || "currentColor"} />

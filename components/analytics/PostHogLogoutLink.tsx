@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { resetPostHogUser } from "@/lib/posthog-client";
@@ -12,15 +11,20 @@ type Props = {
 
 export function PostHogLogoutLink({ children, className }: Props) {
   return (
-    <Link
-      href="/api/auth/logout"
-      prefetch={false}
-      className={className}
-      onClick={() => {
-        resetPostHogUser();
-      }}
-    >
-      {children}
-    </Link>
+    // `contents` drops the form's own box so the button becomes the direct flex
+    // item of whatever contains it — callers pass classes that mix layout
+    // (`mt-auto`, `gap-2`) with visual styling, so they must stay on the button
+    // to keep the desktop row and the mobile drawer laid out as before.
+    <form action="/api/auth/logout" method="POST" className="contents">
+      <button
+        type="submit"
+        className={className}
+        onClick={() => {
+          resetPostHogUser();
+        }}
+      >
+        {children}
+      </button>
+    </form>
   );
 }

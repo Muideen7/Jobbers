@@ -61,7 +61,9 @@ export function cleanCompanyName(displayName: string): string {
   }
 
   const segments = withoutRating.split(" - ");
-  const head = segments[0].trim();
+  // split() on a string known to contain " - " always yields a first element,
+  // but the fallback keeps this honest without asserting the index away.
+  const head = (segments[0] ?? withoutRating).trim();
 
   // Only strip a suffix when the remainder looks like an aggregator/board name rather
   // than a legal or trading name that legitimately contains a hyphen.
