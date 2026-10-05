@@ -253,3 +253,214 @@ colours rather than falling back to black.
 - `NEXT_PUBLIC_SITE_URL` unset → production canonicals and `og:image` fall back to
   `http://localhost:3000`.
 - Authenticated route checks may need an active InsForge session.
+
+---
+
+## Handoff — Security Audit Remediation (2026-10-05)
+
+A full codebase audit was run (1 Critical, 2 High, ~26 Medium, ~10 Low). Three findings were
+fixed; the remainder were reported and deliberately deferred. New shared modules: `lib/auth-cookies.ts`,
+`lib/search-query.ts`, `lib/security-headers.ts`, plus `tests/` (28 tests, `npm test`).
+
+### Done
+
+**1. PostgREST filter injection (was Critical) — `lib/search-query.ts`.**
+`GET /api/jobs` interpolated the raw `search` query param into a PostgREST `.or=(...)` filter.
+Two independent grammar breaks: PostgREST treats `,` `(` `)` `"` `\` as structural, so a query
+string could append predicates (`?search=dev,or=(user_id.not.is.null)`); `ilike` separately
+treats `%` / `*` as wildcards, so a bare `%` widened the term to every row. `parseJobSearch()`
+replaces those seven characters with a space, collapses whitespace runs, lowercases and caps at
+80 chars. Extracted out of the route handler into `lib/` so it is unit-testable and so business
+logic stops living in a route file.
+
+**2. Security headers — `lib/security-headers.ts`, `proxy.ts`, `next.config.ts`.**
+Eight headers, split by what needs to know the request:
+
+| Header | Where | Why there |
+|---|---|---|
+| nosniff, XFO, Referrer-Policy, X-DNS-Prefetch-Control, Permissions-Policy | `next.config.ts`, `/:path*` | identical everywhere, static |
+| HSTS | `next.config.ts`, gated by `has: x-forwarded-proto === https` | `headers()` receives **no request object**, so runtime gating is impossible there; `has` is the declarative equivalent |
+| CSP | **both**, on non-overlapping sources | the strict policy needs a per-request nonce |
+
+**CSP is nonce-based on exactly the session-gated routes.** `proxy.ts` generates a nonce per
+request and sets the policy on both the request and response headers; Next.js reads it back out
+of the CSP request header and stamps it on its own scripts, the page bundles and the inline
+flight payload. Those routes were *already* `ƒ (Dynamic)` — `/login` included — so the strict
+policy costs **zero** extra SSR. Only `/` and `/_not-found` are prerendered, and a nonce cannot
+reach build-time HTML, so those two keep a static `'unsafe-inline'` policy via
+`NON_PROXY_OWNED_SOURCE`. Forcing the 208KB marketing page dynamic to buy nothing was rejected:
+the docs state nonces disable static optimization and CDN caching.
+
+`style-src` stays `'unsafe-inline'` even under the nonce. A nonce **suppresses** `'unsafe-inline'`
+for the directive it appears in, so a nonced `style-src` would silently drop Tailwind's runtime
+styles instead of failing loudly, and inline CSS is not a script-execution vector.
+
+`next.config.ts` and `proxy.ts` must never both set CSP on one path: duplicate response headers
+resolve last-wins, so the static policy would overwrite the nonce. `PROXY_OWNED_ROUTE_PREFIXES`
+drives the `next.config.ts` complement; `proxy.ts`'s own matcher is a hand-written literal because
+**Next.js parses `config` at build time and rejects computed values** (a real build failure, not a
+guess). `tests/security-headers.test.ts` reads `proxy.ts` and asserts the two lists are identical.
+
+Also fixed: `upgrade-insecure-requests` was previously unconditional and would have rewritten
+`http://localhost` in dev. It is now production-only, matching the Next.js CSP guide.
+
+**3. Logout GET→POST + httpOnly cookies — `app/api/auth/logout/route.ts`, `lib/auth-cookies.ts`.**
+Logout was a GET, so any `<img src>`, prefetch or crawler could sign a user out. It is now POST
+only (GET returns 405 + `allow: POST`) with a 303 redirect and a real error log.
+`components/analytics/PostHogLogoutLink.tsx` posts via `<form className="contents">` so
+`components/layout/Navbar.tsx` needed no edits and its desktop-row / mobile-drawer layout holds.
+
+`lib/auth-cookies.ts` is the single source of truth for `AUTH_COOKIE_SETTINGS` (`httpOnly: true`,
+inferred as `NonNullable<Parameters<typeof setAuthCookies>[2]>` because `@insforge/sdk/ssr` does not
+export the type). Three separate sites write auth cookies — `/callback`, `proxy.ts`,
+`/api/auth/refresh` — and the SDK's `accessTokenCookieOptions` defaults `httpOnly` to **false**, so
+one missed call site would have let a refresh silently restore a script-readable cookie.
+`AuthCookieSettings` is spread into `createRefreshAuthRouter(AUTH_COOKIE_SETTINGS)` rather than
+passed positionally, which is where the setting would otherwise be silently dropped.
+
+### Tests — `npm test` (28 passing, zero new dependencies)
+
+Node 26 strips TypeScript natively, so `node --test` runs the suite directly. `tsconfig.json`
+gained `allowImportingTsExtensions` for the explicit `.ts` specifiers. Coverage is on the security
+properties, not on trivia: the SDK's bare default is asserted to be `httpOnly: false` so the
+httpOnly test would actually fail if someone deleted `AUTH_COOKIE_SETTINGS`; injection payloads are
+asserted to be structurally inert; and `proxy.ts`'s matcher is diffed against the shared prefix
+list. `tests/search-query.test.ts` **caught a real bug while being written** — per-character
+replacement left `"sales, marketing"` → `"sales  marketing"`, so the `ilike` pattern could never
+match; `parseJobSearch` now collapses whitespace runs.
+
+### The verification that mattered
+
+Header inspection alone was not proof. A temporary experiment (proxy temporarily owning `/login`,
+session check short-circuited, both reverted) rendered a real page and confirmed in a **single**
+response: the header nonce matched all 18 `<script>` tags, **zero** scripts were un-nonced, and the
+inline `self.__next_f` flight payload was nonced. Without this, the strict policy would have
+white-screened `/dashboard`, `/profile` and `/find-jobs`. Also verified live: nonces differ per
+request; HSTS is absent without `x-forwarded-proto`, present with `https`, absent with `http`.
+
+### Not done
+
+- **The login round-trip is still untested.** No live InsForge session or browser is available here,
+  so the httpOnly change is verified through SDK source and unit tests only. **Log out and back in
+  once after deploy.**
+- Audit items 4–7 deferred on request: no rate limiting on the 3 AI routes, a singleton PostHog
+  client, and unbounded `Map` growth in unauthenticated `/api/public/jobs`.
+- Dead PostHog events (`job_url_submitted`, `cover_letter_generated`, `resume_tailored`,
+  `linkedin_connected`) and the `linkedin_connected` column.
+- 11 bare `fill="var(--color-*)"` / `stroke=` presentation attributes in `AnalyticsCharts.tsx`,
+  `ProfileAttentionBanner.tsx` and `ResumeSection.tsx` that the project's own rules say will not
+  render — the same defect the earlier sweep fixed elsewhere.
+- `app/api/jobs/route.ts:19` — `page` yields `NaN`, defeating its own `Math.max` guard.
+- `app/api/agent/find/route.ts:152` — unvalidated `location`.
+
+---
+
+## Handoff — Footer Social Icons Invisible (2026-10-05)
+
+**Symptom:** the three footer social buttons rendered as plain near-black rounded squares — the
+LinkedIn / GitHub / X glyphs were invisible. Reported as "only black circular background".
+
+**Root cause: a CSS cascade-layer bug, not a colour-token bug.** `app/globals.css` ended with
+element defaults written **unlayered**, including:
+
+```css
+a { color: inherit; text-decoration: none; }
+```
+
+Tailwind v4 emits every utility into `@layer utilities`, and per the CSS cascade spec an
+**unlayered rule outranks every layered one regardless of specificity**. So `color: inherit` beat
+`.text-accent-foreground` on the button, and each glyph — which is `fill="currentColor"` — inherited
+`text-text-primary` (near-black) from the surrounding light `bg-surface` panel, painting black on the
+`#18181b` circle.
+
+This was **systemic, not footer-local**: it silently defeated the colour of *every* `<a>` in the app
+carrying a `text-*` utility. Measured before the fix — `.text-accent-foreground` and `bg-ink` were
+both present and correct in the compiled CSS (`#fff` on `#18181b`), the SVG markup and path data
+were correct in the prerendered HTML, which is why it looked like a token-pairing problem and was not.
+
+**Fix:** the trailing block is now layered. Element defaults (`html`, `body`, `box-sizing`, `a`,
+`a[href]`/`button` cursors, tap-highlight, `font: inherit`, `::selection`, `scroll-margin-top`) moved
+into `@layer base`; the reusable classes (`.landing-hero-glow`, the whole `.btn*` system) into
+`@layer components`. Cascade order is now base → components → utilities, which is the intended
+Tailwind v4 hierarchy.
+
+`.btn*` was also unlayered, which had the same defect in reverse — it outranked utilities, so a
+one-off `bg-*`/`text-*` on a `.btn` element would have been ignored. Moving it to
+`@layer components` fixes that. Verified safe first: **no** element in the codebase combines a
+`.btn*` class with a conflicting colour utility, so no existing element changes appearance.
+
+**Verified in the compiled CSS** (`python3` layer-trace over the built stylesheet): `a{color:inherit}`
+enclosing layer = `base`, `.btn-primary` = `components`, `.text-accent-foreground` and `.bg-ink` =
+`utilities`. 8 anchors that carry an explicit `text-*` colour now render the colour they always
+asked for (`text-text-primary` ×3, `text-text-secondary` ×2, `text-text-muted` ×2,
+`text-text-strong` ×1) instead of silently inheriting.
+
+**Lesson for future work: never add element defaults to `globals.css` unlayered.** A new unlayered
+`a`/`button`/`svg` rule will silently outrank every Tailwind utility in the app, and the symptom
+(invisible or wrong-coloured icons/text) points nowhere near the cause.
+
+**Also in this pass** — social links now point at the real accounts
+(`linkedin.com/in/muideen7`, `github.com/muideen7`, `x.com/OlayeyeMuideen`), and the label→icon
+pairing was changed from an `if/if/return` chain with an implicit X fallback into a
+`Record<SocialLabel, ReactNode>` keyed off a literal union of `socialLinks`. A renamed or
+misspelled network is now a compile error rather than a silently wrong brand glyph.
+
+`npx tsc --noEmit` 0 errors · `npx eslint .` 0 errors · `npm run build` passes · `npm test` 28/28.
+
+### Strict TypeScript pass — completed
+
+The flags outside `strict` are now on and the code satisfies them: `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`,
+`noImplicitReturns`, `noFallthroughCasesInSwitch`. Combined with the earlier work the codebase has
+zero `any`, zero `@ts-ignore`/`@ts-nocheck`, zero `as unknown as` double-assertions, and **no
+non-null assertions or index assertions added to silence the new flags**. Every fix is a real code
+change:
+
+- `app/api/agent/find/route.ts` — the parallel-array read `unscored[i]` (indexed with `jobs`'s
+  index) is gone. The map now iterates `unscored` and uses `parsed.results?.at(i)` for the
+  positional fallback, so the element it returns *is* the fallback. Same behaviour, no unchecked
+  read.
+- `app/dashboard/page.tsx` — `DAY_LABELS[d.getDay()]` → `DAY_LABELS.at(...)` guarded by an
+  `undefined` check, in both the jobs-by-day and research-by-day loops.
+- `app/(auth)/callback/route.ts` — the auth-critical `refreshToken`. The object is now built with
+  `const tokens: Parameters<typeof setAuthCookies>[1]` and the key is only assigned when a refresh
+  token actually exists. This is **behaviour-identical**: the SDK guards with
+  `if (tokens.refreshToken)`, so an absent key and an explicit `undefined` are equivalent. Deriving
+  the type from the SDK means it cannot drift.
+- `tests/auth-cookies.test.ts` — the `Record<string, unknown>` that was hiding `httpOnly` (found
+  while measuring `noPropertyAccessFromIndexSignature`) is replaced with the SDK's real
+  `CookieOptions`. The test previously compared an `unknown` against `true`, so a misspelled cookie
+  flag could never have failed it; it can now.
+- `agent/research.ts`, `lib/adzuna.ts` — index reads folded into the existing null/fallback.
+
+`noPropertyAccessFromIndexSignature` remains deliberately **off**: all 35 errors are
+`process.env.X` → `process.env["X"]` churn with no real safety gain.
+
+### PostHog "[ExceptionAutocapture] failed to load script"
+
+Reported as a Next.js console error. Root cause traced through the minified `posthog-js` 1.434.18
+bundle rather than guessed at: `init` with `capture_exceptions: true` constructs the
+exception-autocapture loader, whose `tf()` reads `config.capture_exceptions` and whose
+`startIfEnabledOrStop()` only calls `loadExternalDependency("exception-autocapture", ...)` when
+`isEnabled` — any of `capture_console_errors` / `capture_unhandled_errors` /
+`capture_unhandled_rejections`. With `capture_exceptions: false` all three are false, so it takes
+the stop path and the request is never made. This is the same class of error already fixed for
+session recording and dead clicks, and it costs nothing here: **there is no error boundary and no
+`posthog.captureException()` call anywhere in the codebase**, so exception autocapture had nothing
+to report even when the script did load.
+
+Also checked the other six tags posthog can fetch (`tracing-headers`, `surveys`, `toolbar`,
+`remote-config`, `product-tours`, `dead-clicks-autocapture`): every one is either already opted out
+or not constructed by this config. Note `disable_external_dependency_loading: true` is **not** a
+fix — it calls the error callback with a message instead, so the console error persists.
+
+`lib/posthog-server.ts` uses `posthog-node`, which has no browser asset loading, so it was
+unaffected. `lib/posthog-client.ts` now exports `buildPostHogConfig(host?)` so the 5 new tests in
+`tests/posthog-client.test.ts` assert on the object `posthog.init` actually receives, not on
+grepped source text.
+
+`npx tsc --noEmit` 0 errors · `npx eslint .` 0 errors · `npm run build` passes (22 routes) ·
+`npm test` 33/33.
+
+**Still needs a human:** log out and back in once after deploy to confirm the httpOnly
+access-token cookie behaves on a real session — no live InsForge session is available locally.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
+import { parseJobSearch } from "@/lib/search-query";
 import { MATCH_THRESHOLD } from "@/lib/utils";
 import type { Job } from "@/types";
 
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     const insforge = await createInsforgeServer();
 
     const { searchParams } = req.nextUrl;
-    const search = searchParams.get("search")?.trim().toLowerCase() ?? "";
+    const search = parseJobSearch(searchParams.get("search"));
     const matchFilter = searchParams.get("matchFilter") ?? "all";
     const sortOption = searchParams.get("sortOption") ?? "score";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));

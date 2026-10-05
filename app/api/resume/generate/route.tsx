@@ -13,11 +13,10 @@ function createResumeDocument(
   profile: Profile,
   generated: GeneratedContent,
 ): React.ReactElement<DocumentProps> {
-  // ResumePDF renders a @react-pdf <Document>; the cast bridges React's component
-  // prop inference to the renderer's document element type.
-  return (
-    <ResumePDF profile={profile} generated={generated} />
-  ) as unknown as React.ReactElement<DocumentProps>;
+  // ResumePDF renders a @react-pdf <Document>. Its own props are not DocumentProps,
+  // but every DocumentProps member is optional and ReactElement is covariant in
+  // its props parameter, so the element is assignable with no assertion at all.
+  return <ResumePDF profile={profile} generated={generated} />;
 }
 
 export async function POST(): Promise<NextResponse> {
@@ -99,8 +98,13 @@ ${profileContext}`,
     await insforge.storage.from("resumes").remove(path);
 
     // InsForge storage upload expects a Blob — wrap the Node Buffer.
-    // Cast to ArrayBuffer to satisfy strict TS — Buffer is a safe subtype at runtime.
-    const blob = new Blob([buffer as unknown as ArrayBuffer], {
+    //
+    // renderToBuffer returns Buffer<ArrayBufferLike>, whose backing store is
+    // only *maybe* an ArrayBuffer (it could be a SharedArrayBuffer), so it is
+    // not assignable to BlobPart. Re-wrapping through Uint8Array narrows the
+    // backing store to ArrayBuffer for real, which is stronger than asserting
+    // the Buffer was always safe. The copy costs one pass over a PDF.
+    const blob = new Blob([new Uint8Array(buffer)], {
       type: "application/pdf",
     });
 

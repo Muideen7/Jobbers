@@ -20,6 +20,41 @@ function getPostHogToken(): string | undefined {
  */
 let initialized = false;
 
+/**
+ * Build the object handed to `posthog.init`.
+ *
+ * Every option here that is not `capture_pageview` exists to stop the SDK from
+ * lazily fetching a bundle from us-assets.i.posthog.com. Any ad blocker that
+ * blocks that host turns each attempt into a console error:
+ *
+ *   [SessionRecording] could not load recorder
+ *   [Dead Clicks] failed to load script
+ *   [PostHog.js] [ExceptionAutocapture] "failed to load script"
+ *
+ * None of those features are used by this app, so nothing is lost by opting out.
+ * `capture_exceptions: false` in particular is free: there is no error boundary
+ * and no manual `posthog.captureException()` call anywhere in the codebase.
+ *
+ * Exported so tests can assert on the real config instead of grepping this file.
+ */
+export function buildPostHogConfig(host?: string) {
+  return {
+    // Omitted rather than passed as `undefined`: a missing api_host tells the SDK
+    // to use its own default, and a conditional spread also keeps this free of an
+    // explicit `undefined` (which exactOptionalPropertyTypes rejects). Callers
+    // read process.env.NEXT_PUBLIC_POSTHOG_HOST as a single static access so
+    // Next.js can inline it into the browser bundle.
+    ...(host ? { api_host: host } : {}),
+    capture_pageview: true,
+    disable_session_recording: true,
+    capture_exceptions: false as const,
+    capture_dead_clicks: false,
+    capture_performance: false,
+    autocapture: false,
+    debug: process.env.NODE_ENV === "development",
+  };
+}
+
 export function initPostHog(): void {
   const token = getPostHogToken();
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
@@ -30,20 +65,7 @@ export function initPostHog(): void {
 
   initialized = true;
 
-  posthog.init(token, {
-    api_host: host,
-    capture_pageview: true,
-    capture_exceptions: true,
-    // Opt out of every optional remote script. These load bundles from
-    // us-assets.i.posthog.com on demand and each failure logs
-    // "[SessionRecording] could not load recorder" / "[Dead Clicks] failed to
-    // load script". None of them are used by this app.
-    disable_session_recording: true,
-    capture_dead_clicks: false,
-    capture_performance: false,
-    autocapture: false,
-    debug: process.env.NODE_ENV === "development",
-  });
+  posthog.init(token, buildPostHogConfig(host));
 }
 
 export function identifyPostHogUser(userId: string): void {

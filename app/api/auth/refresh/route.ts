@@ -1,3 +1,5 @@
 import { createRefreshAuthRouter } from "@insforge/sdk/ssr";
 
-export const { POST } = createRefreshAuthRouter();
+import { AUTH_COOKIE_SETTINGS } from "@/lib/auth-cookies";
+
+export const { POST } = createRefreshAuthRouter(AUTH_COOKIE_SETTINGS);

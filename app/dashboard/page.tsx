@@ -132,8 +132,13 @@ export default async function DashboardPage() {
   for (const j of jobs) {
     const d = new Date(j.found_at);
     if (d >= weekAgo) {
-      const label = DAY_LABELS[d.getDay()];
-      jobsByDay[label] = (jobsByDay[label] ?? 0) + 1;
+      // getDay() is specified to return 0-6 and DAY_LABELS has exactly 7
+      // entries, so this never yields undefined in practice — but an unchecked
+      // index would be typed `string | undefined`, which cannot key the Record.
+      const label = DAY_LABELS.at(d.getDay());
+      if (label !== undefined) {
+        jobsByDay[label] = (jobsByDay[label] ?? 0) + 1;
+      }
     }
   }
   const jobsOverTimeData = DAYS_ORDER.map((d) => ({ day: d, count: jobsByDay[d] ?? 0 }));
@@ -144,8 +149,10 @@ export default async function DashboardPage() {
     if (j.company_research !== null) {
       const d = new Date(j.found_at);
       if (d >= weekAgo) {
-        const label = DAY_LABELS[d.getDay()];
-        researchByDay[label] = (researchByDay[label] ?? 0) + 1;
+        const label = DAY_LABELS.at(d.getDay());
+        if (label !== undefined) {
+          researchByDay[label] = (researchByDay[label] ?? 0) + 1;
+        }
       }
     }
   }

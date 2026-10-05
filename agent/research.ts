@@ -175,7 +175,9 @@ function getHeaderValue(
     (key) => key.toLowerCase() === headerName.toLowerCase(),
   );
 
-  return matchingKey ? headers[matchingKey] : null;
+  // `Object.keys` guarantees the key exists, but noUncheckedIndexedAccess cannot
+  // see that pairing, so the absent case is folded into the existing null.
+  return matchingKey ? (headers[matchingKey] ?? null) : null;
 }
 
 async function log(
