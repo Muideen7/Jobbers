@@ -3,10 +3,20 @@ import { test } from "node:test";
 
 import type { NormalizedJob } from "../lib/jobs/types.ts";
 import {
+  categoryFacets,
   formatPublicContractType,
   formatPublicSalary,
+  isPublicEmploymentType,
   isPublicFilter,
+  isPublicSalaryBand,
+  matchesPublicCategory,
+  matchesPublicCountry,
+  matchesPublicEmployment,
   matchesPublicFilter,
+  matchesPublicSalary,
+  matchesPublicSkills,
+  sanitizePublicCategory,
+  sanitizePublicSkills,
   sortPublicJobs,
   toPublicJob,
 } from "../lib/public-jobs.ts";
@@ -179,4 +189,137 @@ test("the $150k+ chip sorts by numeric minimum, highest first", () => {
     sorted.map((job) => job.externalId),
     ["high", "low", "unknown"],
   );
+});
+
+// ---------------------------------------------------------------------------
+// Facet dropdowns (LiveOpportunities) — the params behind the five pills.
+// ---------------------------------------------------------------------------
+
+test("facet param validation rejects junk before it reaches a filter", () => {
+  for (const valid of ["any", "50k", "100k", "150k"]) {
+    assert.equal(isPublicSalaryBand(valid), true);
+  }
+  for (const invalid of ["", "150000", "50K", "any salary"]) {
+    assert.equal(isPublicSalaryBand(invalid), false);
+  }
+
+  for (const valid of ["any", "fulltime", "parttime", "contract", "internship"]) {
+    assert.equal(isPublicEmploymentType(valid), true);
+  }
+  for (const invalid of ["", "FULLTIME", "freelance", "1=1"]) {
+    assert.equal(isPublicEmploymentType(invalid), false);
+  }
+
+  // Category: trimmed, whitespace-collapsed, length-capped, empty → null.
+  assert.equal(sanitizePublicCategory("  Software   Development  "), "Software Development");
+  assert.equal(sanitizePublicCategory("x".repeat(200))?.length, 80, "capped at 80 chars");
+  assert.equal(sanitizePublicCategory("   "), null);
+  assert.equal(sanitizePublicCategory(null), null);
+
+  // Skills: comma-split, trimmed, de-duplicated, capped at 5 terms × 40 chars.
+  assert.deepEqual(
+    sanitizePublicSkills(" React , react ,TypeScript, ,Python "),
+    ["React", "TypeScript", "Python"],
+  );
+  const many = Array.from({ length: 8 }, (_, i) => `skill${i}`).join(",");
+  assert.equal(sanitizePublicSkills(many).length, 5, "capped at 5 terms");
+  assert.deepEqual(sanitizePublicSkills(null), []);
+});
+
+test("salary bands admit only verifiable minimums at or above the floor", () => {
+  assert.equal(matchesPublicSalary(makeJob({}), "any"), true);
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 120_000 }), "any"), true);
+
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 50_000 }), "50k"), true);
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 49_999 }), "50k"), false);
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 100_000 }), "100k"), true);
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 99_999 }), "100k"), false);
+  // 150k keeps the legacy salary150 promise.
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 150_000 }), "150k"), true);
+  assert.equal(matchesPublicSalary(makeJob({ salaryMin: 149_999 }), "150k"), false);
+  // Free-form/hourly text cannot be verified against a band — excluded, not guessed.
+  assert.equal(
+    matchesPublicSalary(makeJob({ salaryText: "$45-$120/Hour" }), "50k"),
+    false,
+  );
+  assert.equal(matchesPublicSalary(makeJob({}), "50k"), false);
+});
+
+test("employment bands cover contract types and keep the full-time default", () => {
+  // fulltime = legacy chip semantics: unknown counts as full time.
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: null }), "fulltime"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "permanent" }), "fulltime"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "Part-Time" }), "fulltime"), false);
+  // Unknown is NOT part time / contract / internship.
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: null }), "parttime"), false);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: null }), "contract"), false);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: null }), "internship"), false);
+
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "Part-Time" }), "parttime"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "contract" }), "contract"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "Freelance" }), "contract"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "temporary" }), "contract"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "Internship" }), "internship"), true);
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "full_time" }), "internship"), false);
+  // "any" passes everything through.
+  assert.equal(matchesPublicEmployment(makeJob({ employmentType: "part time" }), "any"), true);
+});
+
+test("category filter matches exactly what the cards display", () => {
+  // Null category renders "Technology" on the card — the facet must count it too.
+  assert.equal(matchesPublicCategory(makeJob({ category: null }), "Technology"), true);
+  assert.equal(matchesPublicCategory(makeJob({ category: "Technology" }), "technology"), true);
+  assert.equal(matchesPublicCategory(makeJob({ category: "Design" }), "Technology"), false);
+  // No selection passes everything.
+  assert.equal(matchesPublicCategory(makeJob({ category: "Design" }), null), true);
+
+  assert.deepEqual(
+    categoryFacets([
+      makeJob({ category: "Design" }),
+      makeJob({ category: null }),
+      makeJob({ category: "Engineering" }),
+      makeJob({ category: "design" }),
+    ]),
+    ["Design", "Engineering", "Technology"],
+    "distinct + alphabetical, null → Technology, case-folded",
+  );
+});
+
+test("skills must all appear as whole words in the title or description", () => {
+  const react = makeJob({
+    title: "React Developer",
+    description: "Build component libraries.",
+  });
+  assert.equal(matchesPublicSkills(react, ["React"]), true);
+  assert.equal(matchesPublicSkills(react, ["React", "TypeScript"]), false, "AND semantics");
+  assert.equal(matchesPublicSkills(react, []), true);
+
+  // "Java" must not match "JavaScript" (word boundary).
+  const js = makeJob({ title: "JavaScript Engineer", description: "" });
+  assert.equal(matchesPublicSkills(js, ["Java"]), false);
+  assert.equal(matchesPublicSkills(js, ["JavaScript"]), true);
+
+  // Terms with regex metacharacters are matched literally.
+  const node = makeJob({ title: "Node.js API Developer", description: "" });
+  assert.equal(matchesPublicSkills(node, ["Node.js"]), true);
+  assert.equal(matchesPublicSkills(node, ["C++"]), false);
+
+  // Case-insensitive, description also counts.
+  const py = makeJob({ title: "Data Engineer", description: "Python and SQL pipelines." });
+  assert.equal(matchesPublicSkills(py, ["python"]), true);
+});
+
+test("country filter drops only clear other-country locations", () => {
+  // Remote / unresolvable locations are workable from anywhere — they pass.
+  assert.equal(matchesPublicCountry(makeJob({ remote: true, location: "New York, NY" }), "ng"), true);
+  assert.equal(matchesPublicCountry(makeJob({ location: "Remote" }), "ng"), true);
+  assert.equal(matchesPublicCountry(makeJob({ location: "Anywhere" }), "ng"), true);
+  assert.equal(matchesPublicCountry(makeJob({ location: "" }), "ng"), true);
+  assert.equal(matchesPublicCountry(makeJob({ location: "Atlantis" }), "ng"), true, "unresolvable passes");
+
+  // Matching country passes, different country is dropped.
+  assert.equal(matchesPublicCountry(makeJob({ location: "Lagos, Nigeria" }), "ng"), true);
+  assert.equal(matchesPublicCountry(makeJob({ location: "Lagos, Nigeria" }), "us"), false);
+  assert.equal(matchesPublicCountry(makeJob({ location: "Berlin, Germany" }), "ng"), false);
+  assert.equal(matchesPublicCountry(makeJob({ location: "United Kingdom" }), "gb"), true);
 });

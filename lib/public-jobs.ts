@@ -7,10 +7,12 @@
  * on the multi-source searchAll orchestrator, so everything here operates on
  * NormalizedJob.
  *
- * Type-only imports are erased at runtime, so this module loads fine under
- * `node --test` despite the "@/…" paths.
+ * Loads fine under `node --test`: the only runtime dependency is the
+ * dependency-free `jobs/country.ts` (relative `.ts` import, like search-all),
+ * and the remaining "@/…" imports are type-only, which are erased at runtime.
  */
 
+import { countryFromText } from "./jobs/country.ts";
 import type { NormalizedJob } from "@/lib/jobs/types";
 import type { PublicJob } from "@/types";
 
@@ -57,6 +59,180 @@ export function matchesPublicFilter(job: NormalizedJob, filter: PublicFilter): b
     return job.salaryMin != null && job.salaryMin >= SALARY_FILTER_MIN;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Landing filter facets — the LiveOpportunities dropdowns (Job Categories,
+// Countries, Salary Range, Skills, Employment Type). Each dropdown narrows the
+// same result set server-side so `totalCount` (the "Available Positions" count
+// above the grid) always matches what the cards can show.
+// ---------------------------------------------------------------------------
+
+/** Salary dropdown bands — the floor is a *verifiable* annual minimum (USD). */
+export const PUBLIC_SALARY_BANDS = ["any", "50k", "100k", "150k"] as const;
+export type PublicSalaryBand = (typeof PUBLIC_SALARY_BANDS)[number];
+
+export const PUBLIC_EMPLOYMENT_TYPES = [
+  "any",
+  "fulltime",
+  "parttime",
+  "contract",
+  "internship",
+] as const;
+export type PublicEmploymentType = (typeof PUBLIC_EMPLOYMENT_TYPES)[number];
+
+/** Bounds keep a public, unauthenticated param from bloating cache keys or regexes. */
+export const MAX_PUBLIC_CATEGORY_LENGTH = 80;
+export const MAX_PUBLIC_SKILL_LENGTH = 40;
+export const MAX_PUBLIC_SKILL_TERMS = 5;
+
+export function isPublicSalaryBand(value: string): value is PublicSalaryBand {
+  return (PUBLIC_SALARY_BANDS as readonly string[]).includes(value);
+}
+
+export function isPublicEmploymentType(
+  value: string,
+): value is PublicEmploymentType {
+  return (PUBLIC_EMPLOYMENT_TYPES as readonly string[]).includes(value);
+}
+
+export function sanitizePublicCategory(raw: string | null): string | null {
+  const value =
+    raw?.trim().replace(/\s+/g, " ").slice(0, MAX_PUBLIC_CATEGORY_LENGTH) ?? "";
+  return value || null;
+}
+
+export function sanitizePublicSkills(raw: string | null): string[] {
+  if (!raw) {
+    return [];
+  }
+  // De-dupe case-insensitively — the matcher lowercases anyway, so "React"
+  // and "react" are the same term. First spelling wins.
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const term of raw.split(",")) {
+    const trimmed = term.trim().replace(/\s+/g, " ").slice(0, MAX_PUBLIC_SKILL_LENGTH);
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(trimmed);
+    if (unique.length >= MAX_PUBLIC_SKILL_TERMS) break;
+  }
+  return unique;
+}
+
+const SALARY_FLOORS: Record<Exclude<PublicSalaryBand, "any">, number> = {
+  "50k": 50_000,
+  "100k": 100_000,
+  "150k": 150_000,
+};
+
+/**
+ * Same promise as the legacy salary150 chip: only numeric minimums count —
+ * hourly/free-form text ("$45-$120/Hour") cannot be verified against a band,
+ * so it is excluded rather than guessed.
+ */
+export function matchesPublicSalary(
+  job: NormalizedJob,
+  band: PublicSalaryBand,
+): boolean {
+  if (band === "any") return true;
+  return job.salaryMin != null && job.salaryMin >= SALARY_FLOORS[band];
+}
+
+/**
+ * `fulltime` keeps the legacy chip's semantics (unknown counts as full time —
+ * the cards display "Full time" for a missing type). The other bands match
+ * the source's raw `employmentType` text loosely.
+ */
+export function matchesPublicEmployment(
+  job: NormalizedJob,
+  type: PublicEmploymentType,
+): boolean {
+  if (type === "any") return true;
+  const value = job.employmentType ?? "";
+  switch (type) {
+    case "fulltime":
+      return !value || /full|permanent/i.test(value);
+    case "parttime":
+      return /part/i.test(value);
+    case "contract":
+      return /contract|freelance|temp/i.test(value);
+    case "internship":
+      return /intern/i.test(value);
+  }
+}
+
+/**
+ * What the card prints: `category` defaults to "Technology" in `toPublicJob`,
+ * so null-category jobs must count as Technology here — the facet filter and
+ * the facet list can never disagree.
+ */
+export function displayedJobCategory(job: NormalizedJob): string {
+  return job.category?.trim() || "Technology";
+}
+
+export function matchesPublicCategory(
+  job: NormalizedJob,
+  category: string | null,
+): boolean {
+  if (!category) return true;
+  return displayedJobCategory(job).toLowerCase() === category.toLowerCase();
+}
+
+/**
+ * Distinct displayed categories, alphabetical — drives the Job Categories
+ * dropdown. Case folds ("Design"/"design" are one entry, first spelling wins)
+ * so the list can never disagree with `matchesPublicCategory`.
+ */
+export function categoryFacets(jobs: readonly NormalizedJob[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const job of jobs) {
+    const display = displayedJobCategory(job);
+    const key = display.toLowerCase();
+    if (!byKey.has(key)) {
+      byKey.set(key, display);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Every selected skill must appear as a word in the title or description. */
+export function matchesPublicSkills(
+  job: NormalizedJob,
+  skills: readonly string[],
+): boolean {
+  if (skills.length === 0) return true;
+  const haystack = `${job.title}\n${job.description}`.toLowerCase();
+  return skills.every((skill) =>
+    new RegExp(
+      `(^|[^a-z0-9])${escapeRegExp(skill.toLowerCase())}([^a-z0-9]|$)`,
+    ).test(haystack),
+  );
+}
+
+/**
+ * Country dropdown: the search itself is scoped (JSearch/Adzuna get the
+ * country), and this post-filter keeps the count honest for sources that
+ * ignore it. Remote / unresolvable locations ("Remote", "Anywhere") pass —
+ * those jobs are workable from anywhere; only locations that clearly resolve
+ * to a *different* country are dropped.
+ */
+export function matchesPublicCountry(
+  job: NormalizedJob,
+  countryCode: string,
+): boolean {
+  if (job.remote) return true;
+  const location = job.location.trim();
+  if (!location) return true;
+  if (/\b(remote|anywhere|worldwide)\b/i.test(location)) return true;
+  const resolved = countryFromText(location);
+  return resolved === null || resolved === countryCode;
 }
 
 export function formatPublicSalary(job: NormalizedJob): string {
