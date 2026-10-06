@@ -20,6 +20,12 @@ type Props = {
   company: string;
   jobId: string;
   research: CompanyResearchDossier | null;
+  /**
+   * When used inside the dashboard detail panel the wireframe Actions row owns
+   * the research button, so the dossier card hides its own to avoid a second,
+   * identical action. Defaults to true for the standalone find-jobs page.
+   */
+  showResearchButton?: boolean;
 };
 
 type SectionProps = {
@@ -116,7 +122,12 @@ function Sources({ sources }: { sources: string[] }) {
   );
 }
 
-export function CompanyResearch({ company, jobId, research }: Props) {
+export function CompanyResearch({
+  company,
+  jobId,
+  research,
+  showResearchButton = true,
+}: Props) {
   const hasResearch = research !== null;
 
   return (
@@ -131,7 +142,7 @@ export function CompanyResearch({ company, jobId, research }: Props) {
           </h2>
         </div>
 
-        {!hasResearch && <ResearchCompanyButton jobId={jobId} />}
+        {!hasResearch && showResearchButton && <ResearchCompanyButton jobId={jobId} />}
       </div>
 
       {research ? (
@@ -219,7 +230,7 @@ export function CompanyResearch({ company, jobId, research }: Props) {
             Candidate-specific briefing
           </div>
           <div className="mt-4">
-            <ResearchCompanyButton jobId={jobId} />
+            {showResearchButton && <ResearchCompanyButton jobId={jobId} />}
           </div>
         </div>
       )}
