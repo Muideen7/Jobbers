@@ -310,6 +310,60 @@ alpha-2), `job_min_salary`/`job_max_salary`/`job_salary_period`,
 
 ---
 
+## Arbeitnow & Remote Feeds (keyless providers)
+
+**Check first:** none of these have an installed skill — use this section. All four
+are free, keyless, public APIs verified live 2026-10-06.
+
+### Providers
+
+```typescript
+import { searchArbeitnow, arbeitnowProvider } from "@/lib/jobs/arbeitnow.ts";
+import { remoteokProvider, remotiveProvider, jobicyProvider } from "@/lib/jobs/remote-feeds.ts";
+// Relative ".ts" imports inside lib/jobs/ — node --test cannot resolve "@/…" (same as JSearch).
+```
+
+| Source | Endpoint | Notes |
+| --- | --- | --- |
+| Arbeitnow | `GET www.arbeitnow.com/api/job-board-api` | `{ data, links, meta }`, 325 jobs/page, `?page=` pagination, hourly updates. No `?search=` (ignored) |
+| RemoteOK | `GET remoteok.com/api` | Plain array; element 0 is `{ last_updated, legal }` metadata → parser skips it. `?search=`/`?tag=` **ignored** |
+| Remotive | `GET remotive.com/api/remote-jobs` | Wrapper keys are hyphenated (`job-count`). `?search=` currently ignored; free feed ≈ 18 jobs |
+| Jobicy | `GET jobicy.com/api/v2/remote-jobs?count=100` | `{ success, jobs, … }`; `tag`/`count` filter but `tag` semantics are unreliable for free text. Error payloads are `success:false` **without** `jobs` |
+
+### Rules
+
+- Normalize through each provider's `parse*Response`/`normalize*Job` → `NormalizedJob`; never consume raw payloads downstream
+- All four are `searchMode: "client"` — they return the full feed and `searchAll` applies the local title-token filter (server-searched sources are Adzuna + JSearch only)
+- **Caching/caps are mandatory and owned by `lib/jobs/search-all.ts`:** Remotive's ToS says ~4 GETs/day ("excessive requests will be blocked") → 6 h TTL + daily cap of 4; Arbeitnow/RemoteOK/Jobicy → 30 min TTL (big payloads: Arbeitnow is ~2.8 MB); 300-entry cache cap
+- Remotive `publication_date` is naive ISO → parser appends `Z` (their timestamps are UTC); don't parse it in server-local time
+- Remotive `salary` is free-form (`"$45-$120/Hour"`) → goes into `NormalizedJob.salaryText`, never parsed into min/max
+- Jobicy `jobDescription` may be absent → `jobExcerpt` fallback
+- **Attribution (plan A7, ToS-blocking):** RemoteOK, Remotive, Jobicy all require an on-site link-back naming the source; Arbeitnow asks for one too. Any UI rendering these feeds must credit them (alongside the existing "Jobs by Adzuna")
+- Live check (no keys needed): `node tests/job-sources-smoke.ts`
+
+---
+
+## searchAll Orchestrator
+
+`lib/jobs/search-all.ts` is the single entry point for job discovery:
+
+```typescript
+import { searchAll } from "@/lib/jobs/search-all";
+
+const { jobs, outcomes } = await searchAll(
+  { title: "frontend developer", location: "Lagos", country: "us" }, // country: "us" until plan B1
+  { maxResults: 40 }, // providers/state/now/sourceTtlMs/dailyLimits injectable for tests
+);
+```
+
+- Fans out over `PROVIDER_REGISTRY` with `Promise.allSettled`; a failing source becomes `{ source, count: 0, error }` in `outcomes` — it never throws and never kills the run
+- Cross-source dedupe: lowercase/punctuation-normalized `title|company` fingerprint, fuller description wins
+- `searchMode: "client"` sources are filtered locally against title tokens (≥3 chars); zero tokens disables the filter
+- Logging: per-provider failures are `console.error`'d as `[jobs/searchAll] <source>: …`
+- Routes must map `NormalizedJob` → their own shapes; scoring ids need the `source:externalId` namespace (raw externalIds collide across sources)
+
+---
+
 ## Browserbase
 
 **Check first:** Check AGENTS.md for an installed Browserbase skill. If a Browserbase MCP server is configured — use it. The skill/MCP will have the latest session management and API patterns.

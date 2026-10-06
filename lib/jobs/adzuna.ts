@@ -31,6 +31,7 @@ export function normalizeAdzunaJob(job: AdzunaJob): NormalizedJob {
     salaryMax: job.salary_max ?? null,
     // Adzuna does not state a period; treat as unknown rather than assume YEAR.
     salaryPeriod: null,
+    salaryText: null,
     postedAt: job.created ?? null,
     employmentType: job.contract_type ?? null,
     remote: false,
@@ -40,6 +41,7 @@ export function normalizeAdzunaJob(job: AdzunaJob): NormalizedJob {
 
 export const adzunaProvider: JobProvider = {
   id: "adzuna",
+  searchMode: "server",
   async search(query: JobSearchQuery): Promise<NormalizedJob[]> {
     const country = query.country.trim().toLowerCase() || DEFAULT_COUNTRY;
     const jobs = await searchJobs(query.title, query.location, country);

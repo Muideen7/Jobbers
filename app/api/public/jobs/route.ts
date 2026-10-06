@@ -15,6 +15,8 @@ const RESULTS_PER_PAGE = 12;
 const ADZUNA_FETCH_MULTIPLIER = 4;
 const MAX_ADZUNA_FETCH = 50;
 const QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
+// The security audit flagged this Map as unbounded — evict oldest past the cap.
+const MAX_CACHE_ENTRIES = 200;
 const MAX_QUERY_LENGTH = 80;
 const VALID_FILTERS = new Set(["all", "remote", "fulltime", "salary150"]);
 
@@ -125,6 +127,14 @@ export async function GET(req: NextRequest) {
     };
 
     cache.set(cacheKey, { expires: Date.now() + QUERY_CACHE_TTL_MS, payload });
+
+    while (cache.size > MAX_CACHE_ENTRIES) {
+      const oldest = cache.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      cache.delete(oldest.value);
+    }
 
     return NextResponse.json<PublicJobsResponse>({ success: true, data: payload });
   } catch (error) {

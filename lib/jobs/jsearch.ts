@@ -39,6 +39,7 @@ const jsearchJobSchema = z.object({
   job_min_salary: z.coerce.number().nullish(),
   job_max_salary: z.coerce.number().nullish(),
   job_salary_period: z.string().nullish(),
+  job_salary_string: z.string().nullish(),
   job_posted_at_datetime_utc: z.string().nullish(),
   job_employment_type: z.string().nullish(),
   job_employment_types: z.array(z.string()).nullish(),
@@ -154,6 +155,7 @@ export function normalizeJsearchJob(job: JsearchJob): NormalizedJob {
     salaryMin: job.job_min_salary ?? null,
     salaryMax: job.job_max_salary ?? null,
     salaryPeriod: job.job_salary_period ?? null,
+    salaryText: job.job_salary_string ?? null,
     postedAt: job.job_posted_at_datetime_utc ?? null,
     employmentType: job.job_employment_types?.[0] ?? job.job_employment_type ?? null,
     remote: job.job_is_remote ?? false,
@@ -227,6 +229,7 @@ export async function searchJsearch(
 
 export const jsearchProvider: JobProvider = {
   id: "jsearch",
+  searchMode: "server",
   search(query: JobSearchQuery): Promise<NormalizedJob[]> {
     return searchJsearch(query);
   },

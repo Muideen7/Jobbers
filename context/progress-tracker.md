@@ -7,10 +7,12 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** A1–A3 Multi-Source Provider Layer (`lib/jobs/` — normalized
-interface, Adzuna adapter, JSearch provider; 49/49 tests)
-**Next:** A4–A6 of `context/job-search-expansion-plan.md` (Arbeitnow provider,
-remote feeds, `searchAll` orchestrator + cache) on branch `feat/multi-source-job-search`
+**Last completed:** A1–A6 — full multi-source layer (`lib/jobs/`: interface,
+Adzuna adapter, JSearch, Arbeitnow, RemoteOK/Remotive/Jobicy feeds,
+`searchAll` orchestrator with cache/dedupe/daily caps; `/api/agent/find`
+rewired off Adzuna-only; 63/63 tests)
+**Next:** A7 per-source attribution (ToS-blocking), then Phase B (country
+detection) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
 
@@ -54,7 +56,12 @@ remote feeds, `searchAll` orchestrator + cache) on branch `feat/multi-source-job
 - [x] A1 Normalized provider interface — `lib/jobs/types.ts` + shared-shape tests
 - [x] A2 Adzuna provider adapter — `lib/jobs/adzuna.ts` (lib/adzuna.ts untouched)
 - [x] A3 JSearch provider — `lib/jobs/jsearch.ts` (offline tests green; live smoke pending `JSEARCH_API_KEY` signup)
-- [ ] A4–A6 (Arbeitnow, remote feeds, searchAll orchestrator)
+- [x] A4 Arbeitnow provider — `lib/jobs/arbeitnow.ts` (live: 325 jobs)
+- [x] A5 Remote feeds — `lib/jobs/remote-feeds.ts` (RemoteOK 99 / Remotive 18 / Jobicy 100 live)
+- [x] A6 Orchestrator — `lib/jobs/search-all.ts` (fan-out, dedupe, per-source TTL,
+  Remotive 4/day cap, 300-entry cache; `/api/agent/find` rewired; `/api/public/jobs`
+  kept Adzuna-native with cache cap — see plan for rationale)
+- [ ] A7 Per-source attribution in results UI (feeds' ToS require link-backs)
 - [ ] B Location intelligence · C Matcher quality · D Profile page · E Auto-apply
 
 ---

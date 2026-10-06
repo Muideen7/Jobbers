@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
-import { searchJobs, cleanCompanyName } from "@/lib/adzuna";
 import { generateJson } from "@/lib/llm";
 import { trackPostHogEvent } from "@/lib/posthog-server";
+import { searchAll } from "@/lib/jobs/search-all";
 import { MATCH_THRESHOLD } from "@/lib/utils";
+import type { NormalizedJob } from "@/lib/jobs/types";
 import type { Job } from "@/types";
-import type { AdzunaJob } from "@/lib/adzuna";
 
 type RequestBody = {
   jobTitle: string;
@@ -29,17 +29,27 @@ type ProfileScoreContext = {
   job_titles_seeking: string[] | null;
 };
 
+// JSearch and the feeds return full multi-KB descriptions; scoring on the
+// first ~1200 chars keeps the Gemini prompt bounded (plan C2 refines this).
+const SCORING_DESCRIPTION_CHARS = 1200;
+
+function scoringId(job: NormalizedJob): string {
+  // externalIds are unique per source only — "123" from Adzuna and "123"
+  // from RemoteOK are different jobs, so the source namespaces the id.
+  return `${job.source}:${job.externalId}`;
+}
+
 async function scoreJobsBatch(
-  jobs: AdzunaJob[],
+  jobs: NormalizedJob[],
   profile: ProfileScoreContext,
 ): Promise<ScoredResult[]> {
   const jobList = jobs
     .map(
       (j, i) =>
-        `Job ${i + 1} (id: "${j.id}"):
+        `Job ${i + 1} (id: "${scoringId(j)}"):
 Title: ${j.title}
-Company: ${cleanCompanyName(j.company.display_name)}
-Description: ${j.description}`,
+Company: ${j.company || "Unknown company"}
+Description: ${j.description.slice(0, SCORING_DESCRIPTION_CHARS)}`,
     )
     .join("\n\n");
 
@@ -58,7 +68,7 @@ Description: ${j.description}`,
     missingSkills: [],
   });
 
-  const unscored: ScoredResult[] = jobs.map((j) => zeroScore(j.id));
+  const unscored: ScoredResult[] = jobs.map((j) => zeroScore(scoringId(j)));
 
   let parsed: { results?: ScoredResult[] };
 
@@ -103,6 +113,34 @@ ${jobList}`,
 
     return scored ?? fallback;
   });
+}
+
+/**
+ * Cross-source salary rules: the source's own text wins (currency and period
+ * intact, e.g. Remotive's "$45-$120/Hour"). Numeric figures only collapse to
+ * the "$120k" convention when the period is yearly or unstated — hourly and
+ * monthly numbers are dropped rather than mislabelled. Currency tracking for
+ * numeric figures is plan C2's known gap.
+ */
+function formatSalaryForDb(job: NormalizedJob): string | null {
+  if (job.salaryText) {
+    return job.salaryText;
+  }
+
+  const { salaryMin: min, salaryMax: max } = job;
+  if (min == null || (job.salaryPeriod !== null && job.salaryPeriod !== "YEAR")) {
+    return null;
+  }
+
+  const short = (value: number) => `$${Math.round(value / 1000)}k`;
+
+  if (max != null && min === max) {
+    return short(min);
+  }
+  if (max != null) {
+    return `${short(min)} - ${short(max)}`;
+  }
+  return `${short(min)}+`;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -183,11 +221,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     });
 
-    const adzunaJobs = await searchJobs(jobTitle.trim(), location.trim(), "us", {
-      resultsPerPage: 30,
+    // Phase B1 of the plan replaces this hardcoded "us" with country detection
+    // from the location/profile. The location already rides inside JSearch's
+    // query text and the remote feeds ignore country, so other sources work
+    // for any region today.
+    const searchResult = await searchAll({
+      title: jobTitle.trim(),
+      location: location.trim(),
+      country: "us",
     });
+    const foundJobs = searchResult.jobs;
 
-    if (adzunaJobs.length === 0) {
+    if (foundJobs.length === 0) {
       await insforge.database
         .from("agent_runs")
         .update({
@@ -208,9 +253,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     }
 
-    const scoredResults = await scoreJobsBatch(adzunaJobs, profile);
+    const scoredResults = await scoreJobsBatch(foundJobs, profile);
 
-    const jobRecords = adzunaJobs.map((job, i) => {
+    const jobRecords = foundJobs.map((job, i) => {
       const score = scoredResults[i] ?? {
         matchScore: 0,
         matchReason: "Score unavailable",
@@ -222,16 +267,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         user_id: user.id,
         run_id: runId,
         source: "search" as const,
-        source_url: job.redirect_url,
-        external_apply_url: job.redirect_url,
+        source_url: job.sourceUrl || job.applyUrl,
+        external_apply_url: job.applyUrl,
         title: job.title,
-        company: cleanCompanyName(job.company.display_name),
-        location: job.location.display_name,
-        salary:
-          job.salary_min != null
-            ? `$${Math.round(job.salary_min / 1000)}k - $${Math.round((job.salary_max ?? job.salary_min) / 1000)}k`
-            : null,
-        job_type: job.contract_type ?? "fulltime",
+        company: job.company || "Unknown company",
+        location: job.location || (job.remote ? "Remote" : "Unknown location"),
+        salary: formatSalaryForDb(job),
+        job_type: job.employmentType ?? "fulltime",
         about_role: job.description,
         match_score: score.matchScore,
         match_reason: score.matchReason,

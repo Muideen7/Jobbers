@@ -37,6 +37,8 @@ export type NormalizedJob = {
   salaryMax: number | null;
   /** Salary period as published: HOUR | DAY | WEEK | MONTH | YEAR, or null. */
   salaryPeriod: string | null;
+  /** Source's own free-form salary text ("$45-$120/Hour") when it provides one. */
+  salaryText: string | null;
   /** ISO 8601 UTC datetime the job was posted, or null when unknown. */
   postedAt: string | null;
   /** FULLTIME | CONTRACTOR | PARTTIME | INTERN, source-native, or null. */
@@ -54,5 +56,11 @@ export type JobSearchQuery = {
 
 export type JobProvider = {
   id: JobSourceId;
+  /**
+   * "server" — the upstream API matches the query itself (Adzuna `what`,
+   * JSearch `query`). "client" — the feed returns everything and the
+   * orchestrator applies the token filter locally.
+   */
+  searchMode: "server" | "client";
   search(query: JobSearchQuery): Promise<NormalizedJob[]>;
 };

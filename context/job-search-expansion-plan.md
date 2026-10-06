@@ -1,6 +1,6 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A3 ✅ complete, A4–A6 remaining (branch `feat/multi-source-job-search`)
+> **Status:** Phase A — A1–A6 ✅ complete (branch `feat/multi-source-job-search`); A7 attribution open, Phase B next
 > **Created:** 2026-10-06
 > **Supersedes nothing** — Adzuna stays; this plan adds sources around it.
 > Update this file and `progress-tracker.md` after every completed task.
@@ -94,27 +94,85 @@ Goal: one orchestrator, many providers, one normalized job shape.
   paths) + live `node --env-file=.env.local tests/jsearch-smoke.ts` (NG/US/GB —
   **not yet run: needs a signup key**).
 
-- [ ] **A4 — Arbeitnow provider**
-  `lib/jobs/arbeitnow.ts`, no key. Map `data[]` → `NormalizedJob`; `slug` → canonical
-  job URL; `job_types`/`remote` flags mapped.
-  **Test:** live smoke — ≥50 jobs normalize; apply URLs point at ATS job domains.
+- [x] **A4 — Arbeitnow provider**
+  ✅ Done. `lib/jobs/arbeitnow.ts`, no key. Wrapper `{ data, links, meta }` →
+  `NormalizedJob[]`; `created_at` unix seconds → ISO; `job_types[0]` →
+  `employmentType`; `remote` flag mapped; `url` is Arbeitnow's own job page
+  (it links through to the Greenhouse/SmartRecruiters ATS apply form — adjust
+  the original assumption: apply URLs point at arbeitnow.com, not ATS domains
+  directly; `searchMode: "client"` because the API ignores `?search=`).
+  **Test:** shared-shape assertions extended + live smoke
+  (`node tests/job-sources-smoke.ts`) — 325 jobs, 325 with HTTP apply URLs ✅.
 
-- [ ] **A5 — Remote feeds provider**
-  `lib/jobs/remoteok.ts`, `lib/jobs/remotive.ts`, `lib/jobs/jobicy.ts` (or one
-  `remote-feeds.ts` with three fetchers). Remotive needs `redirect: "follow"` (301).
-  **Test:** live smoke — each source returns ≥1 job; errors isolated per source.
+- [x] **A5 — Remote feeds provider**
+  ✅ Done as one file `lib/jobs/remote-feeds.ts` with three fetchers +
+  parsers (the plan's allowed option — they are one layer sharing
+  `fetchJson`/employment-tag logic). Verified live 2026-10-06:
+  - **RemoteOK** `remoteok.com/api` — array whose element 0 is a
+    `{ last_updated, legal }` metadata object → skipped by the per-entry
+    schema. `?search=`/`?tag=` params are **ignored** (nonsense search still
+    returns all) → client mode.
+  - **Remotive** `remotive.com/api/remote-jobs` — wrapper keys are hyphenated
+    (`job-count`); `publication_date` is naive → appended `Z` (their UTC).
+    `?search=`/`?limit=` are ignored by the current API (all probes returned
+    the same 18 jobs) → client mode. Free feed exposes ~18 jobs.
+  - **Jobicy** `jobicy.com/api/v2/remote-jobs?count=100` — `tag`/`count` do
+    filter, but `tag` semantics are unreliable for free-text queries →
+    fetched plain, client mode. Error payloads are `{ success: false }`
+    **without** a `jobs` key → parser checks `success` before the array.
+    `jobExcerpt` is the fallback when `jobDescription` is absent.
+  Remotive's `salary` free-text string became the new `NormalizedJob.salaryText`
+  field (added to A1's shape; all six sources keep byte-identical key sets).
+  **Test:** shared-shape + per-source fixtures in
+  `tests/job-source-normalize.test.ts`; live smoke — 99/18/100 jobs ✅.
 
-- [ ] **A6 — Orchestrator + cache + cross-source dedupe**
-  `lib/jobs/search-all.ts`: `searchAll({ query, location })` fans out with
-  `Promise.allSettled`, per-provider try/catch (one failure never kills the run),
-  normalizes all, cross-source dedupe on normalized `title|company|description-prefix`
-  fingerprint (reuse the Adzuna fingerprint idea), caps to N results, caches per
-  `query+location` for 5 minutes (reuse the `/api/public/jobs` Map pattern; note the
-  audit flagged unbounded Map growth as a known deferred issue — add a size cap here).
-  Rewire `/api/agent/find` and `/api/public/jobs` to the orchestrator.
-  **Test:** mocked-provider unit tests — a throwing provider still yields results from
-  the rest; cross-source duplicates collapse; cache hit avoids upstream calls;
-  `npm run lint && npm run build` pass.
+- [x] **A6 — Orchestrator + cache + cross-source dedupe**
+  ✅ Done. `lib/jobs/search-all.ts` exports `searchAll(query, options)`:
+  - **Fan-out:** `Promise.allSettled` over `PROVIDER_REGISTRY`
+    (jsearch, adzuna, arbeitnow, remoteok, jobicy, remotive — server-searched
+    sources first so they lead the merged list); `runProvider` never throws →
+    one failing source yields `{ count: 0, error }` and the rest still land.
+  - **Dedupe:** fingerprint = lowercase/punctuation-normalized
+    `title|company`; the copy with the fuller description wins (better Gemini
+    input). Output order follows registry priority.
+  - **Cache:** per `source|country|location|title`, TTL per source —
+    adzuna/jsearch 5 min, arbeitnow/remoteok/jobicy 30 min (big payloads,
+    hourly feeds), **remotive 6 h + hard daily cap of 4 calls/UTC day**
+    (their ToS: "max 4 times a day… excessive requests will be blocked";
+    TTL alone can't bound distinct queries). `MAX_CACHE_ENTRIES = 300`
+    with oldest-first eviction — the audit's unbounded-Map concern.
+  - **Local token filter:** feeds with `searchMode: "client"` drop jobs whose
+    *title* contains no query token (≥3 chars; zero tokens disables the
+    filter). Server-searched sources pass through untouched.
+  - **Result cap:** 40 by default, `maxResults` override.
+  - **Route rewire:** `/api/agent/find` now runs on `searchAll` — scoring ids
+    are namespaced (`source:externalId`, cross-source ids collide otherwise),
+    descriptions truncated to 1200 chars in the prompt (full text stored in
+    DB), salary via `formatSalaryForDb` (source text wins; numeric figures
+    only formatted when yearly/unstated — hourly/monthly dropped rather than
+    mislabelled), `employmentType ?? "fulltime"` → `job_type`.
+    **`country: "us"` remains until B1.**
+  - **`/api/public/jobs` deliberately NOT rewired** (plan change): its
+    filters (`contractType`, `salaryMin`, `sortBy`), `PublicJob` `$`-currency
+    display, over-fetch×4 dedupe and the "Jobs by Adzuna" credit are all
+    Adzuna-native — a naive rewire would show EUR/GBP figures as `$` and make
+    filter promises other sources can't keep. Landing-page multi-sourcing is
+    deferred to a dedicated task; its cache **did** get the size cap
+    (audit fix). `lib/adzuna.ts` callers remain in place for it.
+  **Test:** `tests/search-all.test.ts` — 9 mocked-provider tests (failure
+  isolation, dedupe collapse + keeper rule, cache hit, TTL expiry, client
+  filter, short-query fallback, cap, daily cap incl. next-day reset,
+  cache-size bound); 63/63 green; lint + build pass; live smoke passes.
+
+- [ ] **A7 — Per-source attribution (added, ToS-blocking)**
+  RemoteOK ("link back… mention Remote OK as a source, or we'll suspend
+  access"), Remotive ("link back… mention Remotive as source") and Jobicy
+  ("clearly credited with a direct link") all **require on-site attribution**,
+  and Arbeitnow asks for a link back. With those feeds now rendering in
+  `/api/agent/find`, the results UI needs a source credit line alongside the
+  existing "Jobs by Adzuna" one (per source actually used in the run).
+  **Test:** attribution rendered for each source present in results;
+  Adzuna credit still present.
 
 ---
 
@@ -223,10 +281,11 @@ npm test
 npm run build
 ```
 
-Live smoke (needs network + `.env.local` keys):
+Live smoke (needs network; `job-sources-smoke` needs no keys):
 
 ```bash
-npx tsx tests/jsearch-smoke.ts   # A3 — after JSEARCH_API_KEY is set
+node tests/job-sources-smoke.ts                        # A4–A6 — keyless feeds + orchestrator
+node --env-file=.env.local tests/jsearch-smoke.ts      # A3 — after JSEARCH_API_KEY is set
 ```
 
 ## Known environment notes
@@ -235,7 +294,12 @@ npx tsx tests/jsearch-smoke.ts   # A3 — after JSEARCH_API_KEY is set
   `JSEARCH_API_KEY` needs a one-time manual signup (free, no card).
 - Free-tier budgets: JSearch **200 req/month** → the orchestrator cache is mandatory,
   not optional. If the app outgrows it: RapidAPI same API, or Pro $25/mo.
-- Adzuna attribution: "Jobs by Adzuna" credit must remain on any UI showing Adzuna jobs
-  (API ToS).
-- Deferred from the 2026-10-05 security audit and still relevant: unbounded cache `Map`
-  growth in `/api/public/jobs` — cap entries when the A6 cache lands.
+  Remotive **~4 GET/day** → enforced in `search-all.ts` (6 h TTL + daily cap).
+- Attribution owed per source (A7): "Jobs by Adzuna" (existing), plus RemoteOK,
+  Remotive, Jobicy and Arbeitnow link-backs before their feeds ship to users.
+- Salary figures are formatted as `$Xk` without currency detection — pre-existing
+  behaviour now reachable from non-US sources; proper `salary_currency` handling
+  is C2's known gap.
+- Deferred from the 2026-10-05 security audit: ~~unbounded cache `Map` growth in
+  `/api/public/jobs`~~ — **fixed** during A6 (200-entry cap there, 300-entry cap
+  in `search-all.ts`).
