@@ -18,7 +18,7 @@ const footerColumns: ReadonlyArray<{
     ],
   },
   {
-    heading: "For job seekers",
+    heading: "Resources",
     links: [
       { href: "/profile", label: "Build your profile" },
       { href: "/profile", label: "Resume & cover letters" },
@@ -38,10 +38,11 @@ const footerColumns: ReadonlyArray<{
   },
 ];
 
+// Spec order: X first, then LinkedIn, then GitHub (no ProductHunt presence).
 const socialLinks = [
+  { href: "https://x.com/OlayeyeMuideen", label: "X" },
   { href: "https://www.linkedin.com/in/muideen7", label: "LinkedIn" },
   { href: "https://github.com/muideen7", label: "GitHub" },
-  { href: "https://x.com/OlayeyeMuideen", label: "X" },
 ] as const;
 
 type SocialLabel = (typeof socialLinks)[number]["label"];
@@ -73,17 +74,28 @@ const socialIcons: Record<SocialLabel, ReactNode> = {
   ),
 };
 
+/**
+ * Pre-footer CTA + footer, one design-spec unit: a rounded dark charcoal
+ * wrapper (`bg-inverse` — the "#18181B or similar" the spec allows, kept off
+ * `bg-ink` so the near-black `.btn-primary` fill still reads against it;
+ * ui-rules.md bans accent-filled buttons) whose top half is the centred CTA
+ * ("Your next opportunity is already here." / Start for Free + Find Talent)
+ * and whose bottom half is an inner white card with the 4-column link grid,
+ * a subtle divider and the dynamic copyright line.
+ *
+ * Both CTAs route to `/login` — there is no employer surface yet, so
+ * "Find Talent" is a sign-in doorway like "Start for Free".
+ */
 export function LandingFooter() {
   return (
-    <footer className="w-full text-inverse-foreground pt-16 sm:pt-24 pb-8 sm:pb-12 relative overflow-hidden bg-inverse">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-surface/5 rounded-full blur-[140px] pointer-events-none" />
+    <footer className="w-full px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
+      <div className="max-w-[1440px] mx-auto relative overflow-hidden rounded-3xl bg-inverse text-inverse-foreground p-5 sm:p-8 lg:p-12">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-surface/5 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center max-w-3xl mx-auto space-y-5">
+        {/* Top half — pre-footer CTA */}
+        <div className="relative z-10 text-center max-w-3xl mx-auto space-y-5 pt-4 sm:pt-8">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-inverse-foreground leading-tight">
-            Your next role
-            <br />
-            is already in here.
+            Your next opportunity is already here.
           </h2>
 
           <p className="text-text-faint text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
@@ -96,20 +108,21 @@ export function LandingFooter() {
               href="/login"
               className="btn btn-primary"
             >
-              Get started
+              Start for Free
             </Link>
             <Link
-              href="/find-jobs"
+              href="/login"
               className="btn btn-secondary"
             >
-              See live matches
+              Find Talent
             </Link>
           </div>
         </div>
 
-        <div className="mt-14 sm:mt-20 bg-surface text-text-primary rounded-[32px] sm:rounded-[40px] p-8 sm:p-12 shadow-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-14">
-            <div className="md:col-span-4 space-y-4">
+        {/* Bottom half — inner white footer card */}
+        <div className="relative z-10 mt-12 sm:mt-16 rounded-3xl bg-surface text-text-primary p-8 sm:p-10 shadow-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="space-y-4">
               <div className="flex items-center gap-2.5">
                 <span className="text-text-primary flex">
                   <JobbersIcon className="w-6 h-6" />
@@ -122,7 +135,7 @@ export function LandingFooter() {
                 into the void.
               </p>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 {socialLinks.map((social) => (
                   <a
                     key={social.label}
@@ -138,31 +151,29 @@ export function LandingFooter() {
               </div>
             </div>
 
-            <div className="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
-              {footerColumns.map((column) => (
-                <div key={column.heading} className="space-y-3">
-                  <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
-                    {column.heading}
-                  </h3>
-                  <ul className="space-y-2 text-xs sm:text-sm text-text-secondary">
-                    {column.links.map((link) => (
-                      <li key={link.label}>
-                        <Link
-                          href={link.href}
-                          className="inline-block cursor-pointer hover:text-text-primary transition-colors"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            {footerColumns.map((column) => (
+              <div key={column.heading}>
+                <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+                  {column.heading}
+                </h3>
+                <ul className="mt-3 space-y-2.5 text-xs sm:text-sm text-text-secondary">
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="inline-block cursor-pointer hover:text-text-primary transition-colors"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
-          <div className="mt-12 pt-8 border-t border-border-light text-center text-xs text-inverse-muted">
-            &copy; {new Date().getFullYear()} Jobbers. All rights reserved.
+          <div className="mt-12 pt-8 border-t border-border text-center text-xs text-text-muted">
+            &copy; {new Date().getFullYear()} by Jobbers. All rights reserved. Built by New Studio.
           </div>
         </div>
       </div>
