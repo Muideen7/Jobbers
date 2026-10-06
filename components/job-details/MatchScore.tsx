@@ -38,7 +38,7 @@ export function MatchScore({ matchReason, matchedSkills, missingSkills }: Props)
             <Sparkles className="h-4 w-4 text-success" />
           </div>
           <h2 className="text-xs font-semibold uppercase leading-4 tracking-wide text-text-secondary">
-            AI Match Reasoning
+            Match Reasoning
           </h2>
         </div>
         <p className="text-sm font-medium leading-6 text-text-primary">

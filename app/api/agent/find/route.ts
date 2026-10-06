@@ -6,9 +6,14 @@ import { generateJson } from "@/lib/llm";
 import { trackPostHogEvent } from "@/lib/posthog-server";
 import { detectCountry } from "@/lib/jobs/country";
 import { buildJobRecord } from "@/lib/jobs/job-record";
+import { keywordScoreBatch, reconcileWithAiResults } from "@/lib/jobs/keyword-score";
+import {
+  buildSearchSuccessMessage,
+  partitionNewJobs,
+  type ExistingJobRow,
+} from "@/lib/jobs/search-summary";
 import {
   buildScoringPrompt,
-  scoringId,
   type ProfileScoreContext,
   type ScoredResult,
 } from "@/lib/jobs/scoring-prompt";
@@ -27,25 +32,21 @@ async function scoreJobsBatch(
   jobs: NormalizedJob[],
   profile: ProfileScoreContext,
 ): Promise<ScoredResult[]> {
+  // C5: the deterministic keyword baseline always runs first — a batch can
+  // never come back all-zeros when Gemini is rate-limited (free tier = 20
+  // requests/day). C4's fallback still exists; its floor is now a real score
+  // instead of "Score unavailable".
+  const baseline = keywordScoreBatch(jobs, profile);
+
   // C1/C2: profile context, per-job description truncation (word-boundary,
   // budgeted) and output-token sizing live in the central builder — this
-  // function keeps only the Gemini call and its fallback (C4).
+  // function keeps the Gemini call and the merge with the baseline (C5).
   const { system, prompt, maxOutputTokens } = buildScoringPrompt({
     jobs,
     profile,
   });
 
-  const zeroScore = (jobId: string): ScoredResult => ({
-    jobId,
-    matchScore: 0,
-    matchReason: "Score unavailable",
-    matchedSkills: [],
-    missingSkills: [],
-  });
-
-  const unscored: ScoredResult[] = jobs.map((j) => zeroScore(scoringId(j)));
-
-  let parsed: { results?: ScoredResult[] };
+  let parsed: { results?: unknown };
 
   try {
     parsed = (await generateJson({
@@ -53,23 +54,16 @@ async function scoreJobsBatch(
       prompt,
       temperature: 0.3,
       maxOutputTokens,
-    })) as { results?: ScoredResult[] };
+    })) as { results?: unknown };
   } catch (error) {
     console.error("[api/agent/find] scoreJobsBatch", error);
-    return unscored;
+    return baseline;
   }
 
-  // Prefer the jobId match, fall back to positional order (Gemini is told to
-  // return them in order), then to this job's zero score. Iterating `unscored`
-  // rather than indexing it in parallel with `jobs` removes the last
-  // unchecked-index read: `fallback` is the element, so it cannot be undefined.
-  return unscored.map((fallback, i) => {
-    const scored =
-      parsed.results?.find((r) => r.jobId === fallback.jobId) ??
-      parsed.results?.at(i);
-
-    return scored ?? fallback;
-  });
+  // C5: valid AI results refine the baseline (AI-when-available); anything
+  // missing or malformed keeps its keyword score — the AI can improve a
+  // score, never blank it.
+  return reconcileWithAiResults(baseline, parsed);
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -186,7 +180,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    if (foundJobs.length === 0) {
+    // C5: cross-run dedupe — a listing this search re-found is skipped, so
+    // re-running a search no longer grows the list with duplicate rows.
+    const { data: existingRows, error: existingError } = await insforge.database
+      .from("jobs")
+      .select("source, source_url, external_apply_url")
+      .eq("user_id", user.id);
+
+    if (existingError) {
+      console.error("[api/agent/find] load existing jobs", existingError);
+      throw new Error("Failed to load saved jobs");
+    }
+
+    const existing = (existingRows as ExistingJobRow[] | null) ?? [];
+    const {
+      fresh: newJobs,
+      duplicates,
+      existingCount,
+    } = partitionNewJobs(foundJobs, existing);
+
+    // Covers both "the search found nothing" and "everything it found is
+    // already saved" — the message reconciles against the list either way.
+    if (newJobs.length === 0) {
       await insforge.database
         .from("agent_runs")
         .update({
@@ -201,15 +216,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         success: true,
         data: {
           jobs: [],
-          successMessage:
-            "No jobs found for that search. Try a different title or location.",
+          successMessage: buildSearchSuccessMessage({
+            inserted: 0,
+            duplicates,
+            total: existingCount,
+            highMatchCount: 0,
+          }),
         },
       });
     }
 
-    const scoredResults = await scoreJobsBatch(foundJobs, profile);
+    const scoredResults = await scoreJobsBatch(newJobs, profile);
 
-    const jobRecords = foundJobs.map((job, i) => {
+    const jobRecords = newJobs.map((job, i) => {
       const score = scoredResults[i] ?? {
         matchScore: 0,
         matchReason: "Score unavailable",
@@ -264,10 +283,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       (j) => (j.match_score ?? 0) >= MATCH_THRESHOLD,
     ).length;
 
-    const successMessage =
-      highMatchCount > 0
-        ? `Found ${savedJobs.length} jobs and saved ${highMatchCount} strong match${highMatchCount === 1 ? "" : "es"}.`
-        : `Found ${savedJobs.length} job${savedJobs.length === 1 ? "" : "s"}. No high matches yet — try a broader search.`;
+    // C5: the message states inserted, skipped, high matches and the list
+    // total — the same total the results table paginates over.
+    const successMessage = buildSearchSuccessMessage({
+      inserted: savedJobs.length,
+      duplicates,
+      total: existingCount + savedJobs.length,
+      highMatchCount,
+    });
 
     return NextResponse.json({
       success: true,
