@@ -7,10 +7,11 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** Landing footer redesign ✅ (rounded dark wrapper +
-pre-footer CTA + white 4-column footer card; on top of the Live Opportunities
-rework + C5 keyword scoring — `.env.local` `GEMINI_MODEL=gemini-3.1-flash-lite`,
-restart the dev server to pick it up; 127/127 tests, tsc/eslint/build green)
+**Last completed:** C5 keyword scoring + Live Opportunities rework ✅
+(keyword baseline with AI overlay, dedupe + honest banner; landing spec copy,
+five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
+`GEMINI_MODEL=gemini-3.1-flash-lite` — restart the dev server to pick it up;
+127/127 tests, tsc/eslint/build green)
 **Next:** C5 stale-score backfill (40 rows) → Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
@@ -128,22 +129,6 @@ restart the dev server to pick it up; 127/127 tests, tsc/eslint/build green)
   "Browse all matched roles" → `/find-jobs` (proxy → `/login?next=…` for
   anonymous visitors). Facet params + sanitizers + 6 tests in `e761742`;
   verified 127/127, tsc/eslint/build green
-- [x] Landing footer redesign (design spec) — `LandingFooter` is now one
-  rounded dark container (`rounded-3xl bg-inverse` inset in the page
-  gutters, `p-5 sm:p-8 lg:p-12`, glow clipped): top half centred CTA
-  **"Your next opportunity is already here."** + existing subtitle with
-  **Start for Free** (`btn btn-primary` filled) + **Find Talent**
-  (`btn btn-secondary` white pill), both `href="/login"` — no employer
-  surface exists yet; bottom half inner white card (`rounded-3xl bg-surface
-  p-8 sm:p-10 shadow-2xl`) on `grid-cols-1 md:grid-cols-4 gap-8` — brand
-  col (logo/tagline/socials, reordered X → LinkedIn → GitHub with
-  `flex-wrap` so 44px pills fit the ~140px md column) + Product /
-  Resources / Your account stacks (`space-y-2.5`), then `border-t
-  border-border` + `© {new Date().getFullYear()} by Jobbers. All rights
-  reserved. Built by New Studio.` Deliberately not `bg-ink`: `.btn-primary`
-  fills `bg-ink` and ui-rules bans accent buttons, so charcoal `inverse`
-  (the spec's "#18181B or similar") keeps the near-black pill visible.
-  Verified 127/127, tsc/eslint/build green
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---
