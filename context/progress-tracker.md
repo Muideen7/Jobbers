@@ -129,6 +129,13 @@ five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
   "Browse all matched roles" → `/find-jobs` (proxy → `/login?next=…` for
   anonymous visitors). Facet params + sanitizers + 6 tests in `e761742`;
   verified 127/127, tsc/eslint/build green
+- [x] Landing footer redesign — **rejected & reverted** (`88eec4f`, reverted
+  `90eb41d`): the rounded inset wrapper (`rounded-3xl` inside page gutters)
+  broke the original full-bleed `bg-inverse` width, and the spec's new
+  headline/buttons/copyright replaced copy the user wanted kept. The footer
+  is byte-identical to its pre-redesign state; ui-registry's footer entry
+  was dropped with it. Do not re-apply — wait for a corrected spec that
+  states the width and copy explicitly
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---
