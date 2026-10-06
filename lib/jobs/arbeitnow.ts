@@ -28,6 +28,7 @@ const arbeitnowJobSchema = z.object({
   description: z.string(),
   remote: z.boolean().nullish(),
   url: z.string(),
+  tags: z.array(z.string()).nullish(),
   job_types: z.array(z.string()).nullish(),
   location: z.string().nullish(),
   created_at: z.coerce.number().nullish(),
@@ -57,6 +58,7 @@ export function normalizeArbeitnowJob(job: ArbeitnowJob): NormalizedJob {
     postedAt: job.created_at != null ? new Date(job.created_at * 1000).toISOString() : null,
     employmentType: job.job_types?.[0] ?? null,
     remote: job.remote ?? false,
+    category: job.tags?.[0] ?? null,
     highlights: { responsibilities: [], requirements: [], benefits: [] },
   };
 }

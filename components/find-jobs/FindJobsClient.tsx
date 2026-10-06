@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 import { SearchControls } from "@/components/find-jobs/SearchControls";
 import { JobFilters, type MatchFilter, type SortOption } from "@/components/find-jobs/JobFilters";
 import { JobsTable } from "@/components/find-jobs/JobsTable";
 import { JobsPagination } from "@/components/find-jobs/JobsPagination";
+import { SourceCredits } from "@/components/shared/SourceCredits";
+import { resolveSourceCredits } from "@/lib/source-attribution";
 import type { Job } from "@/types";
 
 const PAGE_SIZE = 20;
@@ -103,6 +105,13 @@ export function FindJobsClient({ initialJobs, initialTotalCount }: Props) {
     };
   }
 
+  // Attribution credits derive from the jobs actually on screen, so every page
+  // and every reload credits the right sources (plan A7).
+  const credits = useMemo(
+    () => resolveSourceCredits(jobs.map((job) => job.source)),
+    [jobs],
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <SearchControls
@@ -130,9 +139,7 @@ export function FindJobsClient({ initialJobs, initialTotalCount }: Props) {
           onPageChange={setCurrentPage}
         />
 
-        {totalCount > 0 && (
-          <p className="text-center text-xs text-text-muted">Jobs by Adzuna</p>
-        )}
+        {totalCount > 0 && <SourceCredits credits={credits} />}
       </div>
     </div>
   );

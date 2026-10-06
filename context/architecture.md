@@ -427,4 +427,4 @@ Rules the AI agent must never violate:
 - Browserbase sessions are always closed with stagehand.close() when done — never leave sessions open.
 - Always scope InsForge queries to the current user_id — never query without a user filter.
 - Adzuna API always includes category=it-jobs — never search without this filter.
-- jobs.source is always 'search' or 'url' — never any other value.
+- jobs.source is 'url' for hand-saved listings, a provider id ('jsearch' | 'adzuna' | 'arbeitnow' | 'remoteok' | 'remotive' | 'jobicy') for multi-source search results, or legacy 'search' (pre-A7 rows, all Adzuna) — never anything else.

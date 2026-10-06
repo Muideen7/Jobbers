@@ -266,7 +266,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return {
         user_id: user.id,
         run_id: runId,
-        source: "search" as const,
+        // Provider id ("jsearch", "adzuna", …) so every saved row can be
+        // attributed to its source (plan A7); legacy rows say "search".
+        source: job.source,
         source_url: job.sourceUrl || job.applyUrl,
         external_apply_url: job.applyUrl,
         title: job.title,

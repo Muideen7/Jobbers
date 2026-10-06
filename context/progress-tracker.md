@@ -7,12 +7,13 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** A1–A6 — full multi-source layer (`lib/jobs/`: interface,
+**Last completed:** A1–A7 — full multi-source layer (`lib/jobs/`: interface,
 Adzuna adapter, JSearch, Arbeitnow, RemoteOK/Remotive/Jobicy feeds,
 `searchAll` orchestrator with cache/dedupe/daily caps; `/api/agent/find`
-rewired off Adzuna-only; 63/63 tests)
-**Next:** A7 per-source attribution (ToS-blocking), then Phase B (country
-detection) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
+**and** `/api/public/jobs` rewired off Adzuna-only; Adzuna demoted to
+last-resort fallback; per-source attribution via `SourceCredits` on both
+results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
+**Next:** Phase B (country detection) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
 
@@ -60,8 +61,15 @@ detection) of `context/job-search-expansion-plan.md` on branch `feat/multi-sourc
 - [x] A5 Remote feeds — `lib/jobs/remote-feeds.ts` (RemoteOK 99 / Remotive 18 / Jobicy 100 live)
 - [x] A6 Orchestrator — `lib/jobs/search-all.ts` (fan-out, dedupe, per-source TTL,
   Remotive 4/day cap, 300-entry cache; `/api/agent/find` rewired; `/api/public/jobs`
-  kept Adzuna-native with cache cap — see plan for rationale)
-- [ ] A7 Per-source attribution in results UI (feeds' ToS require link-backs)
+  kept Adzuna-native here — deferred to A7, see plan for rationale)
+- [x] A7 Per-source attribution + Adzuna demoted from core —
+  `lib/source-attribution.ts` + shared `components/shared/SourceCredits.tsx`
+  (link-back credits on find-jobs, derived from jobs on screen, and on the
+  landing page, from `data.sources[]`); `/api/public/jobs` rewired to
+  `searchAll` (chips became post-filters in `lib/public-jobs.ts`); registry
+  order jsearch → feeds → **adzuna last**; `jobs.source` stores the provider
+  id (plain text, no migration; legacy `"search"` rows credit Adzuna);
+  `NormalizedJob.category` + `JobSearchQuery.remoteOnly` extensions — 79/79 tests
 - [ ] B Location intelligence · C Matcher quality · D Profile page · E Auto-apply
 
 ---

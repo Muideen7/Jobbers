@@ -90,6 +90,9 @@ export function normalizeRemoteokJob(job: RemoteokJob): NormalizedJob {
     postedAt: job.date ?? null,
     employmentType: job.tags?.find((tag) => EMPLOYMENT_TAG.test(tag)) ?? null,
     remote: true,
+    // RemoteOK tags are skills ("golang", "infosec"), not categories — no honest
+    // category to show, so null and let the UI fall back.
+    category: null,
     highlights: { ...EMPTY_HIGHLIGHTS },
   };
 }
@@ -116,6 +119,7 @@ const remotiveJobSchema = z.object({
   url: z.string(),
   title: z.string(),
   company_name: z.string(),
+  category: z.string().nullish(),
   job_type: z.string().nullish(),
   publication_date: z.string().nullish(),
   candidate_required_location: z.string().nullish(),
@@ -158,6 +162,7 @@ export function normalizeRemotiveJob(job: RemotiveJob): NormalizedJob {
     postedAt: toIsoUtc(job.publication_date),
     employmentType: job.job_type ?? null,
     remote: true,
+    category: job.category ?? null,
     highlights: { ...EMPTY_HIGHLIGHTS },
   };
 }
@@ -186,6 +191,7 @@ const jobicyJobSchema = z.object({
   jobTitle: z.string(),
   companyName: z.string(),
   jobType: z.array(z.string()).nullish(),
+  jobIndustry: z.array(z.string()).nullish(),
   jobGeo: z.string().nullish(),
   pubDate: z.string().nullish(),
   jobExcerpt: z.string().nullish(),
@@ -218,6 +224,7 @@ export function normalizeJobicyJob(job: JobicyJob): NormalizedJob {
     postedAt: job.pubDate ?? null,
     employmentType: job.jobType?.[0] ?? null,
     remote: true,
+    category: job.jobIndustry?.[0] ?? null,
     highlights: { ...EMPTY_HIGHLIGHTS },
   };
 }

@@ -223,7 +223,7 @@ type AdzunaJob = {
 const jobRecord = {
   user_id: userId,
   run_id: runId,
-  source: "search", // always 'search' for Adzuna jobs
+  source: "adzuna", // provider id (plan A7); legacy pre-A7 rows say "search"
   source_url: job.redirect_url,
   external_apply_url: job.redirect_url,
   title: job.title,
@@ -246,9 +246,9 @@ const jobRecord = {
 
 - Always include `category=it-jobs` — never search Adzuna without this filter
 - Never pass `where` if location is empty — omit the parameter entirely
-- `source` is always `'search'` for Adzuna jobs — never any other value
+- `source` stores the provider id (`adzuna`, `jsearch`, …) on new rows — legacy pre-A7 rows say `'search'` (all Adzuna); `'url'` only for hand-saved listings
 - `salary_is_predicted: "1"` means Adzuna estimated the salary — this is normal
-- Always display "Jobs by Adzuna" credit on job listings — 116x23px minimum linked to adzuna.com
+- Attribution is per source: credit every source present in the rendered results through `lib/source-attribution.ts` + `components/shared/SourceCredits.tsx` (RemoteOK/Remotive/Jobicy ToS require on-site link-backs; legacy "search" rows credit Adzuna)
 - Adzuna description is a snippet — Gemini scores from it, not a full description
 - Default country to `'us'` — support `gb`, `au`, `ca` as alternatives
 
@@ -356,11 +356,18 @@ const { jobs, outcomes } = await searchAll(
 );
 ```
 
+- Registry order = output priority: `jsearch → arbeitnow → remoteok → jobicy → remotive → adzuna` — **Adzuna sits last as the fallback** (19 countries only) and must never lead the merged list again; a registry-order test locks this in
 - Fans out over `PROVIDER_REGISTRY` with `Promise.allSettled`; a failing source becomes `{ source, count: 0, error }` in `outcomes` — it never throws and never kills the run
 - Cross-source dedupe: lowercase/punctuation-normalized `title|company` fingerprint, fuller description wins
 - `searchMode: "client"` sources are filtered locally against title tokens (≥3 chars); zero tokens disables the filter
+- `remoteOnly: true` on the query maps to JSearch's `work_from_home` param (the only server-side remote filter); every other source is post-filtered on `NormalizedJob.remote` by the caller
+- Both search surfaces run on it: `/api/agent/find` and the public `/api/public/jobs` — the latter's chips are post-filters in `lib/public-jobs.ts`, and its response reports `data.sources[]` (the sources of the rendered cards) so the UI can render the attribution line
 - Logging: per-provider failures are `console.error`'d as `[jobs/searchAll] <source>: …`
 - Routes must map `NormalizedJob` → their own shapes; scoring ids need the `source:externalId` namespace (raw externalIds collide across sources)
+
+### Source attribution (plan A7)
+
+`lib/source-attribution.ts` is the single registry mapping each `JobSourceId` → `{ label, url }` link-back (RemoteOK/Remotive/Jobicy ToS require one; Arbeitnow asks for one; Adzuna's "Jobs by Adzuna" obligation is covered by the same entry). `resolveSourceCredits(sources)` dedupes by label, treats legacy `"search"` as Adzuna, and skips `"url"`/unknown values. The shared `components/shared/SourceCredits.tsx` renders "Jobs via JSearch · …" — `FindJobsClient` derives credits from the jobs on screen, `LiveOpportunities` from the API's `data.sources[]`. Any new surface showing job data must render it too.
 
 ---
 

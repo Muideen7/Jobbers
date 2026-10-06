@@ -2,9 +2,9 @@
  * Adzuna provider — wraps the existing lib/adzuna.ts client in the shared
  * JobProvider interface (context/job-search-expansion-plan.md, task A2).
  *
- * lib/adzuna.ts itself is untouched: /api/public/jobs and /api/agent/find
- * keep consuming searchJobs/dedupeAdzunaJobs exactly as before until the
- * searchAll orchestrator (A6) rewires them.
+ * lib/adzuna.ts itself stays byte-for-byte untouched. Adzuna is now the last
+ * registry entry in search-all.ts — a 19-country fallback, no longer the core
+ * job source (its API does not serve Nigeria and most of the world).
  *
  * Imports are relative (not "@/…") so the files load under `node --test`,
  * which does not resolve the Next.js path alias.
@@ -35,6 +35,7 @@ export function normalizeAdzunaJob(job: AdzunaJob): NormalizedJob {
     postedAt: job.created ?? null,
     employmentType: job.contract_type ?? null,
     remote: false,
+    category: job.category?.label ?? null,
     highlights: { responsibilities: [], requirements: [], benefits: [] },
   };
 }

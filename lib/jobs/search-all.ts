@@ -18,16 +18,19 @@ import { jobicyProvider, remoteokProvider, remotiveProvider } from "./remote-fee
 import type { JobProvider, JobSearchQuery, JobSourceId, NormalizedJob } from "./types.ts";
 
 /**
- * Server-searched sources first: their results already match the query, so
- * they lead the merged list; on description ties they win the dedupe.
+ * Search order = output priority: JSearch leads (global, full-text, server
+ * matched), then the locally-filtered keyless feeds, and **Adzuna sits last as
+ * a fallback only** — its API covers 19 countries and cannot serve Nigeria or
+ * most of the world, so it must never again be the core source (duplicates are
+ * collapsed by dedupe, ties go to the earlier entry).
  */
 export const PROVIDER_REGISTRY: JobProvider[] = [
   jsearchProvider,
-  adzunaProvider,
   arbeitnowProvider,
   remoteokProvider,
   jobicyProvider,
   remotiveProvider,
+  adzunaProvider,
 ];
 
 const DEFAULT_MAX_RESULTS = 40;

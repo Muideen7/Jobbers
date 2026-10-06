@@ -280,7 +280,7 @@ Last updated: 2026-06-05
 ### JobsTable
 
 File: components/find-jobs/JobsTable.tsx
-Last updated: 2026-06-05
+Last updated: 2026-10-06
 
 | Property         | Class                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------- |
@@ -292,10 +292,10 @@ Last updated: 2026-06-05
 | Spacing          | `px-6 py-3` headers, `px-6 py-4` cells                                               |
 | Hover state      | `hover:bg-surface-secondary` on `<tr>`                                                |
 | Shadow           | `shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]`             |
-| Accent usage     | Score bar fill: `bg-success` (≥80), `bg-info` (60-79), `bg-warning` (<60); source badge `bg-accent-light text-accent` for Search |
+| Accent usage     | Score bar fill: `bg-success` (≥80), `bg-info` (60-79), `bg-warning` (<60); source badge `bg-accent-light text-accent` for search-derived rows, `bg-surface-secondary text-text-secondary` for `URL` |
 
 **Pattern notes:**
-Each cell wraps its content in `<Link href="/find-jobs/{id}">` for full-row clickability. Score bar is `h-1 w-24 bg-border-light` track with colored fill div driven by `style={{ width: \`${score}%\` }}`. Company icon uses `Building2` from lucide as a placeholder. Source badge is pill-shaped. Accepts optional `isLoading` prop — dims table with `opacity-60 transition-opacity` during server fetch and skips empty-state when loading.
+Each cell wraps its content in `<Link href="/find-jobs/{id}">` for full-row clickability. Score bar is `h-1 w-24 bg-border-light` track with colored fill div driven by `style={{ width: \`${score}%\` }}`. Company icon uses `Building2` from lucide as a placeholder. Source badge is pill-shaped: it maps `SEARCH_SOURCE_LABELS` — `Search` (legacy rows) plus the provider names `JSearch`/`Adzuna`/`Arbeitnow`/`RemoteOK`/`Remotive`/`Jobicy` (the provider id stored in `jobs.source` since plan A7) — and anything else renders `URL`. Accepts optional `isLoading` prop — dims table with `opacity-60 transition-opacity` during server fetch and skips empty-state when loading.
 
 ---
 
@@ -318,6 +318,24 @@ Last updated: 2026-06-05
 
 **Pattern notes:**
 `getPageNumbers()` returns ellipsis items as `"..."` strings alongside page numbers. Always shows first/last page; ellipsis collapses middle range. `disabled:opacity-40` on Previous/Next at boundaries. Returns `null` when `totalCount === 0`.
+
+---
+
+### SourceCredits
+
+File: components/shared/SourceCredits.tsx
+Last updated: 2026-10-06
+
+| Property         | Class                                                                     |
+| ---------------- | ------------------------------------------------------------------------- |
+| Text — primary   | `text-center text-xs text-text-muted` base line                           |
+| Links            | `underline underline-offset-2 hover:text-text-secondary` on each source   |
+| Spacing          | none — inline `·` separators and a closing `and`                          |
+| Shadow           | `none`                                                                    |
+| Accent usage     | none — deliberately quieter than content                                 |
+
+**Pattern notes:**
+Shared attribution line ("Jobs via JSearch · RemoteOK …") required by the job-source APIs' terms (plan A7). Props: `{ credits: SourceCredit[]; className?: string }` — build credits with `resolveSourceCredits(...)` from `lib/source-attribution.ts` (dedupes by label, legacy `"search"` → Adzuna, skips `url`/unknown). Renders `null` when `credits` is empty, so it is safe to mount unconditionally. Every link opens with `target="_blank" rel="noopener noreferrer"`. Two callers today: `FindJobsClient` (credits from the jobs on screen, rendered when `totalCount > 0` in place of the old static "Jobs by Adzuna" line) and `LiveOpportunities` (credits from the API's `data.sources[]`, rendered under the results grid). Any new surface rendering job data must render this component too.
 
 ---
 
@@ -446,8 +464,8 @@ Nine landing sections compose in `app/page.tsx`; all are Server Components excep
 | ------------- | --------------------------------------------------------------------- |
 | Section id    | `live-opportunities`                                                  |
 | Client        | `LiveOpportunities` is `"use client"` (only section needing state)    |
-| Endpoint      | `GET /api/public/jobs?q=&filter=` — public, no auth, 5 min in-memory cache |
-| Filters       | `all` / `remote` / `fulltime` (`contract_type=full_time`) / `salary150` (`salary_min=150000&sort_by=salary`) |
+| Endpoint      | `GET /api/public/jobs?q=&filter=` — public, no auth, 5 min in-memory cache, multi-source via `searchAll` (JSearch → feeds → Adzuna fallback) |
+| Filters       | `all` / `remote` (JSearch `work_from_home` + remote flag/title/location post-filter) / `fulltime` (unknown type counts as full-time) / `salary150` (verified numeric min ≥ $150k, sorted by salary desc) |
 | Debounce      | 350 ms on the search input; filter chips fire immediately            |
 | Race guard    | monotonic `requestId` ref discards out-of-order responses            |
 | Card pastels  | `PASTEL_BACKGROUNDS` 6-colour array indexed by result position        |
@@ -455,4 +473,4 @@ Nine landing sections compose in `app/page.tsx`; all are Server Components excep
 | Gating        | every "View" button targets `/login` so a role cannot be opened anonymously |
 
 **Pattern notes:**
-`proxy.ts` matches only `/dashboard`, `/profile`, `/find-jobs`, so the landing page and `/api/public/jobs` stay reachable while every detail view stays gated. The endpoint is intentionally separate from the auth-gated `/api/jobs`, which scopes to `user_id` and returns the signed-in user's saved matches. `PublicJob` lives in `types/index.ts` rather than the route file so client components can import it without pulling in route-module code. On mount the effect defers its fetch through `queueMicrotask` to satisfy `react-hooks/set-state-in-effect`.
+`proxy.ts` matches only `/dashboard`, `/profile`, `/find-jobs`, so the landing page and `/api/public/jobs` stay reachable while every detail view stays gated. The endpoint is intentionally separate from the auth-gated `/api/jobs`, which scopes to `user_id` and returns the signed-in user's saved matches. `PublicJob` lives in `types/index.ts` rather than the route file so client components can import it without pulling in route-module code. On mount the effect defers its fetch through `queueMicrotask` to satisfy `react-hooks/set-state-in-effect`. Since plan A7 the response also carries `data.sources[]` (sources of the rendered cards) and the section renders a `SourceCredits` line under the grid; cards default-sort by `postedAt` desc to mix sources, `PublicJob.id` is `source:externalId`, and an all-sources-failed run — not a missing Adzuna key — is what returns 502.

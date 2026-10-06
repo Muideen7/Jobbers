@@ -1,3 +1,5 @@
+import type { JobSourceId } from "@/lib/jobs/types";
+
 export type MissingField =
   | "FULL NAME"
   | "PHONE"
@@ -69,7 +71,12 @@ export interface Job {
   id: string;
   run_id: string | null;
   user_id: string;
-  source: "search" | "url";
+  /**
+   * Provenance: "url" for hand-saved listings, a provider id for jobs found
+   * via the multi-source search, and legacy "search" for pre-A7 rows (all
+   * Adzuna). The attribution line credits these (lib/source-attribution.ts).
+   */
+  source: "search" | "url" | JobSourceId;
   source_url: string | null;
   external_apply_url: string | null;
   title: string | null;

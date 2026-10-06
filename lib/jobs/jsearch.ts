@@ -45,6 +45,8 @@ const jsearchJobSchema = z.object({
   job_employment_types: z.array(z.string()).nullish(),
   job_is_remote: z.boolean().nullish(),
   job_google_link: z.string().nullish(),
+  // AI-enrichment field (backend/frontend/…); absent unless enrich=true, so null is common.
+  job_function: z.string().nullish(),
   // .optional() is required: plain z.unknown() rejects *missing* keys in zod v4,
   // and many real postings ship without job_highlights.
   job_highlights: z.unknown().optional(),
@@ -89,6 +91,8 @@ export function buildJsearchParams(
     query: location ? `${title} jobs in ${location}` : `${title} jobs`,
     country,
     num_pages: String(clampNumPages(numPages)),
+    // Spec: "Only return work from home / remote jobs."
+    ...(query.remoteOnly ? { work_from_home: "true" } : {}),
   });
 }
 
@@ -159,6 +163,7 @@ export function normalizeJsearchJob(job: JsearchJob): NormalizedJob {
     postedAt: job.job_posted_at_datetime_utc ?? null,
     employmentType: job.job_employment_types?.[0] ?? job.job_employment_type ?? null,
     remote: job.job_is_remote ?? false,
+    category: job.job_function ?? null,
     highlights: toHighlights(job.job_highlights),
   };
 }

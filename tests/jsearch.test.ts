@@ -52,6 +52,14 @@ test("num_pages is clamped to the documented 1-20 range", () => {
   assert.equal(buildJsearchParams(query, Number.NaN).get("num_pages"), "1");
 });
 
+test("remoteOnly maps to the spec's work_from_home flag", () => {
+  // The only source that can filter remote server-side — the public route's
+  // "Remote" chip relies on it (plan A7 / public-jobs rewire).
+  assert.equal(buildJsearchParams({ ...query, remoteOnly: true }).get("work_from_home"), "true");
+  // Absent by default: no stray param consuming URL length or confusing the API.
+  assert.equal(buildJsearchParams(query).get("work_from_home"), null);
+});
+
 test("missing API key fails fast with an actionable message", async () => {
   await withEnv("JSEARCH_API_KEY", undefined, async () => {
     await assert.rejects(searchJsearch(query), /JSEARCH_API_KEY is not set/);

@@ -58,6 +58,7 @@ const jsearchJobFixture = {
   job_employment_types: ["FULLTIME"],
   job_is_remote: false,
   job_google_link: "https://www.google.com/search?q=jobs&gl=us#vhid=abc",
+  job_function: "frontend",
   job_highlights: {
     Qualifications: ["Bachelor's degree", "5+ years of experience"],
     Responsibilities: ["Design and implement applications"],
@@ -106,6 +107,7 @@ const remotiveFixture = {
   url: "https://remotive.com/remote-jobs/software-development/software-engineer-2091149",
   title: "Software Engineer / AI Code Trainer",
   company_name: "CodeForAI",
+  category: "Software Development",
   job_type: "contract",
   publication_date: "2026-10-05T05:15:43",
   candidate_required_location: "USA, UK, India",
@@ -148,6 +150,7 @@ test("Adzuna payload normalizes to the shared shape", () => {
   assert.equal(job.postedAt, "2026-10-01T12:00:00Z");
   assert.equal(job.employmentType, "full_time");
   assert.equal(job.remote, false);
+  assert.equal(job.category, "IT Jobs");
   assert.deepEqual(job.highlights, {
     responsibilities: [],
     requirements: [],
@@ -179,6 +182,7 @@ test("JSearch payload normalizes to the shared shape", () => {
   assert.equal(job.postedAt, "2025-03-29T00:00:00.000Z");
   assert.equal(job.employmentType, "FULLTIME");
   assert.equal(job.remote, false);
+  assert.equal(job.category, "frontend");
   assert.deepEqual(job.highlights, {
     responsibilities: ["Design and implement applications"],
     requirements: ["Bachelor's degree", "5+ years of experience"],
@@ -222,7 +226,13 @@ test("every normalized value is a primitive or a known object shape", () => {
     for (const salary of [job.salaryMin, job.salaryMax]) {
       assert.ok(salary === null || typeof salary === "number");
     }
-    for (const scalar of [job.salaryPeriod, job.postedAt, job.employmentType]) {
+    for (const scalar of [
+      job.salaryPeriod,
+      job.salaryText,
+      job.postedAt,
+      job.employmentType,
+      job.category,
+    ]) {
       assert.ok(scalar === null || typeof scalar === "string");
     }
     assert.ok(Array.isArray(job.highlights.responsibilities));
@@ -293,6 +303,8 @@ test("Arbeitnow payload normalizes with ISO postedAt from unix seconds", () => {
   assert.equal(job.postedAt, new Date(1791291662 * 1000).toISOString());
   assert.equal(job.employmentType, "Full Time");
   assert.equal(job.remote, false);
+  // First tag doubles as the category shown on public cards.
+  assert.equal(job.category, "Software Development");
   // Arbeitnow publishes no salary figures — all three salary fields stay null.
   assert.equal(job.salaryMin, null);
   assert.equal(job.salaryMax, null);
@@ -319,6 +331,8 @@ test("RemoteOK metadata element is skipped, jobs normalize with remote flags", (
   assert.equal(job.employmentType, "part time");
   assert.equal(job.salaryMin, 53000);
   assert.equal(job.salaryText, null);
+  // RemoteOK tags are skills, not categories — null so the UI falls back.
+  assert.equal(job.category, null);
   assert.throws(() => parseRemoteokResponse({ jobs: [] }), /unexpected response shape/);
 });
 
@@ -340,6 +354,7 @@ test("Remotive keeps native salary text and treats naive dates as UTC", () => {
   assert.equal(job.location, "USA, UK, India");
   assert.equal(job.employmentType, "contract");
   assert.equal(job.remote, true);
+  assert.equal(job.category, "Software Development");
 });
 
 test("Jobicy normalizes and falls back to the excerpt without full description", () => {
@@ -353,6 +368,7 @@ test("Jobicy normalizes and falls back to the excerpt without full description",
   assert.equal(job.location, "Portugal");
   assert.equal(job.employmentType, "Full-Time");
   assert.equal(job.description, "<p>Join us in bringing joy to customer experience.</p>");
+  assert.equal(job.category, "Cybersecurity");
 
   const excerptOnly = normalizeJobicyJob({
     id: 1,

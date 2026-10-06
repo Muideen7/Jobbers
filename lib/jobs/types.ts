@@ -39,6 +39,8 @@ export type NormalizedJob = {
   salaryPeriod: string | null;
   /** Source's own free-form salary text ("$45-$120/Hour") when it provides one. */
   salaryText: string | null;
+  /** Source's own category/industry label ("IT Jobs", "Cybersecurity"), or null. */
+  category: string | null;
   /** ISO 8601 UTC datetime the job was posted, or null when unknown. */
   postedAt: string | null;
   /** FULLTIME | CONTRACTOR | PARTTIME | INTERN, source-native, or null. */
@@ -52,6 +54,12 @@ export type JobSearchQuery = {
   location: string;
   /** ISO 3166-1 alpha-2 country code ("us", "ng", …). Empty falls back per provider. */
   country: string;
+  /**
+   * Restrict to remote/wfh roles. Only JSearch honours it server-side
+   * (`work_from_home`); other sources ignore it and callers post-filter on
+   * NormalizedJob.remote.
+   */
+  remoteOnly?: boolean;
 };
 
 export type JobProvider = {

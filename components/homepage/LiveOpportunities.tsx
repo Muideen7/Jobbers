@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Search, Sparkles } from "lucide-react";
 
 import { CompanyLogo } from "@/components/homepage/Logos";
+import { SourceCredits } from "@/components/shared/SourceCredits";
+import { resolveSourceCredits } from "@/lib/source-attribution";
 import type { PublicJob } from "@/types";
 
 const filters = [
@@ -91,6 +93,7 @@ export function LiveOpportunities() {
   const [error, setError] = useState<string | null>(null);
   const [liveJobs, setLiveJobs] = useState<PublicJob[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [sources, setSources] = useState<string[]>([]);
 
   const requestId = useRef(0);
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -105,7 +108,7 @@ export function LiveOpportunities() {
       );
       const payload = (await response.json()) as {
         success: boolean;
-        data?: { jobs: PublicJob[]; totalCount: number };
+        data?: { jobs: PublicJob[]; totalCount: number; sources?: string[] };
         error?: string;
       };
 
@@ -122,6 +125,7 @@ export function LiveOpportunities() {
 
       setLiveJobs(payload.data.jobs);
       setTotalCount(payload.data.totalCount);
+      setSources(payload.data.sources ?? []);
       setError(null);
       setStatus("done");
     } catch {
@@ -176,6 +180,10 @@ export function LiveOpportunities() {
   useEffect(() => () => clearTimeout(debounce.current), []);
 
   const isLoading = status === "loading";
+
+  // The API reports which sources contributed the rendered cards; credit them
+  // with link-backs as their terms require (plan A7).
+  const credits = useMemo(() => resolveSourceCredits(sources), [sources]);
 
   return (
     <section id="live-opportunities" className="w-full py-16 sm:py-24 relative">
@@ -324,6 +332,12 @@ export function LiveOpportunities() {
           <p className="mt-10 text-center text-sm text-text-secondary">
             No live roles matched that search. Try a broader keyword or a different filter.
           </p>
+        ) : null}
+
+        {!isLoading && status === "done" && liveJobs.length > 0 ? (
+          <div className="mt-8">
+            <SourceCredits credits={credits} />
+          </div>
         ) : null}
 
         <div className="mt-12 text-center">

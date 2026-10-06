@@ -1,8 +1,8 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A6 ✅ complete (branch `feat/multi-source-job-search`); A7 attribution open, Phase B next
+> **Status:** Phase A — A1–A7 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, `/api/public/jobs` multi-sourced, per-source attribution live. Phase B next
 > **Created:** 2026-10-06
-> **Supersedes nothing** — Adzuna stays; this plan adds sources around it.
+> **Supersedes nothing** — Adzuna stays **as a fallback only** (19 countries; never the core source again); the other sources live around it.
 > Update this file and `progress-tracker.md` after every completed task.
 
 ---
@@ -128,9 +128,11 @@ Goal: one orchestrator, many providers, one normalized job shape.
 
 - [x] **A6 — Orchestrator + cache + cross-source dedupe**
   ✅ Done. `lib/jobs/search-all.ts` exports `searchAll(query, options)`:
-  - **Fan-out:** `Promise.allSettled` over `PROVIDER_REGISTRY`
-    (jsearch, adzuna, arbeitnow, remoteok, jobicy, remotive — server-searched
-    sources first so they lead the merged list); `runProvider` never throws →
+  - **Fan-out:** `Promise.allSettled` over `PROVIDER_REGISTRY` —
+    originally (jsearch, adzuna, arbeitnow, remoteok, jobicy, remotive);
+    **A7 reorders to jsearch, arbeitnow, remoteok, jobicy, remotive, adzuna**,
+    so Adzuna is the last-resort fallback and can never again lead the merged
+    list. `runProvider` never throws →
     one failing source yields `{ count: 0, error }` and the rest still land.
   - **Dedupe:** fingerprint = lowercase/punctuation-normalized
     `title|company`; the copy with the fuller description wins (better Gemini
@@ -152,27 +154,70 @@ Goal: one orchestrator, many providers, one normalized job shape.
     only formatted when yearly/unstated — hourly/monthly dropped rather than
     mislabelled), `employmentType ?? "fulltime"` → `job_type`.
     **`country: "us"` remains until B1.**
-  - **`/api/public/jobs` deliberately NOT rewired** (plan change): its
-    filters (`contractType`, `salaryMin`, `sortBy`), `PublicJob` `$`-currency
-    display, over-fetch×4 dedupe and the "Jobs by Adzuna" credit are all
-    Adzuna-native — a naive rewire would show EUR/GBP figures as `$` and make
-    filter promises other sources can't keep. Landing-page multi-sourcing is
-    deferred to a dedicated task; its cache **did** get the size cap
-    (audit fix). `lib/adzuna.ts` callers remain in place for it.
+  - **`/api/public/jobs` was deliberately NOT rewired here** (plan change,
+    executed in A7): its filters (`contractType`, `salaryMin`, `sortBy`),
+    `PublicJob` `$`-currency display, over-fetch×4 dedupe and the static
+    "Jobs by Adzuna" credit were all Adzuna-native — a naive rewire would show
+    EUR/GBP figures as `$` and make filter promises other sources can't keep.
+    A7 replaced each of those with the multi-source equivalents (see below).
+    Its cache **did** get the size cap here (audit fix).
   **Test:** `tests/search-all.test.ts` — 9 mocked-provider tests (failure
   isolation, dedupe collapse + keeper rule, cache hit, TTL expiry, client
   filter, short-query fallback, cap, daily cap incl. next-day reset,
   cache-size bound); 63/63 green; lint + build pass; live smoke passes.
 
-- [ ] **A7 — Per-source attribution (added, ToS-blocking)**
-  RemoteOK ("link back… mention Remote OK as a source, or we'll suspend
-  access"), Remotive ("link back… mention Remotive as source") and Jobicy
-  ("clearly credited with a direct link") all **require on-site attribution**,
-  and Arbeitnow asks for a link back. With those feeds now rendering in
-  `/api/agent/find`, the results UI needs a source credit line alongside the
-  existing "Jobs by Adzuna" one (per source actually used in the run).
-  **Test:** attribution rendered for each source present in results;
-  Adzuna credit still present.
+- [x] **A7 — Per-source attribution + Adzuna demoted from core**
+  ✅ Done (combined with the requested de-coring of Adzuna). RemoteOK
+  ("link back… mention Remote OK as a source"), Remotive ("link back…
+  mention Remotive as source"), Jobicy ("clearly credited with a direct
+  link") and Arbeitnow all **require on-site attribution**; Adzuna's credit
+  obligation is unchanged. Implementation:
+  - **Adzuna demoted** to last position in `PROVIDER_REGISTRY` (fallback
+    only, never leads the merged list) — locked by a registry-order test in
+    `tests/search-all.test.ts`.
+  - **`/api/public/jobs` rewired to `searchAll`** — the last Adzuna-core
+    surface. Adzuna-specific pieces replaced in `lib/public-jobs.ts`:
+    - Chips became post-filters over `NormalizedJob`: *remote* = remote
+      flag OR "Remote" in title/location; *fulltime* = unknown type counts
+      as full-time (legacy default), explicit part-time/contract/intern
+      excluded; *$150k+* = numeric minimum ≥ 150k **verified** (sources
+      without figures are excluded, never guessed).
+    - New `JobSearchQuery.remoteOnly` → JSearch `work_from_home` param (the
+      only source that can filter remote server-side).
+    - Salary display: source `salaryText` wins, then `$Xk` numerics, then
+      "Salary not listed"; contract types title-cased, null → "Full time".
+    - Default order mixes sources by `postedAt` desc ("live" landing page);
+      `$150k+` sorts by salary desc (legacy `sortBy=salary` behaviour).
+    - `PublicJob.id` = `source:externalId` (cross-source React key
+      collisions), `category` = source's own label or "Technology".
+    - The Adzuna-env 503 check is gone: individual failures degrade, only
+      an **all-sources-failed** run returns 502.
+    - Response gains `data.sources[]` = sources of the rendered cards.
+  - **Shape extensions:** `NormalizedJob.category` (adzuna `category.label`,
+    arbeitnow `tags[0]`, remotive `category`, jobicy `jobIndustry[0]`,
+    jsearch `job_function` — enrichment-only so often null, remoteok null
+    because its tags are skills). Key-set test still enforces identical
+    keys across all six sources.
+  - **Per-job provider attribution in the DB:** `jobs.source` (plain text,
+    no migration needed) now stores the provider id for new agent-found jobs
+    (`jsearch`, `adzuna`, …); legacy rows keep `"search"` (they were all
+    Adzuna). `Job.source` union widened; `JobsTable` `SourceBadge` shows
+    provider names (`Search`/`URL` unchanged for their legacy values).
+    The PostHog `job_found.source` property stays `"search"` — it records
+    provenance class, not provider, so existing dashboards keep working.
+  - **Credit UI:** `lib/source-attribution.ts` (single label+link registry,
+    `resolveSourceCredits` dedupes by label and skips `url`/unknown rows) +
+    shared `components/shared/SourceCredits.tsx` ("Jobs via JSearch · …"
+    with `target="_blank" rel="noopener noreferrer"` link-backs).
+    `FindJobsClient` derives credits from the jobs on screen (correct after
+    any reload/page — replaces the static "Jobs by Adzuna" line);
+    `LiveOpportunities` renders the API-reported `sources`.
+  **Test:** 79/79 green — new `tests/public-jobs.test.ts` (filters, salary/
+  contract formatting, mapping, sorting), `tests/source-attribution.test.ts`
+  (every source link-backed, dedupe, url-skipping), registry-order test,
+  JSearch `work_from_home` test, category assertions per source; live smoke
+  gains an A7 block (`node --env-file=.env.local tests/job-sources-smoke.ts`)
+  — 10 remote-chip cards, 4 credited sources, 0 errors ✅.
 
 ---
 

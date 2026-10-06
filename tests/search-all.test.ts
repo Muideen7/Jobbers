@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   MAX_CACHE_ENTRIES,
+  PROVIDER_REGISTRY,
   createSearchAllState,
   dedupeNormalizedJobs,
   extractQueryTokens,
@@ -38,6 +39,7 @@ function makeJob(
     salaryMax: null,
     salaryPeriod: null,
     salaryText: null,
+    category: null,
     postedAt: null,
     employmentType: null,
     remote: false,
@@ -297,5 +299,16 @@ test("the cache never grows past MAX_CACHE_ENTRIES", async () => {
   assert.ok(
     state.entries.size <= MAX_CACHE_ENTRIES,
     `expected ≤ ${MAX_CACHE_ENTRIES} entries, got ${state.entries.size}`,
+  );
+});
+
+test("the default registry leads with JSearch and demotes Adzuna to last", () => {
+  // Adzuna serves only 19 countries — it must never again be the core source
+  // (it cannot serve Nigeria at all). Locks in the demotion from plan A7.
+  assert.equal(PROVIDER_REGISTRY[0]?.id, "jsearch");
+  assert.equal(PROVIDER_REGISTRY[PROVIDER_REGISTRY.length - 1]?.id, "adzuna");
+  assert.ok(
+    !PROVIDER_REGISTRY.slice(0, -1).some((p) => p.id === "adzuna"),
+    "adzuna must appear exactly once, in the fallback slot",
   );
 });

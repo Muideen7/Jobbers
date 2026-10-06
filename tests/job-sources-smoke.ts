@@ -1,17 +1,20 @@
 /**
- * Live smoke test for the keyless providers (A4/A5) and the searchAll
- * orchestrator (A6). Not part of `npm test` (that only globs *.test.ts) —
- * run it manually:
+ * Live smoke test for the keyless providers (A4/A5), the searchAll
+ * orchestrator (A6) and the public-jobs rewire (A7). Not part of `npm test`
+ * (that only globs *.test.ts) — run it manually:
  *
- *   node tests/job-sources-smoke.ts
+ *   node --env-file=.env.local tests/job-sources-smoke.ts
  *
- * No API keys required. These four feeds are public and keyless by design.
+ * The four feeds are public and keyless; --env-file lets Adzuna/JSearch join
+ * when their keys are present (missing keys must degrade, not fail the run).
  */
 
 import { arbeitnowProvider, searchArbeitnow } from "../lib/jobs/arbeitnow.ts";
 import { jobicyProvider, remoteokProvider, remotiveProvider } from "../lib/jobs/remote-feeds.ts";
 import { searchAll } from "../lib/jobs/search-all.ts";
 import type { JobProvider, JobSearchQuery } from "../lib/jobs/types.ts";
+import { matchesPublicFilter, sortPublicJobs, toPublicJob } from "../lib/public-jobs.ts";
+import { resolveSourceCredits } from "../lib/source-attribution.ts";
 
 const query: JobSearchQuery = {
   title: "frontend developer",
@@ -82,6 +85,40 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     report("searchAll", false, error instanceof Error ? error.message : String(error));
+  }
+
+  // A7 — public-jobs pipeline on the *default* registry (JSearch leads,
+  // Adzuna demoted to last): the "Remote" chip's full path —
+  // remoteOnly query → post-filter → PublicJob mapping → attribution.
+  try {
+    const result = await searchAll(
+      { title: "developer", location: "", country: "us", remoteOnly: true },
+      { maxResults: 48 },
+    );
+    const matched = sortPublicJobs(
+      result.jobs.filter((job) => matchesPublicFilter(job, "remote")),
+      "remote",
+    );
+    const rendered = matched.slice(0, 12);
+    const mapped = rendered.map(toPublicJob);
+    const credits = resolveSourceCredits(rendered.map((job) => job.source));
+    const uniqueIds = new Set(mapped.map((job) => job.id));
+
+    report(
+      "publicJobs remote chip",
+      mapped.length >= 1 &&
+        uniqueIds.size === mapped.length &&
+        credits.length >= 1,
+      `${mapped.length} cards, ${credits.length} credited sources: ` +
+        credits.map((credit) => credit.label).join(", "),
+    );
+    for (const outcome of result.outcomes) {
+      console.log(
+        `       - ${outcome.source}: ${outcome.count} jobs${outcome.error ? ` (${outcome.error})` : ""}`,
+      );
+    }
+  } catch (error) {
+    report("publicJobs remote chip", false, error instanceof Error ? error.message : String(error));
   }
 
   if (failures > 0) {

@@ -26,11 +26,23 @@ function MatchScoreBar({ score }: { score: number }) {
   );
 }
 
+const SEARCH_SOURCE_LABELS: Record<string, string> = {
+  search: "Search",
+  jsearch: "JSearch",
+  adzuna: "Adzuna",
+  arbeitnow: "Arbeitnow",
+  remoteok: "RemoteOK",
+  remotive: "Remotive",
+  jobicy: "Jobicy",
+};
+
 function SourceBadge({ source }: { source: string }) {
-  if (source === "search") {
+  const label = SEARCH_SOURCE_LABELS[source];
+
+  if (label) {
     return (
       <span className="inline-flex items-center rounded-full bg-accent-light px-2 py-0.5 text-xs font-medium text-accent">
-        Search
+        {label}
       </span>
     );
   }
