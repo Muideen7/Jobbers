@@ -1,6 +1,6 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A7 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, `/api/public/jobs` multi-sourced, per-source attribution live. Phase B next
+> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, `/api/public/jobs` multi-sourced, per-source attribution live, country detection + graceful source degradation live. Phase C next
 > **Created:** 2026-10-06
 > **Supersedes nothing** — Adzuna stays **as a fallback only** (19 countries; never the core source again); the other sources live around it.
 > Update this file and `progress-tracker.md` after every completed task.
@@ -153,7 +153,8 @@ Goal: one orchestrator, many providers, one normalized job shape.
     DB), salary via `formatSalaryForDb` (source text wins; numeric figures
     only formatted when yearly/unstated — hourly/monthly dropped rather than
     mislabelled), `employmentType ?? "fulltime"` → `job_type`.
-    **`country: "us"` remains until B1.**
+    **Country detection arrived in B1** (`detectCountry` replaced the
+    hardcoded `"us"`).
   - **`/api/public/jobs` was deliberately NOT rewired here** (plan change,
     executed in A7): its filters (`contractType`, `salaryMin`, `sortBy`),
     `PublicJob` `$`-currency display, over-fetch×4 dedupe and the static
@@ -223,19 +224,40 @@ Goal: one orchestrator, many providers, one normalized job shape.
 
 ## Phase B — Location intelligence
 
-- [ ] **B1 — Country detection**
+- [x] **B1 — Country detection**
   `lib/jobs/country.ts`: detect ISO country from search location string, falling back
   to profile `preferred_locations` then `location`, default `us`. Only call Adzuna when
   the code is in the supported list; otherwise skip Adzuna silently (other providers
   still search — JSearch/Arbeitnow don't need a country code).
   **Test:** unit table — `Lagos→ng`, `London→gb`, `Accra→gh`, empty→profile→`us`,
   unsupported code → Adzuna skipped.
+  **Done:** `detectCountry(primary, fallbacks)` + `countryFromText` (city table,
+  country-name aliases with `uk→gb`, two-letter passthrough only for known ISO
+  codes, diacritic stripping). Find route feeds search location →
+  `preferred_locations` → `location`; the landing route calls `detectCountry()`
+  (no location input → `us` default). `lib/jobs/adzuna.ts` exports
+  `ADZUNA_SUPPORTED_COUNTRIES` (19 codes) / `isAdzunaCountrySupported` and the
+  provider returns `[]` *before any fetch* for unsupported codes.
+  **Test:** `tests/country.test.ts` (10 cases: city/alias/code tables, detection
+  order, default, 19-country list, fetch-stub proving zero requests for `ng`/
+  `zz` and pass-through URL for `gb`/`us`). Live smoke: `detectCountry "Lagos"
+  → ng`, `adzuna: 0 jobs (skipped cleanly)` ✅.
 
-- [ ] **B2 — Graceful degradation on Adzuna 404**
+- [x] **B2 — Graceful degradation on Adzuna 404**
   `UNSUPPORTED_COUNTRY` (or any Adzuna failure) → log to `agent_logs`, continue the run
   with remaining providers. Run status never flips to `failed` because of one source.
   **Test:** mocked Adzuna 404 → run completes, `agent_logs` has a warning row, other
   sources' jobs saved.
+  **Done:** `lib/jobs/source-warnings.ts` → `sourceWarningLogRows({runId, userId,
+  outcomes})` builds `agent_logs` rows (level `"warning"`) for every errored
+  outcome; `/api/agent/find` inserts them right after `searchAll`, *before* the
+  empty-result branch, and `console.error`s insert failures instead of throwing —
+  so a source failure can never flip `agent_runs.status` to `failed` (only
+  unexpected throws reach the catch). Live smoke: 15 jobs despite Adzuna skip,
+  warning row names the actually-failing source (JSearch missing key) ✅.
+  **Test:** `tests/source-warnings.test.ts` (4 cases incl. end-to-end —
+  searchAll with a provider throwing `404 UNSUPPORTED_COUNTRY` → healthy
+  source's job survives + one warning row).
 
 ---
 

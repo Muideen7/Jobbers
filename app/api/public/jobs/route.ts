@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { searchAll } from "@/lib/jobs/search-all";
+import { detectCountry } from "@/lib/jobs/country";
 import {
   isPublicFilter,
   matchesPublicFilter,
@@ -65,8 +66,10 @@ export async function GET(req: NextRequest) {
       {
         title: query || "developer",
         location: "",
-        // Phase B1 of the plan replaces this hardcoded "us" with country detection.
-        country: "us",
+        // B1: the landing search has no location input, so detection gets no
+        // candidates and yields the "us" default — same single source of
+        // truth as the signed-in find route (lib/jobs/country.ts).
+        country: detectCountry(),
         remoteOnly: filter === "remote",
       },
       { maxResults: MAX_RESULTS },

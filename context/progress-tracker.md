@@ -70,7 +70,15 @@ results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
   order jsearch → feeds → **adzuna last**; `jobs.source` stores the provider
   id (plain text, no migration; legacy `"search"` rows credit Adzuna);
   `NormalizedJob.category` + `JobSearchQuery.remoteOnly` extensions — 79/79 tests
-- [ ] B Location intelligence · C Matcher quality · D Profile page · E Auto-apply
+- [x] B1 Country detection — `lib/jobs/country.ts` (`detectCountry`: search
+  location → profile `preferred_locations` → `location` → `us`; city table +
+  country aliases + known-ISO two-letter passthrough) wired into
+  `/api/agent/find` and `/api/public/jobs`; `lib/jobs/adzuna.ts` skips
+  unsupported codes before any fetch (`ADZUNA_SUPPORTED_COUNTRIES`, 19 codes)
+- [x] B2 Graceful source degradation — `lib/jobs/source-warnings.ts`
+  (`sourceWarningLogRows` → `agent_logs` warning rows per errored outcome);
+  a source failure can never flip `agent_runs.status` to `failed` — 91/91 tests
+- [ ] C Matcher quality · D Profile page · E Auto-apply
 
 ---
 

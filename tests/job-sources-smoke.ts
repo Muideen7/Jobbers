@@ -1,6 +1,7 @@
 /**
  * Live smoke test for the keyless providers (A4/A5), the searchAll
- * orchestrator (A6) and the public-jobs rewire (A7). Not part of `npm test`
+ * orchestrator (A6), the public-jobs rewire (A7) and country detection with
+ * graceful Adzuna degradation (B1/B2). Not part of `npm test`
  * (that only globs *.test.ts) — run it manually:
  *
  *   node --env-file=.env.local tests/job-sources-smoke.ts
@@ -11,7 +12,9 @@
 
 import { arbeitnowProvider, searchArbeitnow } from "../lib/jobs/arbeitnow.ts";
 import { jobicyProvider, remoteokProvider, remotiveProvider } from "../lib/jobs/remote-feeds.ts";
+import { detectCountry } from "../lib/jobs/country.ts";
 import { searchAll } from "../lib/jobs/search-all.ts";
+import { sourceWarningLogRows } from "../lib/jobs/source-warnings.ts";
 import type { JobProvider, JobSearchQuery } from "../lib/jobs/types.ts";
 import { matchesPublicFilter, sortPublicJobs, toPublicJob } from "../lib/public-jobs.ts";
 import { resolveSourceCredits } from "../lib/source-attribution.ts";
@@ -119,6 +122,47 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     report("publicJobs remote chip", false, error instanceof Error ? error.message : String(error));
+  }
+
+  // B1/B2 — country detection + graceful Adzuna degradation on the full
+  // registry. For "ng" Adzuna must be *skipped* (count 0, no error — its API
+  // 404s there), every other source must still deliver, and the failure rows
+  // must never blame Adzuna for a silent skip.
+  try {
+    const country = detectCountry("Lagos");
+    report("detectCountry", country === "ng", `"Lagos" → ${country}`);
+
+    const result = await searchAll(
+      { title: "frontend developer", location: "Lagos", country },
+      { maxResults: 48 },
+    );
+    const adzunaOutcome = result.outcomes.find((outcome) => outcome.source === "adzuna");
+    const warningRows = sourceWarningLogRows({
+      runId: null,
+      userId: "smoke",
+      outcomes: result.outcomes,
+    });
+
+    report(
+      "B1 adzuna skip (ng)",
+      adzunaOutcome !== undefined &&
+        adzunaOutcome.count === 0 &&
+        adzunaOutcome.error === undefined,
+      `adzuna: ${adzunaOutcome ? `${adzunaOutcome.count} jobs${adzunaOutcome.error ? ` (${adzunaOutcome.error})` : " (skipped cleanly)"}` : "missing"}`,
+    );
+    report(
+      "B2 other sources survive",
+      result.jobs.length >= 1 && !warningRows.some((row) => row.message.includes("adzuna")),
+      `${result.jobs.length} jobs despite Adzuna skip, ` +
+        `${warningRows.length} warning row(s): ${warningRows.map((row) => row.message).join(" | ") || "none"}`,
+    );
+    for (const outcome of result.outcomes) {
+      console.log(
+        `       - ${outcome.source}: ${outcome.count} jobs${outcome.error ? ` (${outcome.error})` : ""}`,
+      );
+    }
+  } catch (error) {
+    report("B1/B2 country degradation", false, error instanceof Error ? error.message : String(error));
   }
 
   if (failures > 0) {

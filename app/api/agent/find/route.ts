@@ -4,7 +4,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 import { generateJson } from "@/lib/llm";
 import { trackPostHogEvent } from "@/lib/posthog-server";
+import { detectCountry } from "@/lib/jobs/country";
 import { searchAll } from "@/lib/jobs/search-all";
+import { sourceWarningLogRows } from "@/lib/jobs/source-warnings";
 import { MATCH_THRESHOLD } from "@/lib/utils";
 import type { NormalizedJob } from "@/lib/jobs/types";
 import type { Job } from "@/types";
@@ -27,6 +29,9 @@ type ProfileScoreContext = {
   industries: string[] | null;
   experience_level: string | null;
   job_titles_seeking: string[] | null;
+  // B1: inputs for search-country detection (C1 folds them into scoring too).
+  location: string | null;
+  preferred_locations: string[] | null;
 };
 
 // JSearch and the feeds return full multi-KB descriptions; scoring on the
@@ -176,7 +181,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const { data: profile, error: profileError } = await insforge.database
       .from("profiles")
-      .select("skills, industries, experience_level, job_titles_seeking")
+      .select(
+        "skills, industries, experience_level, job_titles_seeking, location, preferred_locations",
+      )
       .eq("id", user.id)
       .maybeSingle<ProfileScoreContext>();
 
@@ -221,16 +228,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Phase B1 of the plan replaces this hardcoded "us" with country detection
-    // from the location/profile. The location already rides inside JSearch's
-    // query text and the remote feeds ignore country, so other sources work
-    // for any region today.
+    // B1: derive the search country from what the user typed, falling back to
+    // the profile's preferred then current location. Adzuna skips unsupported
+    // codes inside its provider (ng → silent no-op), JSearch accepts any ISO
+    // code, and the remote feeds ignore country entirely.
+    const country = detectCountry(location.trim(), [
+      ...(profile.preferred_locations ?? []),
+      profile.location,
+    ]);
+
     const searchResult = await searchAll({
       title: jobTitle.trim(),
       location: location.trim(),
-      country: "us",
+      country,
     });
     const foundJobs = searchResult.jobs;
+
+    // B2: a failing source (e.g. Adzuna 404, JSearch quota) never fails the
+    // run — record it in agent_logs and continue with whatever succeeded.
+    const warningRows = sourceWarningLogRows({
+      runId,
+      userId: user.id,
+      outcomes: searchResult.outcomes,
+    });
+    if (warningRows.length > 0) {
+      const { error: warningError } = await insforge.database
+        .from("agent_logs")
+        .insert(warningRows);
+      if (warningError) {
+        console.error("[api/agent/find] source warnings", warningError);
+      }
+    }
 
     if (foundJobs.length === 0) {
       await insforge.database

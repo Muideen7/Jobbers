@@ -250,7 +250,7 @@ const jobRecord = {
 - `salary_is_predicted: "1"` means Adzuna estimated the salary — this is normal
 - Attribution is per source: credit every source present in the rendered results through `lib/source-attribution.ts` + `components/shared/SourceCredits.tsx` (RemoteOK/Remotive/Jobicy ToS require on-site link-backs; legacy "search" rows credit Adzuna)
 - Adzuna description is a snippet — Gemini scores from it, not a full description
-- Default country to `'us'` — support `gb`, `au`, `ca` as alternatives
+- Country must come from `detectCountry` (`lib/jobs/country.ts`), never a hardcoded literal — the provider itself skips the 19-country list's absence (`ADZUNA_SUPPORTED_COUNTRIES`, plan B1: `ng` → skipped before any fetch, no 404)
 
 ---
 
@@ -349,9 +349,10 @@ import { remoteokProvider, remotiveProvider, jobicyProvider } from "@/lib/jobs/r
 
 ```typescript
 import { searchAll } from "@/lib/jobs/search-all";
+import { detectCountry } from "@/lib/jobs/country";
 
 const { jobs, outcomes } = await searchAll(
-  { title: "frontend developer", location: "Lagos", country: "us" }, // country: "us" until plan B1
+  { title: "frontend developer", location: "Lagos", country: detectCountry("Lagos") }, // plan B1 — never hardcode the country
   { maxResults: 40 }, // providers/state/now/sourceTtlMs/dailyLimits injectable for tests
 );
 ```
@@ -364,6 +365,38 @@ const { jobs, outcomes } = await searchAll(
 - Both search surfaces run on it: `/api/agent/find` and the public `/api/public/jobs` — the latter's chips are post-filters in `lib/public-jobs.ts`, and its response reports `data.sources[]` (the sources of the rendered cards) so the UI can render the attribution line
 - Logging: per-provider failures are `console.error`'d as `[jobs/searchAll] <source>: …`
 - Routes must map `NormalizedJob` → their own shapes; scoring ids need the `source:externalId` namespace (raw externalIds collide across sources)
+
+### Country detection (plan B1)
+
+`lib/jobs/country.ts` owns the search country — routes must never hardcode one:
+
+```typescript
+import { detectCountry } from "@/lib/jobs/country";
+
+const country = detectCountry(searchLocation, [
+  ...(profile.preferred_locations ?? []),
+  profile.location,
+]); // → "ng"; falls back to "us" when nothing resolves
+```
+
+- Detection order: search location → profile `preferred_locations` → profile `location` → `DEFAULT_COUNTRY` (`"us"`); each step tries city table (`Lagos→ng`, `London→gb`, `Accra→gh`, diacritics stripped) → country-name aliases (`uk→gb`, `south africa→za`) → bare two-letter codes **only when known** (a stray `uu` returns null, never a guess)
+- `/api/public/jobs` calls `detectCountry()` with no candidates (the landing search has no location input) → `us` default
+- The result feeds JSearch (valid ISO code for any country) and the Adzuna provider; the remote feeds ignore country
+- **Adzuna skips unsupported codes silently**: `isAdzunaCountrySupported` / `ADZUNA_SUPPORTED_COUNTRIES` (19 codes) in `lib/jobs/adzuna.ts` — outside the list the provider returns `[]` *before any fetch*, so `ng` searches never produce a 404 `UNSUPPORTED_COUNTRY`
+
+### Source failure warnings (plan B2)
+
+A failing source must never fail the run. `lib/jobs/source-warnings.ts`:
+
+```typescript
+import { sourceWarningLogRows } from "@/lib/jobs/source-warnings";
+
+const rows = sourceWarningLogRows({ runId, userId: user.id, outcomes: result.outcomes });
+if (rows.length > 0) await insforge.database.from("agent_logs").insert(rows);
+```
+
+- One `agent_logs` row (level `"warning"`, message names source + error + "Run continued") per errored outcome — insert failures are `console.error`'d, never thrown
+- `/api/agent/find` inserts them right after `searchAll`, before the empty-result branch, so even an all-sources-down run records why while `agent_runs.status` stays `"completed"` (only unexpected throws reach the catch that marks a run `failed`)
 
 ### Source attribution (plan A7)
 
