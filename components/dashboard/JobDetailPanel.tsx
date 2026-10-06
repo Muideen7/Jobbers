@@ -15,21 +15,12 @@ import { ResearchCompanyButton } from "@/components/job-details/ResearchCompanyB
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDate, getInitials } from "@/lib/utils";
+import { formatDate, getInitials, getMatchBadgeVariant } from "@/lib/utils";
 import type { Job } from "@/types";
 
 type Props = {
   job: Job | null;
 };
-
-function getMatchBadgeVariant(
-  score: number | null,
-): "success" | "info" | "warning" | "secondary" {
-  if (score === null) return "secondary";
-  if (score >= 70) return "success";
-  if (score >= 60) return "info";
-  return "warning";
-}
 
 function InfoChip({ icon, children }: { icon: "map" | "pay"; children: React.ReactNode }) {
   return (

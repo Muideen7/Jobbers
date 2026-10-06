@@ -4,24 +4,14 @@ import { ArrowUpRight, DollarSign, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, getInitials } from "@/lib/utils";
 import type { Job } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, getInitials, getMatchBadgeVariant } from "@/lib/utils";
 
 type Props = {
   job: Job;
   isSelected: boolean;
   onSelect: (id: string) => void;
 };
-
-function getMatchBadgeVariant(
-  score: number | null,
-): "success" | "info" | "warning" | "secondary" {
-  if (score === null) return "secondary";
-  if (score >= 70) return "success";
-  if (score >= 60) return "info";
-  return "warning";
-}
 
 function InfoChip({ icon, children }: { icon: "map" | "pay"; children: React.ReactNode }) {
   return (

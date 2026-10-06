@@ -33,6 +33,19 @@ export function getMatchScoreTextColor(score: number): string {
   return "text-warning";
 }
 
+/**
+ * shadcn Badge variant for a match score, so the same green/info/orange
+ * semantics hold across the dashboard cards, detail panel and inventory.
+ */
+export function getMatchBadgeVariant(
+  score: number | null,
+): "success" | "info" | "warning" | "secondary" {
+  if (score === null) return "secondary";
+  if (score >= MATCH_THRESHOLD) return "success";
+  if (score >= 60) return "info";
+  return "warning";
+}
+
 export function formatSalary(salary: string | null): string {
   return salary ?? "—";
 }
