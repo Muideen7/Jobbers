@@ -7,13 +7,12 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** A1–A7 — full multi-source layer (`lib/jobs/`: interface,
-Adzuna adapter, JSearch, Arbeitnow, RemoteOK/Remotive/Jobicy feeds,
-`searchAll` orchestrator with cache/dedupe/daily caps; `/api/agent/find`
-**and** `/api/public/jobs` rewired off Adzuna-only; Adzuna demoted to
-last-resort fallback; per-source attribution via `SourceCredits` on both
-results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
-**Next:** Phase B (country detection) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
+**Last completed:** D1 — Profile overview-first layout + visual pass ✅
+(`ProfileOverview` card, `ProfileForm` accordions; verified at 375/768/1440
+with Playwright against the user-run server using a seeded test user — zero
+horizontal overflow, accordions/summaries/ring all correct, no console
+errors; screenshots in `/tmp/opencode/visual-d1/`, 106/106 tests)
+**Next:** Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
 
@@ -97,12 +96,20 @@ results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
   collapsed headers carry live-state summaries; `divide-y divide-border`
   replaced the spacer dividers. ui-registry updated (Profile Overview entry +
   Profile Form accordion rules); tsc/eslint/106 tests/build green; visual pass
-  at 3 viewports queued against a user-run server (Playwright + Chromium ready)
+  at 3 viewports ✅ — test user `ada.okonkwo.d1@example.com` (seeded partial
+  profile → 78% ring, PHONE/EDUCATION chips) injected into Playwright as SDK
+  session cookies; DOM audit found no horizontal overflow at 375/768/1440,
+  all sections collapsed by default, summaries rendering as designed, working
+  toggles, labelled nav buttons, no console errors (screenshots:
+  `/tmp/opencode/visual-d1/`). Pre-existing gap noted, not D1: no `h1` on the
+  page (app-wide — dashboard/find-jobs also start at `h2`)
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---
 
 ## Decisions Made During Build
+
+- **Gotcha (agent infrastructure):** the `insforge` MCP `run-raw-sql` tool is configured against a *different* InsForge project than this repo (it shows zenith-access's schema and rejects `.insforge/project.json`'s `ik_` API key). Never run Jobbers SQL through it — use the linked CLI (`npx -y @insforge/cli db query "…"`), which targets this project correctly. Identity check: Jobbers tables respond on `https://y7fvq3ie.us-east.insforge.app/api/database/records/{profiles,jobs,agent_runs,agent_logs}`.
 
 - Landing page is composed from `LandingNavbar → Hero → TopCompanies → AiMatcher → HowItWorks → LiveOpportunities → WallOfLove → Faq → LandingFooter`. The older `Navbar`/`Hero`/`HowItWorks`/`Features`/`SuccessStory`/`CTASection`/`Footer` set is replaced: marketing chrome now lives in `components/homepage/LandingNavbar.tsx` and `LandingFooter.tsx`, and `components/layout/Navbar.tsx` + `Footer.tsx` are the in-app chrome.
 - Landing page visuals rely on shared token-driven helpers in `app/globals.css` (`landing-panel`, `landing-grid`, `landing-hero-glow`, `landing-divider`) instead of component-level hardcoded color values.

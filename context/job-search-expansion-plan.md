@@ -1,6 +1,6 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete; Phase C — C1–C4 ✅ complete; Phase D — D1 ✅ complete, overview+sections layout live (visual pass queued against a user-run server) — all on branch `feat/multi-source-job-search`. Adzuna demoted to last-resort fallback, multi-source search + attribution live, country detection + graceful degradation live, full-profile scoring on budgeted full descriptions with highlights persisted. Phase E next (E0 scope docs first)
+> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete; Phase C — C1–C4 ✅ complete; Phase D — D1 ✅ complete, overview+sections layout live and visual pass ✅ at 3 viewports — all on branch `feat/multi-source-job-search`. Adzuna demoted to last-resort fallback, multi-source search + attribution live, country detection + graceful degradation live, full-profile scoring on budgeted full descriptions with highlights persisted. Phase E next (E0 scope docs first)
 > **Created:** 2026-10-06
 > **Supersedes nothing** — Adzuna stays **as a fallback only** (19 countries; never the core source again); the other sources live around it.
 > Update this file and `progress-tracker.md` after every completed task.
@@ -351,9 +351,18 @@ Goal: one orchestrator, many providers, one normalized job shape.
   dividers moved from spacer divs to `divide-y divide-border`.
   **Verified:** `tsc --noEmit`, `eslint .`, 106/106 tests, `npm run build` ✅;
   `ui-registry.md` updated (Profile Overview entry, Profile Form accordion
-  rules, banner marked dashboard-only). **Visual pass at 3 viewports: queued** —
-  the user runs the server themselves (no dev server on this machine), Playwright
-  + Chromium are installed and ready.
+  rules, banner marked dashboard-only). **Visual pass at 3 viewports (375 /
+  768 / 1440) ✅** — a seeded test user (`ada.okonkwo.d1@example.com`, partial
+  profile → 78% ring, PHONE/EDUCATION chips) was signed up via SQL + CLI and
+  injected into Playwright as SDK session cookies; 4 screenshots (incl.
+  accordion-open) plus a programmatic DOM audit show zero horizontal overflow
+  at every viewport, all five sections collapsed by default, live summaries
+  rendering as designed (`Ada Okonkwo · Lagos, Nigeria`, `Frontend Engineer ·
+  Senior · 5 yrs`, `1 role added`, `Frontend Engineer +1 · Remote`), working
+  `aria-expanded` toggles (506px of content revealed on mobile), labelled nav
+  buttons and no console errors. Known pre-existing gap (not D1): the page
+  opens at `h2` with no `h1` — app-wide (dashboard / find-jobs too), logged as
+  a follow-up.
 
 ---
 
