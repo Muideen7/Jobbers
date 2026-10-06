@@ -7,11 +7,15 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** C5 keyword scoring + Live Opportunities rework ✅
-(keyword baseline with AI overlay, dedupe + honest banner; landing spec copy,
-five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
-`GEMINI_MODEL=gemini-3.1-flash-lite` — restart the dev server to pick it up;
-127/127 tests, tsc/eslint/build green)
+**Last completed:** Dashboard workspace rebuild + nav pages ✅
+(3-column workspace: DashboardNav with 6 links/bell/InsForge chip/avatar menu,
+filter sidebar with resume drop-in + AI threshold + location/salary/job-type,
+gradient feed hero with live multi-source search, results-bar pills, responsive
+2–3 col job grid, auto-selected right-hand detail panel with match analysis +
+dossier + action row; `/inventory`, `/ai-resume`, `/company-research`,
+`/applications` created; shadcn/ui primitives hand-written against Jobbers
+tokens; **136/136 tests**, tsc/eslint/build green — commits `a30dbb8`,
+`dccd75b`, `92c89b6`)
 **Next:** Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
@@ -139,6 +143,48 @@ five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
   is byte-identical to its pre-redesign state; ui-registry's footer entry
   was dropped with it. Do not re-apply — wait for a corrected spec that
   states the width and copy explicitly
+- [x] Dashboard workspace rebuild + nav pages — `/dashboard` is now a 3-column
+  workspace (`264px / 1fr / 380px` at `xl`, stacked below): `DashboardNav`
+  (six links — Find Jobs, Inventory, AI Resume, Company Research,
+  Applications, Profile — center search that deep-links to `/dashboard?q=…`,
+  notification bell fed by `/api/notifications` = last 5 completed `agent_runs`
+  + last 5 researched jobs merged top 6, green InsForge signed-in chip, avatar
+  menu with Profile + PostHogLogoutLink, mobile drawer), left `FilterSidebar`
+  (resume drop-in `ResumeDropzone` → upload → Gemini `extractProfile` →
+  `ExtractedReviewDialog` → non-destructive `applyExtractedProfile` merge over
+  the saved row; AI Match Threshold `Slider` 0–100 default 0; location input;
+  salary pills; job-type pills), center feed (`FeedHero` lavender→peach
+  gradient with live multi-source POST `/api/agent/find`, `ResultsBar` with
+  quick pills bound to the same filter state, `JobCard`/`JobGrid` responsive
+  2–3 cols with charcoal `border-ink`/`shadow-sm`/`rounded-2xl` cards,
+  auto-selected top result), right `JobDetailPanel` (match badge,
+  `MatchScore`, `CompanyResearch` with `showResearchButton={false}` so the
+  Actions row owns Research, actions: [Tailor Resume PDF] disabled-coming-soon,
+  [Research Company], [Apply via Source]). Server page feeds top-100 jobs
+  `match_score desc` + `ProfileAttentionBanner`; deleted the replaced widgets
+  `StatsBar`/`RecentActivity`/`AnalyticsCharts`. Filters are a pure tested lib
+  (`lib/dashboard-filters.ts`, 9 tests: salary floor parsing incl. `$150k`
+  shorthand/hourly annualisation, job-type with 7 provider spellings, remote
+  keyword, keyword search, threshold). `/api/jobs` gained a `limit` param
+  (clamp 1–100, default 20). Dashboard uses the charcoal spec
+  (`rounded-2xl`, `shadow-sm`, `border-ink`) per user override; new pages keep
+  the current app language (`border-border`, `shadow-card`, pill buttons).
+  `/inventory` (search + All/Researched/Not researched/High-match pills over
+  every saved job), `/ai-resume` (reuses `ResumeSection` + review dialog,
+  Tailor-for-a-role card coming soon), `/company-research` (saved dossier grid
+  with overview excerpts → detail page, plus a run-a-pass lane with
+  `ResearchCompanyButton`), `/applications` (honest placeholder → Phase E
+  auto-apply CTA, links to inventory/find-jobs). shadcn/ui primitives
+  (`components/ui/{button,badge,card,slider,scroll-area,dialog}.tsx`) were
+  **hand-written** (CLI/init never ran, globals.css preserved): token-mapped
+  (primary→ink, card→surface, destructive→error, overlay `bg-ink/40`,
+  `rounded-2xl` cards, pill buttons, accent 2px outline offset 3px focus),
+  Badge gains `success`/`info`/`warning` variants, match badge green ≥70 /
+  info 60–69 / warning <60 via centralized `getMatchBadgeVariant`. Deps:
+  `class-variance-authority`, `clsx`, `tailwind-merge`, radix
+  dialog/slider/scroll-area/slot; `@theme` shadcn aliases added and mirrored
+  verbatim into ui-tokens.md. **136/136 tests**, tsc/eslint/build green
+  (`a30dbb8` ui primitives, `dccd75b` dashboard, `92c89b6` pages)
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---

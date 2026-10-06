@@ -400,74 +400,298 @@ Last updated: 2026-06-05
 | Accent usage     | Button `bg-accent text-accent-foreground`; tech tags `bg-accent-muted text-accent`; section icon shells rotate between `bg-accent-muted`, `bg-success-lightest`, and `bg-info-lightest` token backgrounds |
 
 **Pattern notes:**
-The research card preserves the Feature 12 card shell and header, then swaps between an empty state with a client action and a dense read-only dossier. The client action lives in its own component, uses plain `fetch` plus `useTransition`, and calls `router.refresh()` after the API saves research. Dossier sections should stay compact, token-driven, and source-linked; do not add a refresh action unless Feature 13 scope changes.
+The research card preserves the Feature 12 card shell and header, then swaps between an empty state with a client action and a dense read-only dossier. The client action lives in its own component, uses plain `fetch` plus `useTransition`, and calls `router.refresh()` after the API saves research. Dossier sections should stay compact, token-driven, and source-linked; do not add a refresh action unless Feature 13 scope changes. Since the dashboard rebuild the component accepts `showResearchButton?: boolean` (default `true`): the standalone find-jobs page keeps the in-card research action, but the dashboard's right-hand panel passes `showResearchButton={false}` so the panel's own Actions row owns it — never render two research buttons for the same job.
 
 ---
 
-### StatsBar
+### shadcn/ui Primitives (Jobbers-mapped)
 
-File: components/dashboard/StatsBar.tsx
-Last updated: 2026-06-05
+Files: components/ui/{button,badge,card,slider,scroll-area,dialog}.tsx
+Last updated: 2026-10-06
 
-| Property         | Class                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| Background       | `bg-surface`                                                                          |
-| Border           | `border border-border`                                                                |
-| Border radius    | `rounded-2xl`                                                                         |
-| Text — primary   | `text-3xl font-semibold leading-9 text-text-primary` stat value                       |
-| Text — secondary | `text-sm font-medium text-text-secondary` label; `text-xs text-text-muted` sub-label  |
-| Spacing          | `p-6` card, `mt-2` between value and trend row, `gap-2` trend row                    |
-| Trend badge      | `rounded-sm bg-success-lightest px-2 py-0.5 text-xs font-medium text-success-darker` |
-| Shadow           | `shadow-card`                                                                         |
+Hand-written `shadcn/ui`-style primitives (the CLI/`init` **never ran** — it would
+have rewritten `app/globals.css`). They mirror the classic shadcn API
+(`cn`, `asChild` via `@radix-ui/react-slot`, `cva` variants, radix dialog /
+slider / scroll-area roots) but every slot class is mapped onto the Jobbers
+token set, so they read as the app's design language:
+
+| Token pair (shadcn name) | Jobbers class |
+| --- | --- |
+| `primary` | `bg-ink text-accent-foreground hover:bg-ink-hover` |
+| `primary-foreground` | `text-accent-foreground` |
+| `card` | `bg-surface` |
+| `muted` | `bg-surface-secondary text-text-muted` |
+| `accent` | `bg-accent-muted text-accent` |
+| `border` | `border-border` |
+| `input` | `border-border bg-surface` |
+| `ring` | `ring-accent` |
+| `destructive` | `bg-error text-accent-foreground` |
+| `foreground` | `text-text-primary` |
 
 **Pattern notes:**
-Four cards in a responsive grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`). Trend badge only renders when a `trend` string is present. Badge uses `TrendingUp` lucide icon at `h-3 w-3`.
+- **Button**: pill radius (`rounded-full`), `h-10 px-5` default / `h-9 px-4` sm /
+  `h-11 px-7` lg, font-weight 700, `outline-2 outline-offset-[3px]
+  focus-visible:outline-accent` focus, variants `default` (ink), `secondary`
+  (surface-secondary), `destructive`, `outline`, `ghost`, `link`.
+- **Badge**: pill (`rounded-full`), variants `default` (ink), `secondary`
+  (surface-secondary), `destructive`, `outline`, plus the match-scoring set
+  `success` / `info` / `warning` (green/blue/orange light fills driven by
+  `--color-success-lightest` etc.). Icons inside use `[&_svg]` (underscore!)
+  variants — `[&svg]` without the underscore generates an invalid
+  `:is(...)svg` selector in Tailwind v4. Match badge variant is chosen by the
+  centralized `getMatchBadgeVariant` in `lib/utils.ts` (green ≥70 via
+  `MATCH_THRESHOLD`, info 60–69, warning <60, `secondary` on null).
+- **Card**: `rounded-2xl border border-border bg-surface` with a
+  `#card-header`/`#card-content` column layout; the dashboard passes
+  `gap-0 py-0 border-ink shadow-sm` overrides.
+- **Slider**: radix root styled with token tracks (`bg-border`), accent thumb
+  (`bg-accent`), `divide-border` ticks.
+- **ScrollArea**: radix root/bar with `bg-border` thumb — used for the sticky
+  dashboard side columns.
+- **Dialog**: radix overlay `bg-ink/40 backdrop-blur-sm`, content
+  `rounded-2xl border border-border bg-surface`, header/footer slots.
+- These primitives are `"use client"`-free for pure presentational ones;
+  components that need state or radix interactivity are marked client. They
+  deliberately live alongside — not instead of — the `.btn` system: `.btn
+  btn-primary` remains the primary button language everywhere else.
 
 ---
 
-### RecentActivity
+### DashboardNav
 
-File: components/dashboard/RecentActivity.tsx
-Last updated: 2026-06-05
+File: components/dashboard/DashboardNav.tsx
+Last updated: 2026-10-06
 
-| Property         | Class                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| Background       | `bg-surface`                                                                          |
-| Border           | `border border-border`                                                                |
-| Border radius    | `rounded-2xl`                                                                         |
-| Text — primary   | `text-sm font-medium leading-5 text-text-primary` activity text                       |
-| Text — secondary | `text-xs text-text-muted` timestamp                                                   |
-| Spacing          | `p-6` card, `mt-5 space-y-5` list, `gap-3` item row                                  |
-| Shadow           | `shadow-card`                                                                         |
-| Dot — job_found  | outer `h-4 w-4 rounded-full bg-success-light`, inner `h-2 w-2 rounded-full bg-success-alt` |
-| Dot — researched | outer `h-4 w-4 rounded-full bg-info-light`, inner `h-2 w-2 rounded-full bg-info`     |
+| Property       | Class |
+| -------------- | ----- |
+| Background     | `sticky top-0 z-50 border-b border-border bg-surface/90 backdrop-blur-md` (mirrors App Navbar) |
+| Container      | `mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8` |
+| Nav links      | `whitespace-nowrap rounded-md text-sm font-medium`, active `text-accent`, idle `text-text-dark hover:text-text-primary`; horizontal at `xl`, mobile drawer below |
+| Search input   | `w-full rounded-full border border-ink bg-surface py-2 pl-10 pr-4 text-sm` `focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface` |
+| Bell badge     | `absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground`, count = notifications from the last 24h |
+| Menus          | popover panels `absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-surface p-4 shadow-xl`, closed by a transparent `fixed inset-0 z-40` backdrop button |
+| Avatar         | `flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-bold text-accent-foreground` with `getInitials`; hover `scale-105` |
+| InsForge chip  | `hidden lg:inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-text-secondary` with a `h-2 w-2 rounded-full bg-success` dot |
+| Drawer         | `fixed inset-0 z-[60] lg:hidden` — `bg-ink/40` scrim + `w-[min(20rem,85vw)] bg-surface p-6 shadow-xl` slide-in, rendered **outside** the header so `backdrop-blur` never becomes a containing block |
 
 **Pattern notes:**
-Activity dots use inline `style` with CSS variables for the exact token colors (success-light/success-alt, info-light/info) since Tailwind v4 generates classes from these tokens but the dot outer ring needs the `background` shorthand. `mt-0.5` on the dot aligns it with the first line of multi-line activity text.
+- **Six links**: Find Jobs, Inventory, AI Resume, Company Research,
+  Applications, Profile. `/find-jobs` is active via `startsWith` (it has
+  dynamic children); the rest are exact matches. Profile also lives in the
+  avatar menu.
+- **Navbar search = instant feed filter**: submit pushes
+  `/dashboard?q=<query>`; `DashboardClient` adopts the new `initialQuery` via
+  the sanctioned adjust-state-during-render pattern (no
+  set-state-in-effect). On the dashboard this re-filters the already-loaded
+  feed; from any other page it lands on the filtered feed.
+- **Bell data**: fetched client-side from `/api/notifications` (last 5
+  completed `agent_runs` + last 5 researched jobs, merged by `completed_at` /
+  `found_at`, top 6). Identical bell on every workspace page.
+- **Hooks hygiene**: `Date.now()` is computed inside the fetch callback (not
+  render — `react-hooks/purity`), and `query` follows `initialQuery` with the
+  render-adjustment pattern rather than an effect.
 
 ---
 
-### Analytics Charts
+### ResumeDropzone + ExtractedReviewDialog
 
-File: components/dashboard/AnalyticsCharts.tsx
-Last updated: 2026-06-05
+Files: components/dashboard/ResumeDropzone.tsx, components/dashboard/ExtractedReviewDialog.tsx
+Last updated: 2026-10-06
 
-| Property      | Value                                                                           |
-| ------------- | ------------------------------------------------------------------------------- |
-| Library       | `recharts` — `BarChart`, `AreaChart`, `ResponsiveContainer`                     |
-| Chart height  | `h-55` (220px) container, `ResponsiveContainer width="100%" height="100%"`      |
-| Grid lines    | `vertical={false}`, `stroke="var(--color-border)"`, `strokeDasharray="4 4"`    |
-| Axis labels   | `fill: "var(--color-chart-axis)"`, `fontSize: 12`, `axisLine={false}`, `tickLine={false}` |
-| Tooltip       | `borderRadius: 8`, `border: "1px solid var(--color-border)"`, `fontSize: 12`   |
-| Research bars | `fill="var(--color-info)"`, `radius={[4,4,0,0]}`, `maxBarSize={40}`             |
-| Jobs area     | `stroke="var(--color-accent)"`, `strokeWidth={3}`, gradient fill id `jobsGradient` (opacity 0.2→0) |
-| Match bars    | `fill="var(--color-success)"`, `radius={[4,4,0,0]}`, `maxBarSize={60}`          |
-| Card shell    | `rounded-2xl border border-border bg-surface p-6 shadow-card`                  |
+| Property | Class |
+| -------- | ----- |
+| Dropzone  | `cursor-pointer rounded-xl border-2 border-dashed p-4 text-center` — idle `border-ink/30 bg-surface-secondary`, dragging `border-accent bg-accent-muted` |
+| States    | uploading/extracting show `Loader2 animate-spin text-accent`; parsed shows a `bg-success-lightest` ring + `FileText text-success` |
+| Dialog    | shadcn `Dialog` — header "Resume extracted", body summary card `rounded-xl border border-border bg-surface-secondary p-4`, skill `Badge variant="secondary"`, footer `DialogClose` "Discard" + "Apply to profile" |
+| Feedback  | applied state `rounded-xl border border-border bg-success-lightest p-4` with `Check` + "Profile updated"; errors `text-error` |
 
 **Pattern notes:**
-Three named exports from one file — `CompanyResearchChart`, `JobsOverTimeChart`, `MatchDistributionChart`. All are `"use client"` (recharts needs browser). Colors use CSS variable references (`var(--color-*)`) so they stay token-driven inside recharts props. Left margin is `left: -20` on all charts to trim excess YAxis whitespace. Area gradient defined in `<defs>` with id `jobsGradient`.
+- Non-destructive merge: `applyExtractedProfile` in `actions/profile.ts` only
+  lets a non-empty extracted value win over the saved row, then delegates the
+  write to `saveProfile`. `requireUser()` and the final write stay **outside**
+  the action's own `try/catch` so a `NEXT_REDIRECT` can escape (same invariant
+  as every other profile action).
+- Dropzone rejects non-PDF (`file.type !== "application/pdf"`) and >2MB.
+- `onApplied` is optional and only wired when a callback is actually passed
+  (spread `{...(onApplied ? { onApplied } : {})}` — `exactOptionalPropertyTypes`
+  forbids passing explicit `undefined`).
 
-## Jobbers Marketing Shell
+---
+
+### Dashboard workspace page
+
+File: app/dashboard/page.tsx
+Last updated: 2026-10-06
+
+| Property   | Class |
+| ---------- | ----- |
+| Shell      | `main.mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-8` + `flex flex-col gap-5` |
+| Workspace  | `grid grid-cols-1 gap-5 xl:grid-cols-[264px_minmax(0,1fr)_380px]` — left filters / center feed / right detail panel |
+| Sidebars   | `xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:self-start` (left, via FilterSidebar) and `xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)]` (right, via JobDetailPanel's ScrollArea) |
+
+**Pattern notes:**
+- **Dashboard spec overrides the app language** (user decision): workspace
+  cards use `rounded-2xl` (16px), `shadow-sm`, charcoal `border-ink` borders
+  and ink buttons. New/placeholder pages keep the current app language
+  (`border-border`, `shadow-card`, `.btn` pills). `twMerge` keeps `border-ink`
+  over `border-border` when both are passed.
+- Server component fetches top-100 jobs `match_score desc
+  nullsFirst:false`, the profile (completion banner + nav identity), renders
+  `PostHogIdentify` + `DashboardNav` + optional `ProfileAttentionBanner` +
+  `DashboardClient`. `searchParams` is awaited (Next 16 async params).
+- The old `StatsBar` / `RecentActivity` / `AnalyticsCharts` dashboard widgets
+  were **deleted** (unused elsewhere); `recharts` remains only if other pages
+  use it — none currently do.
+
+### DashboardClient (workspace orchestrator)
+
+File: components/dashboard/DashboardClient.tsx
+Last updated: 2026-10-06
+
+| Property        | Class |
+| --------------- | ----- |
+| State           | `jobs`, `selectedId`, `filters` (`DashboardFilters` from `lib/dashboard-filters.ts`), `isSearching`, `searchMessage` |
+| Sync            | adopts `initialJobs` / `initialQuery` prop changes via **adjust-state-during-render** (`prevInitial*` refs) — fires after `router.refresh()` (research completed) or a `?q=` navigation |
+| Auto-select     | one-shot render adjustment: when `selectedId === null && filtered.length > 0` set the first filtered job's id (converges, no effect) |
+| Live search     | `POST /api/agent/find { jobTitle, location: "" }` → shows `successMessage` → `refetchJobs()` from `/api/jobs?limit=100` |
+| Applied resume  | `onAppliedResume` → `router.refresh()` so the attention banner + initial jobs re-render server-side |
+
+**Pattern notes:**
+- One shared `filters` object powers both the left sidebar and the results-bar
+  pills — `FilterSidebar` and `ResultsBar` both receive it plus an
+  `onChange(patch)`.
+- Selection is independent of filters: the panel keeps showing the selected
+  job even if it is filtered out of the grid.
+- Three `setState`-in-effect lint violations (jobs sync, query sync,
+  auto-select) were all converted to the sanctioned render-adjustment pattern.
+
+### FilterSidebar + FeedHero + ResultsBar + JobGrid
+
+Files: components/dashboard/{FilterSidebar,FeedHero,ResultsBar,JobGrid}.tsx
+Last updated: 2026-10-06
+
+| Property      | Class |
+| ------------- | ----- |
+| Sidebar cards | `rounded-2xl border border-ink bg-surface p-5 shadow-sm`, section headers `text-xs font-semibold uppercase tracking-wide text-text-secondary` |
+| Threshold     | shadcn `Slider` `min 0 max 100 step 5`, default 0 (keyword scores average ~33 — a 70 floor would hide everything), "Min match: {n}%" + Ghost "Reset" |
+| Location      | `w-full rounded-lg border border-ink bg-surface px-3 py-2 text-sm` `focus:ring-2 focus:ring-accent focus:ring-offset-2` |
+| Salary pills  | 3-col grid `Any / $100k+ / $150k+`, `Button size sm` `rounded-full`, active `default` variant |
+| Job-type pills| All / Full-Time / Remote / Contract, clicking the active pill toggles back to `all` |
+| FeedHero      | `overflow-hidden rounded-2xl border border-ink bg-gradient-to-br from-lavender via-lavender-soft to-peach p-6 shadow-sm sm:p-8` — `h1` "Find your match", pill search input, ink submit `Button rounded-full px-6` |
+| ResultsBar    | `h2 text-sm font-semibold text-text-darkest` "Available Positions ({count})" + quick pills All / Remote / Full Time / $150k+; toggling an active pill off resets the dimension (job type → `all`, salary → `0`) |
+| JobGrid       | `grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3`; empty state has `SearchX` icon + "Clear filters" button |
+
+**Pattern notes:**
+- Match badges on cards live in a colored pill chosen by `getMatchBadgeVariant`
+  (green ≥70 / info 60–69 / warning <60 / secondary on null) — the wireframe's
+  "green 88% Match" is the ≥70 case, not the default.
+- The hero search is a *live discovery run* (`/api/agent/find`); the navbar
+  search is the *instant filter*. Both are documented here so they are not
+  conflated later.
+
+### JobCard + JobDetailPanel
+
+Files: components/dashboard/{JobCard,JobDetailPanel}.tsx
+Last updated: 2026-10-06
+
+| Property       | Class |
+| -------------- | ----- |
+| Card shell     | `Card` `gap-0 overflow-hidden rounded-2xl border-ink py-0 shadow-sm`; selected `ring-2 ring-accent ring-offset-2 ring-offset-surface`, idle `hover:-translate-y-0.5 hover:shadow-md` |
+| Card header    | company-initials square `h-8 w-8 rounded-lg bg-accent-muted text-xs font-bold text-accent`, company name + `formatDate(found_at)` |
+| Card chips     | `inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-text-secondary` with `MapPin`/`DollarSign` at `h-3 w-3` |
+| Card footer    | `flex items-center gap-2 border-t border-ink/10 pt-3` — "View details" → `/find-jobs/{id}` and "Apply" (external, `target="_blank"`) as `Button size sm variant outline flex-1` |
+| Panel shell    | `overflow-hidden rounded-2xl border border-ink bg-surface shadow-sm xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)]`; content scrolls via `ScrollArea className="xl:h-[calc(100vh-7rem)]"` |
+| Panel header   | company box `h-10 w-10 rounded-xl bg-accent-muted text-sm font-bold text-accent`, company + title, match `Badge` right |
+| Actions        | [Tailor Resume PDF] = `Button disabled justify-between` with "Coming soon"; [Research Company] = `ResearchCompanyButton` wrapped in `[&_button]:w-full`; [Apply via Source] = external link button, falling back to a Jobbers detail link when `external_apply_url` is missing |
+
+**Pattern notes:**
+- The card is **not** wrapped in a `<button>` (the nested links would be
+  invalid HTML); only the header/title/chips region is the interactive select
+  region, and the footer links sit outside it.
+- The panel reuses `MatchScore` (match reasoning + matched/missing skill
+  pills) and `CompanyResearch` with `showResearchButton={false}` — the
+  Actions row owns the research action in the dashboard, avoiding a duplicate.
+- Auto-selects the top scored job on first load so the panel never renders the
+  "No job selected" empty state unless the feed is genuinely empty.
+
+### shadcn/radix dependencies
+
+Installed for the workspace (all pinned in `package.json`, locked in the
+lockfile): `class-variance-authority`, `clsx`, `tailwind-merge`,
+`@radix-ui/react-dialog`, `@radix-ui/react-slider`,
+`@radix-ui/react-scroll-area`, `@radix-ui/react-slot`. `cn` + `getInitials`
+live in `lib/utils.ts`. No other radix primitives were added (menus, dropdowns
+etc. are hand-rolled in the workspace components to avoid dragging in more).
+
+---
+
+### Inventory page
+
+File: app/inventory/page.tsx (server) + components/inventory/InventoryClient.tsx (client)
+Last updated: 2026-10-06
+
+| Property | Class |
+| -------- | ----- |
+| Cards    | current app language — `rounded-2xl border border-border bg-surface p-5 shadow-card` |
+| Card header | company-initials `h-9 w-9 rounded-full bg-accent-muted text-xs font-bold text-accent` + name + `formatDate`, match `Badge` |
+| Title    | `text-base font-semibold leading-6 text-text-primary hover:text-accent` link to `/find-jobs/{id}` |
+| Status   | `Badge variant="success"` "Researched" / `variant="secondary"` "Not researched", `variant="info"` "Tailored" |
+| Footer   | `mt-auto flex items-center gap-2 border-t border-border pt-3` — View details + Apply (external) `Button size sm variant outline flex-1` |
+| Controls | search input (`rounded-lg border border-border bg-surface` + `Search` icon) + status pills (All / Researched / Not researched / High match (70%+)) |
+| Empty    | `SearchX` icon shell + copy; no-jobs variant shows a "Search for jobs" → `/dashboard` button |
+
+**Pattern notes:**
+Server fetches up to 500 jobs (`found_at desc`) and lets the client filter
+with the shared `matchesQuery` from `lib/dashboard-filters.ts` plus a local
+status predicate. High match uses `MATCH_THRESHOLD` from `lib/utils.ts`.
+
+---
+
+### AI Resume page
+
+File: app/ai-resume/page.tsx (server) + components/ai-resume/AiResumeClient.tsx (client)
+Last updated: 2026-10-06
+
+`AiResumeClient` composes the existing `ResumeSection` (upload → Gemini
+extract, `existingResumeUrl={profile.resume_pdf_url}`) with the shared
+`ExtractedReviewDialog`, wiring `ResumeSection.onExtracted` → open the review
+dialog → `router.refresh()` after apply. A second card promotes the coming-soon
+Tailor-a-resume-for-a-role flow with `.btn btn-primary`-style "Find a role"
+→ `/dashboard`. Uses the current app language throughout.
+
+---
+
+### Company Research page
+
+File: app/company-research/page.tsx (server)
+Last updated: 2026-10-06
+
+| Property      | Class |
+| ------------- | ----- |
+| Dossier cards | `rounded-2xl border border-border bg-surface p-5 shadow-card`; `Badge variant="success"` "Researched"; overview excerpt `line-clamp-3 text-sm leading-6 text-text-secondary`; "Open dossier" `text-accent hover:text-accent-dark` link |
+| Run lane      | per-job row `rounded-2xl border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between` with `FileText` icon + `ResearchCompanyButton` (shrinks on `sm`) |
+
+**Pattern notes:**
+Two server-side partitions of the same jobs query: saved dossiers
+(`company_research IS NOT NULL`) vs. a run-a-pass lane (`IS NULL`). The page is
+server-rendered; `ResearchCompanyButton` handles its own client state +
+`router.refresh()`. Fully researched shows "Every saved company has been
+researched. 🎉".
+
+---
+
+### Applications page
+
+File: app/applications/page.tsx (server)
+Last updated: 2026-10-06
+
+Honest placeholder — tracking ships with the Phase E auto-apply scope. A card
+explains the plan and links to `/inventory` ("Ready to apply") and
+`/find-jobs` ("Find more roles") as `group` hoverable cards
+(`rounded-2xl border border-border bg-surface p-5 hover:border-accent` with an
+`ArrowRight` that nudges `group-hover:translate-x-0.5`).
+
+---
 
 | Property        | Value                                                                    |
 | --------------- | ------------------------------------------------------------------------ |

@@ -46,15 +46,25 @@ const monaSans = Mona_Sans({ variable: "--font-sans", subsets: ["latin"] });
 
 ## Navbar
 
-Two distinct navbars, deliberately separate files:
+Three navigation surfaces, deliberately separate files:
 
 | | File | Used by |
 | --- | --- | --- |
 | Marketing | `components/homepage/LandingNavbar.tsx` | `/` |
-| In-app | `components/layout/Navbar.tsx` | `/dashboard`, `/profile`, `/find-jobs`, `/login` |
+| In-app | `components/layout/Navbar.tsx` | `/profile`, `/find-jobs`, `/login` |
+| Workspace | `components/dashboard/DashboardNav.tsx` | `/dashboard`, `/inventory`, `/ai-resume`, `/company-research`, `/applications` |
 
-Both share `h-16`, `sticky top-0 z-50`, `bg-surface/90 backdrop-blur-md`,
-`border-b border-border`, and the `max-w-[1440px] px-4 sm:px-6 lg:px-8` container.
+The workspace nav adds a center global search (submits to
+`/dashboard?q=…`), a notification bell (data from `/api/notifications`), the
+green InsForge signed-in chip, an avatar menu with Profile + sign-out, and
+six links: Find Jobs, Inventory, AI Resume, Company Research, Applications,
+Profile. `/profile` keeps the in-app `Navbar` (dashboard decision — Profile is
+reachable from the workspace avatar menu).
+
+Both shared chrome conventions apply to all three: `h-16`, `sticky top-0
+z-50`, `bg-surface/90 backdrop-blur-md`, `border-b border-border`, and the
+container gutters. The workspace drawer is rendered **outside** `<header>` for
+the same `backdrop-blur` containing-block reason.
 
 The in-app navbar is **auth-aware** via the `isAuthenticated` prop:
 
@@ -94,6 +104,34 @@ box-shadow: var(--shadow-card)
 `shadow-card` is the only shadow in the app. Arbitrary `shadow-[...]` rgba stacks are
 dead — they were all replaced. Never use a colored card background; color goes inside
 cards via badges, bars and text.
+
+---
+
+## Dashboard Workspace (spec override)
+
+The `/dashboard` workspace is the one place the app-wide card language is
+deliberately overridden (user-approved wireframe spec). Everything **inside**
+the workspace grid uses the charcoal spec; other pages keep the app language:
+
+| | Workspace (dashboard) | Everywhere else |
+| --- | --- | --- |
+| Card radius | `rounded-2xl` (16px) | `rounded-2xl` (16px) — same |
+| Card shadow | `shadow-sm` | `shadow-card` |
+| Card border | `border-ink` (charcoal) | `border-border` |
+| Buttons | ink primaries, pill | `.btn btn-primary` pills |
+| Focus | `ring-2 ring-accent ring-offset-2 ring-offset-surface` | `ring-1 ring-accent` |
+
+`twMerge` keeps the dashboard overrides winning when both class sets are
+passed (e.g. the shadcn `Card` default `border-border` + the workspace's
+`border-ink`, or `shadow-sm` over `shadow-card`).
+
+The workspace layout: `grid grid-cols-1 gap-5 xl:grid-cols-[264px_minmax(0,1fr)_380px]`
+(left filters / center feed / right detail panel), both side columns
+`xl:sticky xl:top-[5.5rem]`, and the whole shell `max-w-[1600px]` instead of
+the app's `1440px`. Match badges are colored pills via `getMatchBadgeVariant`
+(green ≥70 / info 60–69 / warning <60 / secondary on null). The rule "never
+mix the two languages" is the reason a banner rendered server-side above the
+grid (`ProfileAttentionBanner`) keeps its normal `border-border shadow-card`.
 
 ---
 

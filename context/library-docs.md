@@ -26,6 +26,47 @@ Never rely on general training knowledge alone for library APIs — they change 
 
 ---
 
+## shadcn/ui primitives (self-hosted, Jobbers-mapped)
+
+**Check first:** no installed skill for these — they are plain,
+hand-written variants of the classic shadcn/ui components. Read
+`context/ui-registry.md` → "shadcn/ui Primitives" before using them.
+
+### What was installed and why
+
+| Package | Used by |
+| --- | --- |
+| `class-variance-authority` | `cva()` variant mapping in `components/ui/{button,badge,card}.tsx` |
+| `clsx` + `tailwind-merge` | `cn(...)` in `lib/utils.ts` — `twMerge` deliberately keeps `border-ink`/`shadow-sm` (dashboard overrides) winning over `border-border`/`shadow-card` |
+| `@radix-ui/react-dialog` | `components/ui/dialog.tsx` (ResumeDropzone/ExtractedReviewDialog, review flow) |
+| `@radix-ui/react-slider` | `components/ui/slider.tsx` (FilterSidebar AI threshold) |
+| `@radix-ui/react-scroll-area` | `components/ui/scroll-area.tsx` (sticky dashboard columns) |
+| `@radix-ui/react-slot` | `asChild` composition in button/badge/dialog |
+
+### Rules
+
+- **The CLI / `shadcn init` must never run** — it rewrites `app/globals.css`.
+  All primitives in `components/ui/` are hand-written and token-mapped
+  (see the ui-registry token-pair table: `primary`→ink, `card`→surface,
+  `muted`→surface-secondary, `destructive`→error, overlay `bg-ink/40`).
+- `cn()` / `getInitials()` are the only additions to `lib/utils.ts` from this
+  feature; `getMatchBadgeVariant` chose the score badge variant
+  (success ≥ `MATCH_THRESHOLD` / info 60–69 / warning <60 / secondary null).
+- Tailwind v4 arbitrary-variant gotcha: use `[&_svg]` (underscore) for
+  descendant selectors — `[&svg]` generates an invalid `:is(...)svg` rule
+  that breaks the CSS build (real bug, fixed in `badge.tsx`).
+- `exactOptionalPropertyTypes` is on: never pass explicit `undefined` to an
+  optional prop — spread conditionally (`{...(cond ? { prop } : {})}`).
+- `react-hooks` v6 lint is strict: no synchronous `setState` inside effects
+  (use the sanctioned adjust-state-during-render pattern) and no impure
+  calls like `Date.now()` during render.
+- Focus ring convention (v4): `outline-2 outline-offset-[3px]
+  focus-visible:outline-accent`.
+- These primitives complement — not replace — the `.btn` system; app pages
+  outside the dashboard keep `.btn btn-primary`.
+
+---
+
 ## InsForge
 
 **Check first:** Check AGENTS.md for an installed InsForge skill. If an InsForge MCP server is configured — use it. The skill/MCP will have the latest API patterns.
