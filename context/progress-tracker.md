@@ -55,7 +55,7 @@ errors; screenshots in `/tmp/opencode/visual-d1/`, 106/106 tests)
 
 - [x] A1 Normalized provider interface — `lib/jobs/types.ts` + shared-shape tests
 - [x] A2 Adzuna provider adapter — `lib/jobs/adzuna.ts` (lib/adzuna.ts untouched)
-- [x] A3 JSearch provider — `lib/jobs/jsearch.ts` (offline tests green; live smoke pending `JSEARCH_API_KEY` signup)
+- [x] A3 JSearch provider — `lib/jobs/jsearch.ts` (offline tests green; live smoke ✅ — us / ng-Lagos / gb-London all returned 10 jobs with descriptions + apply URLs)
 - [x] A4 Arbeitnow provider — `lib/jobs/arbeitnow.ts` (live: 325 jobs)
 - [x] A5 Remote feeds — `lib/jobs/remote-feeds.ts` (RemoteOK 99 / Remotive 18 / Jobicy 100 live)
 - [x] A6 Orchestrator — `lib/jobs/search-all.ts` (fan-out, dedupe, per-source TTL,

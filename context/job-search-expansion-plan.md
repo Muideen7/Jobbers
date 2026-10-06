@@ -79,6 +79,8 @@ Goal: one orchestrator, many providers, one normalized job shape.
 - [x] **A3 — JSearch provider**
   ✅ Done. `lib/jobs/jsearch.ts` + `JSEARCH_API_KEY` in `.env.local.example`
   (key requires one-time manual signup at https://app.openwebninja.com/api/jsearch — no card).
+  **Key added to `.env.local`; live smoke ✅** — `tests/jsearch-smoke.ts`
+  passes us / ng-Lagos / gb-London (10 jobs each, descriptions + apply URLs).
   Built against the official spec — keep these URLs:
   - Markdown docs: `https://www.openwebninja.com/api/jsearch/llms.txt`
   - OpenAPI spec: `https://openwebninja.s3.us-east-1.amazonaws.com/portal/openapi/jsearch.yaml`
@@ -421,8 +423,9 @@ node --env-file=.env.local tests/jsearch-smoke.ts      # A3 — after JSEARCH_AP
 
 ## Known environment notes
 
-- `.env.local` has `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `GEMINI_API_KEY` set.
-  `JSEARCH_API_KEY` needs a one-time manual signup (free, no card).
+- `.env.local` has `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `GEMINI_API_KEY`,
+  `JSEARCH_API_KEY` set (JSearch key obtained from the free signup at
+  https://app.openwebninja.com/api/jsearch — live smoke passes).
 - Free-tier budgets: JSearch **200 req/month** → the orchestrator cache is mandatory,
   not optional. If the app outgrows it: RapidAPI same API, or Pro $25/mo.
   Remotive **~4 GET/day** → enforced in `search-all.ts` (6 h TTL + daily cap).
