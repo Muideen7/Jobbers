@@ -520,3 +520,47 @@ would make before adding a third provider.
 **Still needs a human:** eyeball `/login` in both colour schemes. The GitHub mark is `currentColor`,
 so it is correct by construction, but the Google mark's four brand hexes are fixed and are the one
 thing here that will not adapt to a dark-theme surface on its own.
+
+---
+
+## Handoff — OAuth Sign-In Silently Failed In Chromium Browsers (2026-10-06)
+
+**Symptom:** "Continue with Google/GitHub" bounced straight back to `/login` with no error in
+Brave/Chrome. Firefox completed the whole flow. Deployed app only (`jobbers-match.vercel.app`).
+
+**Root cause — not the browser profile, not the backend, not the Oct 5 auth commit:**
+`lib/security-headers.ts` sets `form-action 'self'` on every policy. The buttons were
+`<form action="/api/auth/oauth/{provider}" method="get">`. Chromium re-checks `form-action`
+against every hop of a *form submission's* redirect chain, so the route's `307` to
+`accounts.google.com` / `github.com` violated `'self'` and Chromium aborted the navigation —
+the user silently landed back on `/login`. Firefox does not apply `form-action` to redirects,
+which is exactly why it only "broke after switching system" (new machine → different default
+browser).
+
+**Proof:**
+- Fresh-profile headless Brave on the deployed `/login`: form click → CSP violation
+  `Sending form data to .../api/auth/oauth/google? violates "form-action 'self'"`, never leaves
+  the page. Same result on localhost.
+- Direct `page.goto("/api/auth/oauth/google")` in the same Brave: lands on Google sign-in,
+  zero violations → the backend chain was always fine.
+- Backend logs corroborate: `OAuth PKCE code created` + clean `302`, and Firefox's full
+  round-trip (`/shared/callback` → app `/callback` → exchange) completed successfully.
+
+**Fix (`components/auth/LoginCard.tsx`):** the two provider buttons are now plain
+`<a href="/api/auth/oauth/{provider}">` links (identical classes, no visual change). A link
+navigation is not a form submission, so `form-action` never applies and the strict CSP stays
+untouched — deliberately **not** loosened to `form-action 'self' https://accounts.google.com …`.
+`<a>` over `<Link>` on purpose: these are API routes and Link's viewport prefetch would fire
+`signInWithOAuth` and burn the one-time PKCE state before the click; the
+`@next/next/no-html-link-for-pages` rule is disabled inline with that reasoning.
+
+**Verification:** `npx eslint .` 0 · `npx tsc --noEmit` 0 · `npm test` 33/33 · headless Brave
+click on the rebuilt login page reaches `accounts.google.com` with zero `form-action` violations.
+
+**Known separate issue (untouched):** PostHog's `us-assets.i.posthog.com` config fetch is blocked
+by `script-src`/`connect-src` on the static (nonce-less) policy — analytics config + surveys fail
+to load on prerendered routes. Pre-dates this fix; needs its own pass (add the host to
+`connect-src`/`script-src` or self-host the loader).
+
+**Still needs a human:** complete one real Google **and** GitHub sign-in in Brave on the deployed
+app after this ships.

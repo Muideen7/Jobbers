@@ -58,25 +58,36 @@ export function LoginCard({ error }: Props) {
             </div>
           ) : null}
 
+          {/* Links, not GET forms: Chromium enforces `form-action 'self'` on
+              every hop of a form submission's redirect chain, so a form posting
+              to the OAuth start URL gets killed the moment the route 307s to
+              accounts.google.com / github.com and the user silently bounces
+              back here. Firefox does not enforce it on redirects, which is why
+              this only broke in Chromium browsers. A plain link navigation is
+              not a form submission, so `form-action` never applies and the CSP
+              can stay strict. The routes only read the path — they never read
+              form bodies — so GET links are behaviourally identical.
+
+              `<a>` rather than `<Link>` deliberately: these are API routes, and
+              Link prefetches on viewport, which would fire signInWithOAuth and
+              burn the one-time PKCE state before the user clicks. */}
           <div className="mt-8 grid gap-3">
-            <form action="/api/auth/oauth/google" method="get">
-              <button
-                type="submit"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <CompanyLogo type="google" className="h-5 w-5 shrink-0" />
-                Continue with Google
-              </button>
-            </form>
-            <form action="/api/auth/oauth/github" method="get">
-              <button
-                type="submit"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <CompanyLogo type="github" className="h-5 w-5 shrink-0" />
-                Continue with GitHub
-              </button>
-            </form>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see note above */}
+            <a
+              href="/api/auth/oauth/google"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <CompanyLogo type="google" className="h-5 w-5 shrink-0" />
+              Continue with Google
+            </a>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see note above */}
+            <a
+              href="/api/auth/oauth/github"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <CompanyLogo type="github" className="h-5 w-5 shrink-0" />
+              Continue with GitHub
+            </a>
           </div>
         </div>
       </div>
