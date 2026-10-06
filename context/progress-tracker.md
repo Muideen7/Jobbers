@@ -109,6 +109,21 @@ errors; screenshots in `/tmp/opencode/visual-d1/`, 106/106 tests)
 
 ## Decisions Made During Build
 
+- **LLM provider direction (2026-10-06):** no changes to `lib/llm.ts` yet — the
+  agreed future provider is **Groq** (Gemini free-tier limits are the pain point).
+  Until then Gemini stays, with `GEMINI_MODEL` as the escape hatch.
+- **Gemini free-tier quota gotchas (verified live):** quota is **20 requests/day
+  per project per model** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`).
+  `gemini-3-flash-preview` (configured) and `gemini-3.8-flash` both exhausted
+  during verification (reset ≈ 6 h); `gemini-3.1-pro`/`gemini-pro-latest` have
+  **limit: 0** for new keys; `gemini-3.5-flash`/`gemini-3.8-flash` also threw
+  intermittent 503 capacity errors. Model quirks: `gemini-3.5-flash-lite` and
+  `gemini-flash-lite-latest` **reject `thinkingConfig` with 400** (which
+  `generateJson` always sends), but `gemini-3.1-flash-lite` accepts it and
+  works. **`generateJson` + C2 scoring verified end-to-end live** with
+  `GEMINI_MODEL=gemini-3.1-flash-lite`: valid JSON, fixture scores 98/15/0
+  (strong/weak/mismatch). Smoke script kept at `/tmp/opencode/llm-verify/`.
+
 - **Gotcha (agent infrastructure):** the `insforge` MCP `run-raw-sql` tool is configured against a *different* InsForge project than this repo (it shows zenith-access's schema and rejects `.insforge/project.json`'s `ik_` API key). Never run Jobbers SQL through it — use the linked CLI (`npx -y @insforge/cli db query "…"`), which targets this project correctly. Identity check: Jobbers tables respond on `https://y7fvq3ie.us-east.insforge.app/api/database/records/{profiles,jobs,agent_runs,agent_logs}`.
 
 - Landing page is composed from `LandingNavbar → Hero → TopCompanies → AiMatcher → HowItWorks → LiveOpportunities → WallOfLove → Faq → LandingFooter`. The older `Navbar`/`Hero`/`HowItWorks`/`Features`/`SuccessStory`/`CTASection`/`Footer` set is replaced: marketing chrome now lives in `components/homepage/LandingNavbar.tsx` and `LandingFooter.tsx`, and `components/layout/Navbar.tsx` + `Footer.tsx` are the in-app chrome.
