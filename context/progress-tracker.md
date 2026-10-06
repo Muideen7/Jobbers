@@ -78,7 +78,17 @@ results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
 - [x] B2 Graceful source degradation — `lib/jobs/source-warnings.ts`
   (`sourceWarningLogRows` → `agent_logs` warning rows per errored outcome);
   a source failure can never flip `agent_runs.status` to `failed` — 91/91 tests
-- [ ] C Matcher quality · D Profile page · E Auto-apply
+- [x] C1–C4 Matcher quality — `lib/jobs/scoring-prompt.ts`
+  (`ProfileScoreContext` now carries all nine plan fields + `location`;
+  `buildScoringPrompt` centralizes prompt construction with word-boundary
+  description truncation on a 160k-char shared / 6k-per-job budget — Adzuna
+  snippets pass through as-is — and job-count-scaled `maxOutputTokens`, fixing
+  a flat 1200 that could not hold 40 results and silently zero-scored full
+  batches) + `lib/jobs/job-record.ts` (`buildJobRecord` persists JSearch
+  highlights into `jobs.responsibilities/requirements/benefits`; salary rules
+  moved verbatim) + C4 semantics verified (zero-score fallback,
+  `MATCH_THRESHOLD`, no new events) — 106/106 tests
+- [ ] D Profile page (D1 layout choice needs user decision) · E Auto-apply
 
 ---
 

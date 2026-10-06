@@ -5,6 +5,13 @@ import { createInsforgeServer } from "@/lib/insforge-server";
 import { generateJson } from "@/lib/llm";
 import { trackPostHogEvent } from "@/lib/posthog-server";
 import { detectCountry } from "@/lib/jobs/country";
+import { buildJobRecord } from "@/lib/jobs/job-record";
+import {
+  buildScoringPrompt,
+  scoringId,
+  type ProfileScoreContext,
+  type ScoredResult,
+} from "@/lib/jobs/scoring-prompt";
 import { searchAll } from "@/lib/jobs/search-all";
 import { sourceWarningLogRows } from "@/lib/jobs/source-warnings";
 import { MATCH_THRESHOLD } from "@/lib/utils";
@@ -16,53 +23,16 @@ type RequestBody = {
   location: string;
 };
 
-type ScoredResult = {
-  jobId: string;
-  matchScore: number;
-  matchReason: string;
-  matchedSkills: string[];
-  missingSkills: string[];
-};
-
-type ProfileScoreContext = {
-  skills: string[] | null;
-  industries: string[] | null;
-  experience_level: string | null;
-  job_titles_seeking: string[] | null;
-  // B1: inputs for search-country detection (C1 folds them into scoring too).
-  location: string | null;
-  preferred_locations: string[] | null;
-};
-
-// JSearch and the feeds return full multi-KB descriptions; scoring on the
-// first ~1200 chars keeps the Gemini prompt bounded (plan C2 refines this).
-const SCORING_DESCRIPTION_CHARS = 1200;
-
-function scoringId(job: NormalizedJob): string {
-  // externalIds are unique per source only — "123" from Adzuna and "123"
-  // from RemoteOK are different jobs, so the source namespaces the id.
-  return `${job.source}:${job.externalId}`;
-}
-
 async function scoreJobsBatch(
   jobs: NormalizedJob[],
   profile: ProfileScoreContext,
 ): Promise<ScoredResult[]> {
-  const jobList = jobs
-    .map(
-      (j, i) =>
-        `Job ${i + 1} (id: "${scoringId(j)}"):
-Title: ${j.title}
-Company: ${j.company || "Unknown company"}
-Description: ${j.description.slice(0, SCORING_DESCRIPTION_CHARS)}`,
-    )
-    .join("\n\n");
-
-  const profileContext = JSON.stringify({
-    skills: profile.skills,
-    industries: profile.industries,
-    experience_level: profile.experience_level,
-    desired_roles: profile.job_titles_seeking,
+  // C1/C2: profile context, per-job description truncation (word-boundary,
+  // budgeted) and output-token sizing live in the central builder — this
+  // function keeps only the Gemini call and its fallback (C4).
+  const { system, prompt, maxOutputTokens } = buildScoringPrompt({
+    jobs,
+    profile,
   });
 
   const zeroScore = (jobId: string): ScoredResult => ({
@@ -79,28 +49,10 @@ Description: ${j.description.slice(0, SCORING_DESCRIPTION_CHARS)}`,
 
   try {
     parsed = (await generateJson({
-      system:
-        "You are a job matching assistant. Score each job against the candidate profile and return only valid JSON.",
-      prompt: `Score each of the following ${jobs.length} jobs against this candidate profile and return JSON with this exact shape:
-{
-  "results": [
-    {
-      "jobId": "string — the id field from the job",
-      "matchScore": number (0-100),
-      "matchReason": "string — one concise paragraph explaining the match",
-      "matchedSkills": ["string"],
-      "missingSkills": ["string"]
-    }
-  ]
-}
-
-Candidate profile:
-${profileContext}
-
-Jobs to score:
-${jobList}`,
+      system,
+      prompt,
       temperature: 0.3,
-      maxOutputTokens: 1200,
+      maxOutputTokens,
     })) as { results?: ScoredResult[] };
   } catch (error) {
     console.error("[api/agent/find] scoreJobsBatch", error);
@@ -118,34 +70,6 @@ ${jobList}`,
 
     return scored ?? fallback;
   });
-}
-
-/**
- * Cross-source salary rules: the source's own text wins (currency and period
- * intact, e.g. Remotive's "$45-$120/Hour"). Numeric figures only collapse to
- * the "$120k" convention when the period is yearly or unstated — hourly and
- * monthly numbers are dropped rather than mislabelled. Currency tracking for
- * numeric figures is plan C2's known gap.
- */
-function formatSalaryForDb(job: NormalizedJob): string | null {
-  if (job.salaryText) {
-    return job.salaryText;
-  }
-
-  const { salaryMin: min, salaryMax: max } = job;
-  if (min == null || (job.salaryPeriod !== null && job.salaryPeriod !== "YEAR")) {
-    return null;
-  }
-
-  const short = (value: number) => `$${Math.round(value / 1000)}k`;
-
-  if (max != null && min === max) {
-    return short(min);
-  }
-  if (max != null) {
-    return `${short(min)} - ${short(max)}`;
-  }
-  return `${short(min)}+`;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -182,7 +106,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { data: profile, error: profileError } = await insforge.database
       .from("profiles")
       .select(
-        "skills, industries, experience_level, job_titles_seeking, location, preferred_locations",
+        "skills, industries, experience_level, job_titles_seeking, " +
+          "years_experience, work_experience, remote_preference, " +
+          "preferred_locations, salary_expectation, location",
       )
       .eq("id", user.id)
       .maybeSingle<ProfileScoreContext>();
@@ -291,26 +217,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         missingSkills: [],
       };
 
-      return {
-        user_id: user.id,
-        run_id: runId,
-        // Provider id ("jsearch", "adzuna", …) so every saved row can be
-        // attributed to its source (plan A7); legacy rows say "search".
-        source: job.source,
-        source_url: job.sourceUrl || job.applyUrl,
-        external_apply_url: job.applyUrl,
-        title: job.title,
-        company: job.company || "Unknown company",
-        location: job.location || (job.remote ? "Remote" : "Unknown location"),
-        salary: formatSalaryForDb(job),
-        job_type: job.employmentType ?? "fulltime",
-        about_role: job.description,
-        match_score: score.matchScore,
-        match_reason: score.matchReason,
-        matched_skills: score.matchedSkills,
-        missing_skills: score.missingSkills,
-        found_at: new Date().toISOString(),
-      };
+      // C3: highlights/salary/source all flow through the record builder.
+      return buildJobRecord({
+        job,
+        userId: user.id,
+        runId,
+        score,
+        foundAt: new Date().toISOString(),
+      });
     });
 
     const { data: insertedJobs, error: insertError } = await insforge.database

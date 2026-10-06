@@ -398,6 +398,29 @@ if (rows.length > 0) await insforge.database.from("agent_logs").insert(rows);
 - One `agent_logs` row (level `"warning"`, message names source + error + "Run continued") per errored outcome — insert failures are `console.error`'d, never thrown
 - `/api/agent/find` inserts them right after `searchAll`, before the empty-result branch, so even an all-sources-down run records why while `agent_runs.status` stays `"completed"` (only unexpected throws reach the catch that marks a run `failed`)
 
+### Scoring prompt builder (plan C1+C2)
+
+`lib/jobs/scoring-prompt.ts` is the only place the Gemini scoring prompt may be built — routes must not assemble it inline:
+
+```typescript
+import { buildScoringPrompt, type ProfileScoreContext } from "@/lib/jobs/scoring-prompt";
+
+const { system, prompt, maxOutputTokens } = buildScoringPrompt({ jobs, profile });
+const parsed = (await generateJson({ system, prompt, temperature: 0.3, maxOutputTokens })) as { results?: ScoredResult[] };
+```
+
+- **Full profile (C1):** `ProfileScoreContext` carries all nine scoring fields (`skills`, `industries`, `experience_level`, `job_titles_seeking` → `desired_roles`, `years_experience`, `work_experience`, `remote_preference`, `preferred_locations`, `salary_expectation`) plus `location` (shared with B1's country detection; serialized as `current_location`). The find route must `select(...)` all ten columns.
+- **Description budget (C2):** descriptions are cut to `min(6_000, 160_000 ÷ jobCount)` chars at a word boundary via `truncateAtWordBoundary`, *while the job list is built* — never truncate the assembled prompt (it would cut the JSON instructions). Adzuna snippets (~300 chars) sit below both caps and pass as-is.
+- **Output budget:** `scoringMaxOutputTokens(n)` = `400n+400`, floored at 1200, capped 16384. Never hardcode `maxOutputTokens` for scoring — a flat 1200 cannot hold 40 results and `generateJson` throws `MAX_TOKENS`, zero-scoring the whole batch.
+- **Scoring semantics (C4):** the zero-score fallback (`matchReason: "Score unavailable"`), jobId→positional→fallback result matching, `MATCH_THRESHOLD` from `lib/utils.ts`, and the existing event names all stay in the route — do not rename or remove them.
+
+### Job record builder (plan C3)
+
+`lib/jobs/job-record.ts` maps a `NormalizedJob` to its `jobs` insert row:
+
+- `buildJobRecord({ job, userId, runId, score, foundAt })` — persists `job.highlights.{responsibilities,requirements,benefits}` into their `text[]` columns (JSearch `job_highlights` is the first source that fills them; others insert `[]`, matching the `'{}'` default), keeps `source` = provider id, `job_type` = `employmentType ?? "fulltime"`, location fallbacks `Remote`/`Unknown location`
+- `formatSalaryForDb(job)` lives here too (moved verbatim from the route): source text wins; numeric figures only format when yearly/unstated — hourly/monthly dropped, never mislabelled
+
 ### Source attribution (plan A7)
 
 `lib/source-attribution.ts` is the single registry mapping each `JobSourceId` → `{ label, url }` link-back (RemoteOK/Remotive/Jobicy ToS require one; Arbeitnow asks for one; Adzuna's "Jobs by Adzuna" obligation is covered by the same entry). `resolveSourceCredits(sources)` dedupes by label, treats legacy `"search"` as Adzuna, and skips `"url"`/unknown values. The shared `components/shared/SourceCredits.tsx` renders "Jobs via JSearch · …" — `FindJobsClient` derives credits from the jobs on screen, `LiveOpportunities` from the API's `data.sources[]`. Any new surface showing job data must render it too.

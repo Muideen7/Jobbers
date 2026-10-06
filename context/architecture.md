@@ -429,4 +429,5 @@ Rules the AI agent must never violate:
 - Adzuna API always includes category=it-jobs — never search without this filter.
 - The search country comes from `detectCountry` (`lib/jobs/country.ts`, fallback chain search location → profile preferred/current location → "us") — never a hardcoded literal; Adzuna is skipped silently outside `ADZUNA_SUPPORTED_COUNTRIES` (its API 404s there).
 - A failing job source never fails the run: searchAll isolates it into an `outcomes` error, `sourceWarningLogRows` records it in `agent_logs` (level 'warning'), and `agent_runs.status` only becomes 'failed' for unexpected errors — never for one source's outage.
+- The Gemini scoring prompt is built only via `buildScoringPrompt` (`lib/jobs/scoring-prompt.ts`) and `jobs` insert rows only via `buildJobRecord` (`lib/jobs/job-record.ts`) — never inline in a route; scoring keeps its zero-score fallback and `MATCH_THRESHOLD` from `lib/utils.ts`.
 - jobs.source is 'url' for hand-saved listings, a provider id ('jsearch' | 'adzuna' | 'arbeitnow' | 'remoteok' | 'remotive' | 'jobicy') for multi-source search results, or legacy 'search' (pre-A7 rows, all Adzuna) — never anything else.

@@ -1,6 +1,6 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, `/api/public/jobs` multi-sourced, per-source attribution live, country detection + graceful source degradation live. Phase C next
+> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete; Phase C — C1–C4 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, multi-source search + attribution live, country detection + graceful degradation live, full-profile scoring on budgeted full descriptions with highlights persisted. Phase D next (**D1 layout choice needs user decision**), then E
 > **Created:** 2026-10-06
 > **Supersedes nothing** — Adzuna stays **as a fallback only** (19 countries; never the core source again); the other sources live around it.
 > Update this file and `progress-tracker.md` after every completed task.
@@ -263,29 +263,69 @@ Goal: one orchestrator, many providers, one normalized job shape.
 
 ## Phase C — Matcher quality
 
-- [ ] **C1 — Full-profile scoring context**
+- [x] **C1 — Full-profile scoring context**
   Extend `ProfileScoreContext` in `app/api/agent/find/route.ts` to include
   `years_experience`, `work_experience`, `remote_preference`, `preferred_locations`,
   `salary_expectation` alongside the existing four fields.
   **Test:** context-builder unit test asserting all nine fields present.
+  **Done:** the type moved to `lib/jobs/scoring-prompt.ts` (exported) and now
+  carries the nine plan fields **plus `location`** — B1 shares the type for
+  country detection and the candidate's current city is a legitimate match
+  signal, so `buildProfileContext` serializes it as `current_location` too.
+  The find route selects all ten columns (`years_experience`,
+  `work_experience`, `remote_preference`, `salary_expectation` added).
+  **Test:** `tests/scoring-prompt.test.ts` — all nine + location asserted on a
+  full profile *and* on an all-null profile (keys present, values null).
 
-- [ ] **C2 — Score on full descriptions**
+- [x] **C2 — Score on full descriptions**
   Providers that return full text (JSearch, Arbeitnow, remote feeds) feed Gemini
   unabridged up to a token budget; Adzuna snippets stay as-is. Truncate centrally in
   the prompt builder, never mid-JSON.
   **Test:** prompt-builder test — truncation applied, all profile fields included,
   job count matches.
+  **Done:** prompt construction extracted to `lib/jobs/scoring-prompt.ts`
+  (`buildScoringPrompt` → `{ system, prompt, maxOutputTokens }`). Budgets:
+  `SCORING_TOTAL_DESCRIPTION_CHARS = 160_000` shared across the batch,
+  `SCORING_MAX_DESCRIPTION_CHARS = 6_000` per job (40 jobs → 4k each), cut at
+  word boundaries via `truncateAtWordBoundary` **while building the job list**
+  — the surrounding structure (JSON instructions, ids) is never truncated.
+  Adzuna's ~300-char snippets sit far below both caps → untouched, as the plan
+  requires. Output sizing: `scoringMaxOutputTokens(n)` = `400n+400` floored at
+  the old 1200, capped 16384 — the previous flat 1200 could not hold 40
+  results (~6k tokens), so a full batch risked `MAX_TOKENS` → JSON parse fail →
+  *every* job silently zero-scored; the fallback still exists (C4) but no
+  longer triggers for size reasons.
+  **Test:** truncation (word boundary + uniform-string proof + hard-cap
+  fallback), budget division, all-profile-fields-in-prompt, job count matches
+  (`(id: "` occurrences == N), multi-KB description cut to budget with ids and
+  titles intact, output-token sizing.
 
-- [ ] **C3 — Structured highlights into DB**
+- [x] **C3 — Structured highlights into DB**
   Map JSearch `job_highlights.{Responsibilities, Qualifications, Benefits}` →
   `jobs.responsibilities` / `jobs.requirements` / `jobs.benefits` (columns exist and
   are currently never populated for search jobs).
   **Test:** normalizer unit test.
+  **Done:** the JSearch normalizer half already existed (A1, tested in
+  `job-source-normalize.test.ts`); what was missing was persistence. Record
+  building moved out of the route into `lib/jobs/job-record.ts`
+  (`buildJobRecord` + `formatSalaryForDb` moved verbatim) and now writes
+  `highlights.{responsibilities,requirements,benefits}` into their columns;
+  sources without highlights insert `[]` (matching the columns' `'{}'`
+  default); `nice_to_have` stays untouched.
+  **Test:** `tests/job-record.test.ts` — highlights copied, empty-array case,
+  salary rules byte-identical to the old route function, source/url/score
+  fields, zero-score wording, `job_type`/`location` fallbacks.
 
-- [ ] **C4 — Preserve scoring semantics**
+- [x] **C4 — Preserve scoring semantics**
   Zero-score fallback on Gemini failure, `MATCH_THRESHOLD` from `lib/utils.ts` only,
   no new event names.
   **Test:** existing test suite green; `npm run lint && npm run build`.
+  **Done:** no behavioural change intended — `scoreJobsBatch` still catches
+  `generateJson` failures and returns `Score unavailable` zeros, still
+  prefers jobId → positional → fallback order, `MATCH_THRESHOLD` import and
+  the `job_search_started`/`job_found` events are untouched (PostHog
+  `job_found.source` still `"search"` per the A7 provenance decision).
+  **Verified:** 106/106 tests, `tsc --noEmit`, `eslint .`, `npm run build` ✅.
 
 ---
 
