@@ -251,6 +251,7 @@ All environment variables defined in `.env.local` for development. Never hardcod
 | `GEMINI_MODEL`                  | agent/ functions       |
 | `ADZUNA_APP_ID`                 | lib/adzuna.ts          |
 | `ADZUNA_APP_KEY`                | lib/adzuna.ts          |
+| `JSEARCH_API_KEY`               | lib/jobs/jsearch.ts    |
 | `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`   | lib/posthog-client.ts  |
 | `NEXT_PUBLIC_POSTHOG_HOST`           | lib/posthog-client.ts  |
 

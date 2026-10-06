@@ -6,9 +6,11 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Phase 5 — Dashboard
-**Last completed:** 17 Adzuna Multi-Location Duplicate Fix
-**Next:** 18 Analytics Charts — PostHog Data
+**Phase:** Phase 6 — Multi-Source Job Search Expansion
+**Last completed:** A1–A3 Multi-Source Provider Layer (`lib/jobs/` — normalized
+interface, Adzuna adapter, JSearch provider; 49/49 tests)
+**Next:** A4–A6 of `context/job-search-expansion-plan.md` (Arbeitnow provider,
+remote feeds, `searchAll` orchestrator + cache) on branch `feat/multi-source-job-search`
 
 ---
 
@@ -46,6 +48,14 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] 16 Recent Activity — Real Data
 - [ ] 17 Analytics Charts — PostHog Data
 - [x] 18 Adzuna Multi-Location Duplicate Fix
+
+### Phase 6 — Multi-Source Job Search Expansion (plan: `context/job-search-expansion-plan.md`)
+
+- [x] A1 Normalized provider interface — `lib/jobs/types.ts` + shared-shape tests
+- [x] A2 Adzuna provider adapter — `lib/jobs/adzuna.ts` (lib/adzuna.ts untouched)
+- [x] A3 JSearch provider — `lib/jobs/jsearch.ts` (offline tests green; live smoke pending `JSEARCH_API_KEY` signup)
+- [ ] A4–A6 (Arbeitnow, remote feeds, searchAll orchestrator)
+- [ ] B Location intelligence · C Matcher quality · D Profile page · E Auto-apply
 
 ---
 

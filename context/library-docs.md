@@ -254,6 +254,62 @@ const jobRecord = {
 
 ---
 
+## JSearch API (OpenWeb Ninja)
+
+**Check first:** Check AGENTS.md for an installed JSearch skill. If none exists — use this file, `https://www.openwebninja.com/api/jsearch/llms.txt` (markdown docs) and the OpenAPI spec at `https://openwebninja.s3.us-east-1.amazonaws.com/portal/openapi/jsearch.yaml`.
+
+### Job Search
+
+```typescript
+import { searchJsearch, jsearchProvider } from "@/lib/jobs/jsearch.ts";
+// NOTE: lib/jobs/* files import each other with relative ".ts" paths on purpose —
+// `node --test` does not resolve the "@/…" alias. Keep that style inside lib/jobs/.
+
+const jobs = await searchJsearch(
+  { title: "frontend developer", location: "Lagos", country: "ng" },
+  { numPages: 1 }, // optional; 1–20, default 1
+);
+```
+
+### Endpoint & Auth
+
+- `GET https://api.openwebninja.com/jsearch/search-v2`
+- Header `x-api-key: $JSEARCH_API_KEY` — free tier at https://app.openwebninja.com/api/jsearch (200 requests/month, 1000/hour, no card)
+- **Each page = 1 credit.** `num_pages` 1–20, each page returns ~10 jobs — so one request can return up to 200 jobs. Always cache results (the A6 orchestrator owns this).
+
+### Response Shape
+
+```typescript
+{
+  status: "OK",
+  request_id: string,
+  parameters: { query, cursor, num_pages, country, … },
+  data: {
+    jobs: [ /* see below */ ],
+    cursor: string | null, // pass back as ?cursor= for the next page
+  },
+}
+```
+
+Key job fields (full list in the OpenAPI spec): `job_id`, `job_title`,
+`employer_name`, `job_apply_link`, `job_description` (FULL text, unlike
+Adzuna's snippet), `job_location`/`job_city`/`job_state`/`job_country` (ISO
+alpha-2), `job_min_salary`/`job_max_salary`/`job_salary_period`,
+`job_posted_at_datetime_utc`, `job_employment_types[]`, `job_is_remote`,
+`job_google_link`, `job_highlights` (keys *typically* `Qualifications`,
+`Responsibilities`, `Benefits` — parse case-insensitively, may be absent).
+
+### Rules
+
+- Query phrasing matters: put location inside `query` — `"developer jobs in chicago"`; `lib/jobs/jsearch.ts` (`buildJsearchParams`) builds this, don't hand-roll it
+- `country` is ISO 3166-1 alpha-2 and works for **every** country (including `ng`) — unlike Adzuna's 19-country list
+- Normalize through `lib/jobs/jsearch.ts` (`normalizeJsearchJob` → `NormalizedJob`) — never consume the raw payload downstream
+- zod gotcha: `z.unknown()` rejects *missing* keys in zod v4 — use `.optional()` (this is why `job_highlights` is `z.unknown().optional()`)
+- 401/403 → key problem, 429 → monthly quota: the provider throws human-readable messages for both; never surface raw HTTP errors to users
+- Live check: `node --env-file=.env.local tests/jsearch-smoke.ts` (NG, US, GB)
+
+---
+
 ## Browserbase
 
 **Check first:** Check AGENTS.md for an installed Browserbase skill. If a Browserbase MCP server is configured — use it. The skill/MCP will have the latest session management and API patterns.
