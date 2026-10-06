@@ -13,6 +13,7 @@ import {
   matchesPublicFilter,
   matchesPublicSalary,
   matchesPublicSkills,
+  PUBLIC_RESULTS_PER_PAGE,
   sanitizePublicCategory,
   sanitizePublicSkills,
   sortPublicJobs,
@@ -38,8 +39,8 @@ export type PublicJobsResponse = {
   error?: string;
 };
 
-const RESULTS_PER_PAGE = 12;
-// Enough mixed-source results to fill several pages of cards before trimming.
+// Breadth for the facet lists and the full set behind "Browse all matched
+// roles"; the grid itself trims to PUBLIC_RESULTS_PER_PAGE after filtering.
 const MAX_RESULTS = 48;
 const QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
 // The security audit flagged this Map as unbounded — evict oldest past the cap.
@@ -138,7 +139,7 @@ export async function GET(req: NextRequest) {
       postFiltered.filter((job) => matchesPublicCategory(job, category)),
       filter,
     );
-    const rendered = matched.slice(0, RESULTS_PER_PAGE);
+    const rendered = matched.slice(0, PUBLIC_RESULTS_PER_PAGE);
 
     // Every source failed — a genuine outage, not just an empty result set.
     const allSourcesFailed =

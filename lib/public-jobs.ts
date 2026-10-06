@@ -28,6 +28,15 @@ export const PUBLIC_FILTERS: readonly string[] = [
 /** Salary floor the "$150k+" chip promises — figures below are in USD. */
 const SALARY_FILTER_MIN = 150_000;
 
+/**
+ * Cards the landing grid renders per fetch — a clean 3×3 at the `lg`
+ * breakpoint. The rest of the matched set (the route's 48-result cap) stays
+ * one click away behind "Browse all matched roles" → `/find-jobs`, which the
+ * proxy redirects to `/login?next=…` for anonymous visitors, so seeing more
+ * always means signing in first.
+ */
+export const PUBLIC_RESULTS_PER_PAGE = 9;
+
 export function isPublicFilter(value: string): value is PublicFilter {
   return (PUBLIC_FILTERS as readonly string[]).includes(value);
 }

@@ -362,7 +362,7 @@ const { jobs, outcomes } = await searchAll(
 - Cross-source dedupe: lowercase/punctuation-normalized `title|company` fingerprint, fuller description wins
 - `searchMode: "client"` sources are filtered locally against title tokens (≥3 chars); zero tokens disables the filter
 - `remoteOnly: true` on the query maps to JSearch's `work_from_home` param (the only server-side remote filter); every other source is post-filtered on `NormalizedJob.remote` by the caller
-- Both search surfaces run on it: `/api/agent/find` and the public `/api/public/jobs` — the latter's chips are post-filters in `lib/public-jobs.ts`, and its response reports `data.sources[]` (the sources of the rendered cards) so the UI can render the attribution line
+- Both search surfaces run on it: `/api/agent/find` and the public `/api/public/jobs` — the latter's legacy `filter` chips *and* the five landing dropdowns (`category`, `country`, `salary`, `skills`, `employment`) are post-filters in `lib/public-jobs.ts`, and its response reports `data.sources[]` (the sources of the rendered cards) plus `data.facets.categories` (categories still available under the other active filters) so the UI can render the attribution line and the Job Categories dropdown
 - Logging: per-provider failures are `console.error`'d as `[jobs/searchAll] <source>: …`
 - Routes must map `NormalizedJob` → their own shapes; scoring ids need the `source:externalId` namespace (raw externalIds collide across sources)
 
@@ -380,7 +380,7 @@ const country = detectCountry(searchLocation, [
 ```
 
 - Detection order: search location → profile `preferred_locations` → profile `location` → `DEFAULT_COUNTRY` (`"us"`); each step tries city table (`Lagos→ng`, `London→gb`, `Accra→gh`, diacritics stripped) → country-name aliases (`uk→gb`, `south africa→za`) → bare two-letter codes **only when known** (a stray `uu` returns null, never a guess)
-- `/api/public/jobs` calls `detectCountry()` with no candidates (the landing search has no location input) → `us` default
+- `/api/public/jobs` uses its `country` param when the landing dropdown picks a resolvable market (`countryFromText("Nigeria")` → `ng`, the raw text is passed to `searchAll` as `location` so JSearch embeds it in its query); with no selection — or junk it cannot resolve — it calls `detectCountry()` with no candidates → `us` default. `matchesPublicCountry` then post-filters for sources that ignore the market: remote/unresolvable locations pass, clear other-country locations drop
 - The result feeds JSearch (valid ISO code for any country) and the Adzuna provider; the remote feeds ignore country
 - **Adzuna skips unsupported codes silently**: `isAdzunaCountrySupported` / `ADZUNA_SUPPORTED_COUNTRIES` (19 codes) in `lib/jobs/adzuna.ts` — outside the list the provider returns `[]` *before any fetch*, so `ng` searches never produce a 404 `UNSUPPORTED_COUNTRY`
 

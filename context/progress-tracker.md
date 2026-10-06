@@ -7,12 +7,12 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** D1 — Profile overview-first layout + visual pass ✅
-(`ProfileOverview` card, `ProfileForm` accordions; verified at 375/768/1440
-with Playwright against the user-run server using a seeded test user — zero
-horizontal overflow, accordions/summaries/ring all correct, no console
-errors; screenshots in `/tmp/opencode/visual-d1/`, 106/106 tests)
-**Next:** Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
+**Last completed:** C5 keyword scoring + Live Opportunities rework ✅
+(keyword baseline with AI overlay, dedupe + honest banner; landing spec copy,
+five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
+`GEMINI_MODEL=gemini-3.1-flash-lite` — restart the dev server to pick it up;
+127/127 tests, tsc/eslint/build green)
+**Next:** C5 stale-score backfill (40 rows) → Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
 
@@ -103,6 +103,32 @@ errors; screenshots in `/tmp/opencode/visual-d1/`, 106/106 tests)
   toggles, labelled nav buttons, no console errors (screenshots:
   `/tmp/opencode/visual-d1/`). Pre-existing gap noted, not D1: no `h1` on the
   page (app-wide — dashboard/find-jobs also start at `h2`)
+- [x] C5 Keyword-first scoring + dedupe + honest banner —
+  `lib/jobs/keyword-score.ts` (`keywordScore`/`keywordScoreBatch`/
+  `reconcileWithAiResults`; weights 50 skills / 20 title / 10 seniority /
+  10 industry / 10 location; empty profile caps ≈26 with a "too thin to
+  score" reason) + `lib/jobs/search-summary.ts` (`jobSaveKey` =
+  `source + coalesce(source_url, external_apply_url)`, `partitionNewJobs`,
+  `buildSearchSuccessMessage` — message total = table total). Find route:
+  dedupe before insert, keyword baseline first, Gemini overlays only when
+  quota allows (failures keep keyword scores — never zeros again);
+  `MatchScore` header → "Match Reasoning"; `.env.local` sets
+  `GEMINI_MODEL=gemini-3.1-flash-lite`. Live data fix: 13 duplicate rows
+  deleted (`dup_extra = 0` verified); the 40 stale "Score unavailable" rows
+  get the keyword backfill as the closing step. 127/127 tests
+  (`53eb345`, `1517947`, `cc27e6e`, `e761742`)
+- [x] Landing Live Opportunities rework (two design specs) — hero copy
+  ("Live Opportunities" pill, "Find your next opportunity.", 60-second
+  subtitle), full-width search over five **server-side** dropdown facets
+  (Job Categories from `data.facets.categories`, Countries → `country`
+  search scope + post-filter, Salary Range, Skills, Employment Type; dark
+  Clear Filter) with local `FilterPill` listbox menus (check mark,
+  outside-click/Escape close, viewport-edge flip) and the
+  **"Available Positions (Search Result: N)"** header. Grid trims to
+  `PUBLIC_RESULTS_PER_PAGE` = **9** (3×3 at `lg`); the rest is behind
+  "Browse all matched roles" → `/find-jobs` (proxy → `/login?next=…` for
+  anonymous visitors). Facet params + sanitizers + 6 tests in `e761742`;
+  verified 127/127, tsc/eslint/build green
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---

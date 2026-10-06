@@ -16,7 +16,12 @@ import { detectCountry } from "../lib/jobs/country.ts";
 import { searchAll } from "../lib/jobs/search-all.ts";
 import { sourceWarningLogRows } from "../lib/jobs/source-warnings.ts";
 import type { JobProvider, JobSearchQuery } from "../lib/jobs/types.ts";
-import { matchesPublicFilter, sortPublicJobs, toPublicJob } from "../lib/public-jobs.ts";
+import {
+  matchesPublicFilter,
+  PUBLIC_RESULTS_PER_PAGE,
+  sortPublicJobs,
+  toPublicJob,
+} from "../lib/public-jobs.ts";
 import { resolveSourceCredits } from "../lib/source-attribution.ts";
 
 const query: JobSearchQuery = {
@@ -102,7 +107,7 @@ async function main(): Promise<void> {
       result.jobs.filter((job) => matchesPublicFilter(job, "remote")),
       "remote",
     );
-    const rendered = matched.slice(0, 12);
+    const rendered = matched.slice(0, PUBLIC_RESULTS_PER_PAGE);
     const mapped = rendered.map(toPublicJob);
     const credits = resolveSourceCredits(rendered.map((job) => job.source));
     const uniqueIds = new Set(mapped.map((job) => job.id));
