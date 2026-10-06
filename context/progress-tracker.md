@@ -12,7 +12,7 @@ Update this file after every completed feature. Any AI agent reading this should
 five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
 `GEMINI_MODEL=gemini-3.1-flash-lite` — restart the dev server to pick it up;
 127/127 tests, tsc/eslint/build green)
-**Next:** C5 stale-score backfill (40 rows) → Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
+**Next:** Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
 
 ---
 
@@ -114,9 +114,12 @@ five server-side facet dropdowns, 3×3/9-card grid; `.env.local`
   quota allows (failures keep keyword scores — never zeros again);
   `MatchScore` header → "Match Reasoning"; `.env.local` sets
   `GEMINI_MODEL=gemini-3.1-flash-lite`. Live data fix: 13 duplicate rows
-  deleted (`dup_extra = 0` verified); the 40 stale "Score unavailable" rows
-  get the keyword backfill as the closing step. 127/127 tests
-  (`53eb345`, `1517947`, `cc27e6e`, `e761742`)
+  deleted (`dup_extra = 0` verified); then the 40 stale "Score
+  unavailable" rows were re-scored with the same `keywordScore` (temp
+  root script, run and deleted, never committed) through one generated
+  `UPDATE … FROM (VALUES …)` — verified `stale = 0`, `zero_score = 0`,
+  scores 13–59 / avg 33, skill arrays populated where matched.
+  127/127 tests (`53eb345`, `1517947`, `cc27e6e`, `e761742`)
 - [x] Landing Live Opportunities rework (two design specs) — hero copy
   ("Live Opportunities" pill, "Find your next opportunity.", 60-second
   subtitle), full-width search over five **server-side** dropdown facets
