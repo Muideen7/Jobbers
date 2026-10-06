@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
 import { Navbar } from "@/components/layout/Navbar";
-import { ProfileAttentionBanner } from "@/components/profile/ProfileAttentionBanner";
+import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfilePageClient } from "@/components/profile/ProfilePageClient";
 import { privateMetadata } from "../private-metadata";
 
@@ -44,9 +44,10 @@ export default async function ProfilePage() {
       <PostHogIdentify userId={user.id} />
       <Navbar isAuthenticated />
       <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1440px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-        <ProfileAttentionBanner
+        <ProfileOverview
           completionPercent={completionPercent}
           missingFields={missingFields}
+          profile={profile ?? null}
         />
         <ProfilePageClient profile={profile ?? null} />
       </main>

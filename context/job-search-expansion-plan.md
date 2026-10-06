@@ -1,6 +1,6 @@
 # Job Search Expansion Plan — Multi-Source, Global, AI Auto-Apply
 
-> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete; Phase C — C1–C4 ✅ complete (branch `feat/multi-source-job-search`); Adzuna demoted to last-resort fallback, multi-source search + attribution live, country detection + graceful degradation live, full-profile scoring on budgeted full descriptions with highlights persisted. Phase D next (**D1 layout choice needs user decision**), then E
+> **Status:** Phase A — A1–A7 ✅ complete; Phase B — B1–B2 ✅ complete; Phase C — C1–C4 ✅ complete; Phase D — D1 ✅ complete, overview+sections layout live (visual pass queued against a user-run server) — all on branch `feat/multi-source-job-search`. Adzuna demoted to last-resort fallback, multi-source search + attribution live, country detection + graceful degradation live, full-profile scoring on budgeted full descriptions with highlights persisted. Phase E next (E0 scope docs first)
 > **Created:** 2026-10-06
 > **Supersedes nothing** — Adzuna stays **as a fallback only** (19 countries; never the core source again); the other sources live around it.
 > Update this file and `progress-tracker.md` after every completed task.
@@ -331,7 +331,7 @@ Goal: one orchestrator, many providers, one normalized job shape.
 
 ## Phase D — Profile page restructure
 
-- [ ] **D1 — Overview-first layout decision**
+- [x] **D1 — Overview-first layout decision**
   Replace the "resume section then giant form" default with a profile home:
   completion summary at top, resume + **Extract Profile** as the primary fast path,
   the manual `ProfileForm` sections secondary (collapsed or tabbed). **Layout choice
@@ -339,6 +339,21 @@ Goal: one orchestrator, many providers, one normalized job shape.
   before it's confirmed.
   **Test:** visual pass at 3 viewports, lint/build, `ui-registry.md` updated with the
   new components.
+  **Done:** user chose **overview + sections**. New server component
+  `components/profile/ProfileOverview.tsx` is the profile home's top card —
+  always visible (the old `ProfileAttentionBanner` hides at 100% and stays
+  dashboard-only), with ring + status line (`text-success` at 100%) +
+  missing-field chips + at-a-glance stats (Skills / Roles / Experience / Years).
+  `ProfileForm` sections became `FormSection` accordion rows: all collapsed by
+  default (resume extraction is the primary fast path, position unchanged),
+  header shows title + live-state summary (`3 roles added`, first title +2),
+  `applyExtracted()` opens every section so extraction can be reviewed —
+  dividers moved from spacer divs to `divide-y divide-border`.
+  **Verified:** `tsc --noEmit`, `eslint .`, 106/106 tests, `npm run build` ✅;
+  `ui-registry.md` updated (Profile Overview entry, Profile Form accordion
+  rules, banner marked dashboard-only). **Visual pass at 3 viewports: queued** —
+  the user runs the server themselves (no dev server on this machine), Playwright
+  + Chromium are installed and ready.
 
 ---
 

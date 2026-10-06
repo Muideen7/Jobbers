@@ -2,6 +2,8 @@
 
 import { useImperativeHandle, useState, useTransition } from "react";
 
+import { ChevronDown } from "lucide-react";
+
 import { saveProfile } from "@/actions/profile";
 import type { ExtractedProfile } from "@/actions/profile";
 import type { Profile } from "@/types";
@@ -182,9 +184,61 @@ function TagInput({
   );
 }
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+const SECTION_IDS = [
+  "personal",
+  "professional",
+  "experience",
+  "education",
+  "preferences",
+] as const;
+
+type SectionId = (typeof SECTION_IDS)[number];
+
+/**
+ * One accordion row of the manual-entry form (plan D1, "overview + sections"):
+ * the section title plus a one-line summary of what is already filled in, so a
+ * collapsed section still tells the user what lives inside. All sections start
+ * collapsed — resume extraction is the primary path — and open together after
+ * an extraction so the filled fields can be reviewed and saved.
+ */
+function FormSection({
+  title,
+  summary,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <h3 className="mb-4 text-sm font-semibold text-text-primary">{children}</h3>
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-start justify-between gap-4 py-4 text-left focus:outline-none focus:ring-1 focus:ring-accent"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-text-primary">
+            {title}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-text-muted">
+            {summary}
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          className={`mt-0.5 shrink-0 text-text-secondary transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {isOpen && <div className="pb-6">{children}</div>}
+    </div>
   );
 }
 
@@ -290,6 +344,49 @@ export function ProfileForm({ profile, formRef }: Props) {
   );
   const [coverLetterTone, setCoverLetterTone] = useState(profile?.cover_letter_tone ?? "");
 
+  // D1: manual entry is the secondary path — every section starts collapsed.
+  const [openSections, setOpenSections] = useState<Set<SectionId>>(new Set());
+
+  function toggleSection(id: SectionId) {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function openAllSections() {
+    setOpenSections(new Set(SECTION_IDS));
+  }
+
+  // Collapsed-header summaries: the first values a user would look for.
+  const personalSummary =
+    [fullName, location, linkedinUrl].filter(Boolean).join(" · ") ||
+    "Name, location and links";
+  const professionalSummary =
+    [currentTitle, experienceLevel, yearsExperience ? `${yearsExperience} yrs` : ""]
+      .filter(Boolean)
+      .join(" · ") || "Title, level, skills and industries";
+  const filledRoles = workEntries.filter(
+    (entry) => entry.company || entry.title,
+  ).length;
+  const experienceSummary =
+    filledRoles > 0
+      ? `${filledRoles} ${filledRoles === 1 ? "role" : "roles"} added`
+      : "No roles added yet";
+  const educationSummary =
+    [degree, fieldOfStudy, institution].filter(Boolean).join(", ") ||
+    "Degree, field and institution";
+  const firstSeekingTitle = jobTitlesSeeking[0] ?? "";
+  const seekingSummary =
+    jobTitlesSeeking.length > 1
+      ? `${firstSeekingTitle} +${jobTitlesSeeking.length - 1}`
+      : firstSeekingTitle;
+  const preferencesSummary =
+    [seekingSummary, remotePreference].filter(Boolean).join(" · ") ||
+    "Titles, remote preference and locations";
+
   useImperativeHandle(formRef, () => ({
     applyExtracted(data: ExtractedProfile) {
       if (data.full_name) setFullName(data.full_name);
@@ -323,6 +420,8 @@ export function ProfileForm({ profile, formRef }: Props) {
       }
       if (data.job_titles_seeking.length > 0)
         setJobTitlesSeeking(data.job_titles_seeking);
+      // The success copy says "Review and save below" — reveal everything.
+      openAllSections();
     },
   }));
 
@@ -394,10 +493,14 @@ export function ProfileForm({ profile, formRef }: Props) {
           </p>
         </div>
 
-        <div className="space-y-8 p-6">
+        <div className="divide-y divide-border px-6">
           {/* Personal Info */}
-          <div>
-            <SectionHeading>Personal Info</SectionHeading>
+          <FormSection
+            title="Personal Info"
+            summary={personalSummary}
+            isOpen={openSections.has("personal")}
+            onToggle={() => toggleSection("personal")}
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <FormLabel>Full Name</FormLabel>
@@ -455,13 +558,15 @@ export function ProfileForm({ profile, formRef }: Props) {
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="border-t border-border" />
+          </FormSection>
 
           {/* Professional Info */}
-          <div>
-            <SectionHeading>Professional Info</SectionHeading>
+          <FormSection
+            title="Professional Info"
+            summary={professionalSummary}
+            isOpen={openSections.has("professional")}
+            onToggle={() => toggleSection("professional")}
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FormLabel>Current / Last Job Title</FormLabel>
@@ -510,16 +615,16 @@ export function ProfileForm({ profile, formRef }: Props) {
                 />
               </div>
             </div>
-          </div>
-
-          <div className="border-t border-border" />
+          </FormSection>
 
           {/* Work Experience */}
-          <div>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-text-primary">
-                Work Experience
-              </h3>
+          <FormSection
+            title="Work Experience"
+            summary={experienceSummary}
+            isOpen={openSections.has("experience")}
+            onToggle={() => toggleSection("experience")}
+          >
+            <div className="mb-4 flex items-center justify-end">
               <button
                 type="button"
                 onClick={addWorkEntry}
@@ -607,13 +712,15 @@ export function ProfileForm({ profile, formRef }: Props) {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="border-t border-border" />
+          </FormSection>
 
           {/* Education */}
-          <div>
-            <SectionHeading>Education</SectionHeading>
+          <FormSection
+            title="Education"
+            summary={educationSummary}
+            isOpen={openSections.has("education")}
+            onToggle={() => toggleSection("education")}
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <FormLabel>Highest Degree</FormLabel>
@@ -649,13 +756,15 @@ export function ProfileForm({ profile, formRef }: Props) {
                 />
               </div>
             </div>
-          </div>
-
-          <div className="border-t border-border" />
+          </FormSection>
 
           {/* Job Preferences */}
-          <div>
-            <SectionHeading>Job Preferences</SectionHeading>
+          <FormSection
+            title="Job Preferences"
+            summary={preferencesSummary}
+            isOpen={openSections.has("preferences")}
+            onToggle={() => toggleSection("preferences")}
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FormLabel>Job Titles Seeking</FormLabel>
@@ -706,7 +815,7 @@ export function ProfileForm({ profile, formRef }: Props) {
                 />
               </div>
             </div>
-          </div>
+          </FormSection>
         </div>
 
         <div className="border-t border-border px-6 py-4">

@@ -177,7 +177,29 @@ Last updated: 2026-06-03
 | Accent usage     | SVG ring stroke uses `var(--color-accent)`; warning badges use `bg-warning text-warning-foreground` |
 
 **Pattern notes:**
-Completion ring is a pure SVG circle with the `strokeDashoffset` SVG attribute driven by the `completionPercent` prop. Missing field badges use `rounded-sm` (not pill) with warning color. Ring is 88×88px, radius 34, stroke-width 8.
+Completion ring is a pure SVG circle with the `strokeDashoffset` SVG attribute driven by the `completionPercent` prop. Missing field badges use `rounded-sm` (not pill) with warning color. Ring is 88×88px, radius 34, stroke-width 8. Since D1 this banner renders **only on /dashboard** — the profile page uses `ProfileOverview` below.
+
+---
+
+### Profile Overview
+
+File: components/profile/ProfileOverview.tsx
+Last updated: 2026-10-06
+
+| Property         | Class                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| Background       | `bg-surface`                                                                          |
+| Border           | `border border-border`                                                                |
+| Border radius    | `rounded-2xl`                                                                         |
+| Text — primary   | `text-base font-semibold text-text-primary` heading; `text-3xl font-semibold` stat values |
+| Text — secondary | `text-sm text-text-secondary` status line — `text-success` when 100%                    |
+| Spacing          | `p-6`, banner layout `flex items-start justify-between gap-6`; stats `mt-5 flex flex-wrap gap-x-8 gap-y-4` |
+| Hover state      | `none`                                                                                |
+| Shadow           | `shadow-card`                                                                         |
+| Accent usage     | Ring identical to ProfileAttentionBanner; missing chips `bg-warning text-warning-foreground` |
+
+**Pattern notes:**
+Always renders (unlike the attention banner, which hides at 100%) — it is the profile home's top card (plan D1, "overview + sections"). The `dl` stats row shows Skills / Roles / Experience / Years: `text-xs font-medium text-text-muted` labels above `text-3xl font-semibold` values, `Years` renders an em dash when `years_experience` is null. Server component taking `profile` plus the `calculateCompletion` outputs; ring geometry shared with the banner (88×88, radius 34, stroke-width 8).
 
 ---
 
@@ -214,22 +236,24 @@ Thin client wrapper that owns the `useRef<ProfileFormHandle>` connecting `Resume
 ### Profile Form
 
 File: components/profile/ProfileForm.tsx
-Last updated: 2026-06-03
+Last updated: 2026-10-06
 
 | Property         | Class                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------- |
 | Background       | `bg-surface`                                                                          |
-| Border           | `border border-border` card; `border-t border-border` section dividers; `border border-border` work entry cards |
+| Border           | `border border-border` card; `divide-y divide-border` section dividers; `border border-border` work entry cards |
 | Border radius    | `rounded-2xl` outer card, `rounded-xl` work entry cards, `rounded-lg` inputs/selects/buttons |
 | Text — primary   | `text-sm font-semibold text-text-primary` section headings; `text-sm text-text-primary` body |
 | Text — secondary | `text-xs font-medium uppercase tracking-wide text-text-secondary` form labels         |
-| Spacing          | `p-6` body, `px-6 py-5` header, `px-6 py-4` footer, `space-y-8` section gaps         |
+| Spacing          | `px-6` body (`divide-y` sections), `px-6 py-5` header, `px-6 py-4` footer, section rows `py-4` toggle + `pb-6` content |
 | Hover state      | `hover:bg-surface-secondary` secondary buttons; `hover:opacity-90` primary/Save button |
 | Shadow           | `shadow-card`                                                                         |
-| Accent usage     | `focus:ring-1 focus:ring-accent` on all inputs; `bg-accent-light text-accent` skill tags; `bg-accent text-accent-foreground` Save button |
+| Accent usage     | `focus:ring-1 focus:ring-accent` on all inputs and section toggles; `bg-accent-light text-accent` skill tags; `bg-accent text-accent-foreground` Save button |
 
 **Pattern notes:**
 Form labels use `text-xs font-medium uppercase tracking-wide` — all caps with letter-spacing, not sentence case. Tag inputs render removable pill chips with `bg-accent-light text-accent`. Work Experience entries are individually bordered sub-cards inside the main form card. Month/Year pickers use two adjacent `<select>` elements. Save Profile button is full-width at the bottom of the card.
+
+Since D1 the five sections (Personal / Professional / Work Experience / Education / Job Preferences) render as `FormSection` accordion rows: a full-width `button py-4` header carrying the `text-sm font-semibold` title over a `text-xs text-text-muted truncate` summary computed from live state (e.g. `3 roles added`, first seeking title + `+2`), with `ChevronDown size={16}` rotating `rotate-180` when open; content sits in `pb-6`. **All sections start collapsed** — resume extraction is the primary path — and `applyExtracted()` calls `openAllSections()` so extracted fields can be reviewed. The old `<SectionHeading>` component and `space-y-8`/spacer-divider layout are gone; `divide-y divide-border` on the body wrapper draws the dividers. `+ Add role` stays inside the Work Experience content, right-aligned (`justify-end`) since the section title moved to the toggle row.
 
 ---
 

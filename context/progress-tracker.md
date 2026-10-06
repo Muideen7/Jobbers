@@ -88,7 +88,17 @@ results surfaces; per-job provider ids in `jobs.source`; 79/79 tests)
   highlights into `jobs.responsibilities/requirements/benefits`; salary rules
   moved verbatim) + C4 semantics verified (zero-score fallback,
   `MATCH_THRESHOLD`, no new events) — 106/106 tests
-- [ ] D Profile page (D1 layout choice needs user decision) · E Auto-apply
+- [x] D1 Profile overview-first layout — new `components/profile/ProfileOverview.tsx`
+  (always-visible completion card: ring, status line, missing-field chips,
+  Skills/Roles/Experience/Years stats), `/profile` swapped to it (the old
+  ProfileAttentionBanner stays dashboard-only), `ProfileForm` converted to
+  `FormSection` accordion rows — all collapsed by default so resume extraction
+  reads as the primary path, `applyExtracted()` opens every section for review,
+  collapsed headers carry live-state summaries; `divide-y divide-border`
+  replaced the spacer dividers. ui-registry updated (Profile Overview entry +
+  Profile Form accordion rules); tsc/eslint/106 tests/build green; visual pass
+  at 3 viewports queued against a user-run server (Playwright + Chromium ready)
+- [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
 
 ---
 
