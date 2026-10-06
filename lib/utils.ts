@@ -1,4 +1,25 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
 export const MATCH_THRESHOLD = 70;
+
+/** Tailwind class merger used by the shadcn/ui primitives in components/ui. */
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
+}
+
+/** Two-letter avatar initials from a display name or email address. */
+export function getInitials(nameOrEmail: string | null | undefined): string {
+  const value = (nameOrEmail ?? "").trim();
+  if (!value) return "?";
+
+  const localName = value.split("@")[0] ?? "";
+  const words = localName.split(/[\s._-]+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
+
+  return `${(words[0] ?? "")[0]}${(words[1] ?? "")[0]}`.toUpperCase();
+}
 
 export function getMatchScoreColor(score: number): string {
   if (score >= 80) return "bg-success";

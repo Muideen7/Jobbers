@@ -19,6 +19,13 @@ export async function GET(req: NextRequest) {
     const sortOption = searchParams.get("sortOption") ?? "score";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
 
+    // The dashboard feed asks for a bigger first page so its client-side
+    // filters work over a representative set; cap it to keep the response sane.
+    const limitParam = parseInt(searchParams.get("limit") ?? "", 10);
+    const pageSize = Number.isFinite(limitParam)
+      ? Math.min(Math.max(limitParam, 1), 100)
+      : PAGE_SIZE;
+
     let query = insforge.database
       .from("jobs")
       .select("*", { count: "exact" })
@@ -44,8 +51,8 @@ export async function GET(req: NextRequest) {
       query = query.order("found_at", { ascending: true });
     }
 
-    const from = (page - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
     query = query.range(from, to);
 
     const { data, error, count } = await query;
@@ -64,7 +71,7 @@ export async function GET(req: NextRequest) {
         jobs: (data as Job[] | null) ?? [],
         totalCount: count ?? 0,
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       },
     });
   } catch (error) {

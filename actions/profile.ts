@@ -14,7 +14,7 @@ import { createInsforgeServer } from "@/lib/insforge-server";
 import { trackPostHogEvent } from "@/lib/posthog-server";
 import { calculateCompletion } from "@/lib/profile-utils";
 import { generateJson } from "@/lib/llm";
-import type { Education, WorkExperience } from "@/types";
+import type { Education, Profile, WorkExperience } from "@/types";
 
 type WorkExperienceEntry = {
   company: string;
@@ -219,6 +219,113 @@ export type ExtractedProfile = {
   linkedin_url: string | null;
   portfolio_url: string | null;
 };
+
+/**
+ * Applies an extracted (resume-parsed) profile over the user's saved one.
+ *
+ * Merging is non-destructive: an extracted value only wins when it is
+ * non-empty, so re-parsing a resume never wipes fields the user filled in by
+ * hand. The actual write is delegated to saveProfile — which handles its own
+ * locking/errors — and, like saveProfile, this method keeps requireUser and
+ * the final write outside its own try/catch so NEXT_REDIRECT can escape.
+ */
+export async function applyExtractedProfile(
+  extracted: ExtractedProfile,
+): Promise<{ success: boolean; error?: string }> {
+  // requireUser must stay outside try/catch (NEXT_REDIRECT invariant).
+  const user = await requireUser();
+
+  const merged: ProfileFormData = await (async () => {
+    const insforge = await createInsforgeServer();
+    const { data: profile, error } = await insforge.database
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle<Profile>();
+
+    if (error || !profile) {
+      console.error("[actions/profile] applyExtractedProfile fetch", error);
+      throw new Error("Profile not found. Please sign out and sign in again.");
+    }
+
+    const pick = (
+      value: string | null | undefined,
+      current: string | null,
+    ): string => (value && value.trim().length > 0 ? value : current ?? "");
+
+    const pickArray = (
+      value: string[] | null | undefined,
+      current: string[],
+    ): string[] => (value && value.length > 0 ? value : current);
+
+    const toWorkEntry = (w: WorkExperience): WorkExperienceEntry => ({
+      company: w.company,
+      title: w.title,
+      start_date: w.start_date,
+      end_date: w.end_date ?? "",
+      is_current: w.is_current,
+      responsibilities: w.responsibilities,
+    });
+
+    const extractedWork = extracted.work_experience.map(toWorkEntry);
+    const extractedHasWork = extracted.work_experience.length > 0;
+
+    const extractedEducation = extracted.education;
+    const extractedHasEducation =
+      extractedEducation.degree ||
+      extractedEducation.field ||
+      extractedEducation.institution ||
+      extractedEducation.graduation_year;
+
+    return {
+      fullName: pick(extracted.full_name, profile.full_name),
+      phone: pick(extracted.phone, profile.phone),
+      location: pick(extracted.location, profile.location),
+      linkedinUrl: pick(extracted.linkedin_url, profile.linkedin_url),
+      portfolioUrl: pick(extracted.portfolio_url, profile.portfolio_url),
+      workAuth: profile.work_authorization ?? "",
+      currentTitle: pick(extracted.current_title, profile.current_title),
+      experienceLevel: pick(
+        extracted.experience_level,
+        profile.experience_level,
+      ),
+      yearsExperience:
+        extracted.years_experience != null
+          ? String(extracted.years_experience)
+          : profile.years_experience != null
+            ? String(profile.years_experience)
+            : "",
+      skills: pickArray(extracted.skills, profile.skills),
+      industries: pickArray(extracted.industries, profile.industries),
+      workEntries: extractedHasWork
+        ? extractedWork
+        : (profile.work_experience ?? []).map(toWorkEntry),
+      degree: extractedHasEducation
+        ? extractedEducation.degree ?? ""
+        : profile.education?.degree ?? "",
+      fieldOfStudy: extractedHasEducation
+        ? extractedEducation.field ?? ""
+        : profile.education?.field ?? "",
+      institution: extractedHasEducation
+        ? extractedEducation.institution ?? ""
+        : profile.education?.institution ?? "",
+      graduationYear: extractedHasEducation
+        ? extractedEducation.graduation_year ?? ""
+        : profile.education?.graduation_year ?? "",
+      jobTitlesSeeking: pickArray(
+        extracted.job_titles_seeking,
+        profile.job_titles_seeking,
+      ),
+      remotePreference: profile.remote_preference ?? "",
+      salaryExpectation: profile.salary_expectation ?? "",
+      preferredLocations: profile.preferred_locations,
+      coverLetterTone: profile.cover_letter_tone ?? "",
+    };
+  })();
+
+  // Outside the try/catch above so saveProfile's own redirects can escape.
+  return saveProfile(merged);
+}
 
 export async function extractProfile(): Promise<{
   success: boolean;

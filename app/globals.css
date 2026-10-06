@@ -36,6 +36,23 @@
   /* Used for text on dark CTA backgrounds. */
   --color-accent-foreground: #ffffff;
 
+  /* shadcn/ui semantic aliases (components/ui/*). Every value points at an
+   * existing Jobbers token so the primitives cannot introduce a foreign
+   * palette — mirrored verbatim into ui-tokens.md. */
+  --color-foreground: #18181b;
+  --color-card: #ffffff;
+  --color-card-foreground: #18181b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #18181b;
+  --color-primary: #18181b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f4f4f5;
+  --color-secondary-foreground: #18181b;
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #a1a1aa;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
   /* Dark panels (how-it-works, footer, chart surfaces). */
   --color-inverse: #2d2f33;
   --color-inverse-deep: #242629;
