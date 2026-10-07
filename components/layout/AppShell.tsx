@@ -446,11 +446,7 @@ export function AppShell({ user, children }: Props) {
             collapsed ? "justify-center" : "justify-between px-4"
           }`}
         >
-          {!collapsed && (
-            <Link href="/home" aria-label="Jobbers home">
-              <Logo />
-            </Link>
-          )}
+          {!collapsed && <Logo href="/home" />}
           <button
             type="button"
             onClick={() => setCollapsedPreference(!collapsed)}
@@ -539,9 +535,9 @@ export function AppShell({ user, children }: Props) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <Link href="/home" className="lg:hidden" aria-label="Jobbers home">
-            <Logo />
-          </Link>
+          <span className="lg:hidden">
+            <Logo href="/home" />
+          </span>
 
           <form
             role="search"
@@ -659,9 +655,7 @@ export function AppShell({ user, children }: Props) {
           />
           <div className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col bg-surface shadow-card">
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
-              <Link href="/home" onClick={() => setDrawerOpen(false)} aria-label="Jobbers home">
-                <Logo />
-              </Link>
+              <Logo href="/home" onClick={() => setDrawerOpen(false)} />
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
