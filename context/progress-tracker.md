@@ -6,8 +6,8 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Workspace Revamp (prompt pack) — Prompt 3 complete
-**Last completed:** Prompt 3 (Jobs page merges Find Jobs / AI Matches / Inventory / Dossiers) ✅
+**Phase:** Workspace Revamp (prompt pack) — Phase 5 complete (Features 14–17 done)
+**Last completed:** Feature 17 — Analytics Charts (empty states added) ✅
 (`/jobs` now serves three deep-linkable views through `?tab=` — `for-you` (default), `all`,
 `saved` — plus a `?researched=1` chip. Vocabulary lives in `lib/workspace/jobs-tab.ts` and is
 normalised **server-side** in `app/(workspace)/jobs/page.tsx`, because each tab is a different
@@ -86,7 +86,7 @@ linked to but not yet read — they land with Prompts 5 and 8.
 - [x] 14 Dashboard Page — Full UI
 - [x] 15 Stats Bar — Real Data
 - [x] 16 Recent Activity — Real Data
-- [ ] 17 Analytics Charts — PostHog Data
+- [x] 17 Analytics Charts — PostHog Data (empty states)
 - [x] 18 Adzuna Multi-Location Duplicate Fix
 
 ### Phase 6 — Multi-Source Job Search Expansion (plan: `context/job-search-expansion-plan.md`)
