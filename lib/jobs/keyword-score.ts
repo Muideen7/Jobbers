@@ -12,14 +12,19 @@
  * takes the keyword results as *baseline* and overlays valid AI entries, so a
  * rate-limited or garbage response can only improve, never blank, the scores.
  *
- * Weights (sum 100):
- *   50 skills    — profile skills found in the posting (word-boundary; short
- *                  skills case-sensitive; separator spellings compact-matched)
- *   20 title     — desired/past title tokens covered by the posting title
+ * The headline score is the *coverage of the job's required skills* — the share
+ * of the skills a posting names that the profile already has. All required skills
+ * covered = 100%; 6 of 8 = 75%. This is what the candidate asked for ("my 27
+ * skills capped me at 59%") and it keeps the number independent of how many
+ * skills the profile happens to list.
+ *
+ * When a posting names no recognisable skill at all, the score falls back to the
+ * softer context signals (weights sum 100):
+ *   40 title     — desired/past title tokens covered by the posting title
  *                  (generic role words count half)
- *   10 seniority — profile experience level vs level hints in the posting
- *   10 industry  — profile industries named in the posting
- *   10 location  — remote preference + preferred locations vs the posting
+ *   20 seniority — profile experience level vs level hints in the posting
+ *   20 industry  — profile industries named in the posting
+ *   20 location  — remote preference + preferred locations vs the posting
  *
  * Relative/type-only imports keep this module loadable under `node --test`.
  */
@@ -33,12 +38,16 @@ import type { NormalizedJob } from "./types.ts";
 
 export type KeywordScore = Omit<ScoredResult, "jobId">;
 
+/**
+ * Weights for the *secondary* signals only. The headline score is required-skill
+ * coverage; these weights only apply when a posting names no recognisable skills
+ * (see `keywordScore`). Sum 100.
+ */
 export const KEYWORD_SCORE_WEIGHTS = {
-  skills: 50,
-  title: 20,
-  seniority: 10,
-  industry: 10,
-  location: 10,
+  title: 40,
+  seniority: 20,
+  industry: 20,
+  location: 20,
 } as const;
 
 /** Title tokens that carry no distinctive meaning ("Frontend *Engineer*"). */
@@ -128,9 +137,9 @@ const TECH_SKILLS = [
 
 type Band = "entry" | "mid" | "senior" | "exec";
 
-/** Distance 0..3 → points 10/6/3/1 when both sides have a known band. */
-const BAND_DISTANCE_POINTS = [10, 6, 3, 1] as const;
-const UNKNOWN_BAND_POINTS = 6;
+/** Distance 0..3 → points 20/12/6/2 when both sides have a known band. */
+const BAND_DISTANCE_POINTS = [20, 12, 6, 2] as const;
+const UNKNOWN_BAND_POINTS = 12;
 
 /** Order matters: "Senior Director" resolves to exec, "Mid-Senior" to mid. */
 const BAND_PATTERNS: ReadonlyArray<[Band, RegExp]> = [
@@ -247,7 +256,7 @@ function titleTokens(value: string): string[] {
     .map((token) => ROLE_SYNONYMS[token] ?? token);
 }
 
-/** 0–20: how much of the desired title the posting's title covers. */
+/** 0–40 of the fallback weight: desired/past title tokens covered by the posting title. */
 function titlePoints(profile: ProfileScoreContext, job: NormalizedJob): number {
   const titles = desiredTitles(profile);
   if (titles.length === 0) return 0;
@@ -280,7 +289,7 @@ function resolveBand(value: string): Band | null {
   return null;
 }
 
-/** 0–10: profile experience level vs the posting's level hints. */
+/** 0–20 of the fallback weight: profile experience level vs the posting's level hints. */
 function seniorityPoints(profile: ProfileScoreContext, job: NormalizedJob): number {
   const profileBand = profile.experience_level
     ? resolveBand(profile.experience_level)
@@ -301,7 +310,7 @@ function seniorityPoints(profile: ProfileScoreContext, job: NormalizedJob): numb
   return BAND_DISTANCE_POINTS[distance] ?? UNKNOWN_BAND_POINTS;
 }
 
-/** 0–10: a named profile industry appears in the posting (absent signal = full). */
+/** 0–20 of the fallback weight: a named profile industry appears in the posting (absent signal = full). */
 function industryPoints(profile: ProfileScoreContext, rawText: string): number {
   const industries = profile.industries ?? [];
   if (industries.length === 0) return KEYWORD_SCORE_WEIGHTS.industry;
@@ -323,49 +332,82 @@ function parseRemotePreference(value: string | null): RemotePreference {
   return "none";
 }
 
-/** 0–10: 6 for remote fit + 4 for location fit; absent signals give full points. */
+/** 0–20 of the fallback weight: 12 for remote fit + 8 for location fit; absent signals give full points. */
 function locationPoints(profile: ProfileScoreContext, job: NormalizedJob): number {
   const preference = parseRemotePreference(profile.remote_preference);
   let points: number;
   switch (preference) {
     case "remote":
-      points = job.remote ? 6 : 0;
+      points = job.remote ? 12 : 0;
       break;
     case "onsite":
-      points = job.remote ? 0 : 6;
+      points = job.remote ? 0 : 12;
       break;
     case "hybrid":
-      points = 3;
+      points = 6;
       break;
     case "none":
-      points = 6;
+      points = 12;
       break;
   }
 
   const preferred = (profile.preferred_locations ?? [])
     .map((l) => l.toLowerCase().trim())
     .filter((l) => l.length >= 2);
-  if (preferred.length === 0) return points + 4;
+  if (preferred.length === 0) return points + 8;
 
   const jobLocation = (job.location ?? "").toLowerCase();
   if (!jobLocation || jobLocation.includes("unknown location")) {
-    return points + 2;
+    return points + 4;
   }
   const locationMatch =
     preferred.some(
       (l) => jobLocation.includes(l) || (l.length > 3 && l.includes(jobLocation)),
     ) ||
     (job.remote && preferred.some((l) => l.includes("remote")));
-  return points + (locationMatch ? 4 : 0);
+  return points + (locationMatch ? 8 : 0);
 }
 
-function skillPoints(matched: number, total: number): number {
-  if (total === 0) return 0;
-  // Matching 60% of your skills (at least 3, or all of a short list) tops the
-  // band out — a posting is not expected to name every skill you have.
-  const needed = Math.min(total, Math.max(3, Math.ceil(total * 0.6)));
-  return Math.round(
-    KEYWORD_SCORE_WEIGHTS.skills * Math.min(1, matched / needed),
+/**
+ * Is `phrase` a whole-word run inside `container`? "CSS" inside "Tailwind CSS"
+ * yes; "SQL" inside "PostgreSQL" no. Used to drop sub-skills that are just
+ * fragments of a longer skill name.
+ */
+function containsPhrase(container: string, phrase: string): boolean {
+  const haystack = normalizePhrase(container);
+  const needle = normalizePhrase(phrase);
+  if (!needle || needle === haystack) return false;
+  return new RegExp(`(^| )${escapeRegExp(needle)}( |$)`).test(haystack);
+}
+
+/**
+ * Every recognisable skill a posting names — the denominator of the match score.
+ * Profile skills come first (so their spelling wins) and known tech terms fill
+ * in the rest. Deduplicated case-insensitively, and fragment skills that are a
+ * whole word inside a longer one ("CSS"/"Tailwind" ⊂ "Tailwind CSS") drop out so
+ * one requirement never counts twice.
+ */
+function jobSkillsIn(job: NormalizedJob, profileSkills: string[]): string[] {
+  const rawText = postingText(job);
+  const seen = new Set<string>();
+  const skills: string[] = [];
+
+  const add = (skill: string): void => {
+    const key = skill.toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    skills.push(skill);
+  };
+
+  for (const skill of profileSkills) {
+    if (skillInText(rawText, skill)) add(skill);
+  }
+  for (const tech of TECH_SKILLS) {
+    if (skillInText(rawText, tech)) add(tech);
+  }
+
+  return skills.filter(
+    (skill) => !skills.some((other) => containsPhrase(other, skill)),
   );
 }
 
@@ -373,27 +415,35 @@ function buildReason(input: {
   profile: ProfileScoreContext;
   matchedSkills: string[];
   missingSkills: string[];
+  requiredCount: number;
   titleMatched: boolean;
 }): string {
-  const { profile, matchedSkills, missingSkills, titleMatched } = input;
-  const totalSkills = profile.skills?.length ?? 0;
+  const { profile, matchedSkills, missingSkills, requiredCount, titleMatched } =
+    input;
+  const totalProfileSkills = profile.skills?.length ?? 0;
   const titles = desiredTitles(profile);
 
-  if (totalSkills === 0 && titles.length === 0) {
+  if (totalProfileSkills === 0 && titles.length === 0) {
     return "Profile too thin to score — add skills and desired roles to improve matching.";
   }
 
   const parts: string[] = [];
-  if (totalSkills > 0) {
+  if (requiredCount > 0) {
     if (matchedSkills.length > 0) {
       const shown = matchedSkills.slice(0, 4).join(", ");
       const more = matchedSkills.length > 4 ? ", …" : "";
       parts.push(
-        `${matchedSkills.length}/${totalSkills} of your skills appear in this posting (${shown}${more})`,
+        `${matchedSkills.length}/${requiredCount} required skills covered (${shown}${more})`,
       );
     } else {
-      parts.push("None of your profile skills appear in this posting");
+      parts.push(
+        `None of the ${requiredCount} skills this role asks for are on your profile`,
+      );
     }
+  } else {
+    parts.push(
+      "This posting names no specific skills — scored on title, level and location",
+    );
   }
   if (titles.length > 0) {
     parts.push(
@@ -412,8 +462,14 @@ function buildReason(input: {
 
 /**
  * Score one posting against the profile — deterministic, synchronous, no I/O.
- * An empty profile scores at most 26/100 (neutral seniority/industry/location
- * only), so a thin profile can never fabricate high matches.
+ *
+ * The headline number is *required-skill coverage*: the share of the skills the
+ * posting names that the profile already covers. Cover everything and it is
+ * 100%; cover 6 of 8 and it is 75%. The score no longer depends on how many
+ * skills the profile lists, which is what used to cap good matches in the 50s.
+ *
+ * Postings that name no recognisable skill fall back to the softer context
+ * signals (title/seniority/industry/location), so they still rank sensibly.
  */
 export function keywordScore(
   job: NormalizedJob,
@@ -422,25 +478,31 @@ export function keywordScore(
   const rawText = postingText(job);
   const profileSkills = profile.skills ?? [];
 
-  const matchedSkills = profileSkills.filter((skill) =>
-    skillInText(rawText, skill),
+  const jobSkills = jobSkillsIn(job, profileSkills);
+  const matchedSkills = jobSkills.filter((skill) =>
+    profileKnows(skill, profileSkills),
   );
-  const missingSkills = TECH_SKILLS.filter(
-    (tech) => skillInText(rawText, tech) && !profileKnows(tech, profileSkills),
-  ).slice(0, 8);
+  const missingSkills = jobSkills
+    .filter((skill) => !profileKnows(skill, profileSkills))
+    .slice(0, 8);
 
-  const scores = {
-    skills: skillPoints(matchedSkills.length, profileSkills.length),
-    title: titlePoints(profile, job),
-    seniority: seniorityPoints(profile, job),
-    industry: industryPoints(profile, rawText),
-    location: locationPoints(profile, job),
-  };
+  const title = titlePoints(profile, job);
 
-  const matchScore = Math.max(
-    0,
-    Math.min(100, Object.values(scores).reduce((sum, n) => sum + n, 0)),
-  );
+  const matchScore =
+    jobSkills.length > 0
+      ? Math.round((matchedSkills.length / jobSkills.length) * 100)
+      : Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              title +
+                seniorityPoints(profile, job) +
+                industryPoints(profile, rawText) +
+                locationPoints(profile, job),
+            ),
+          ),
+        );
 
   return {
     matchScore,
@@ -448,7 +510,8 @@ export function keywordScore(
       profile,
       matchedSkills,
       missingSkills,
-      titleMatched: scores.title >= KEYWORD_SCORE_WEIGHTS.title / 2,
+      requiredCount: jobSkills.length,
+      titleMatched: title >= KEYWORD_SCORE_WEIGHTS.title / 2,
     }),
     matchedSkills,
     missingSkills,

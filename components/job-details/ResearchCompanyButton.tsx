@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import { Search } from "lucide-react";
 
 import type { CompanyResearchDossier } from "@/types";
+import { cn } from "@/lib/utils";
 
 type Props = {
   jobId: string;
+  fullWidth?: boolean;
 };
 
-export function ResearchCompanyButton({ jobId }: Props) {
+export function ResearchCompanyButton({ jobId, fullWidth = false }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -50,12 +52,20 @@ export function ResearchCompanyButton({ jobId }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
+    <div
+      className={cn(
+        "flex flex-col gap-2",
+        fullWidth ? "w-full items-stretch" : "items-start sm:items-end",
+      )}
+    >
       <button
         type="button"
         disabled={isPending}
         onClick={handleClick}
-        className="btn btn-primary btn-sm disabled:opacity-60"
+        className={cn(
+          "btn btn-primary btn-sm disabled:opacity-60",
+          fullWidth && "w-full justify-center",
+        )}
       >
         <Search className="h-4 w-4" />
         {isPending ? "Researching..." : "Research Company"}

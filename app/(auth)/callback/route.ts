@@ -26,7 +26,7 @@ async function getRedirectPath(userId: string, accessToken: string): Promise<str
     return "/profile";
   }
 
-  return "/dashboard";
+  return "/home";
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

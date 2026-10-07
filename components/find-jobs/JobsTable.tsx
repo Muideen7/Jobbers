@@ -101,7 +101,7 @@ export function JobsTable({ jobs, isLoading = false }: Props) {
               }`}
             >
               <td className="px-6 py-4">
-                <Link href={`/find-jobs/${job.id}`} className="flex items-center gap-3">
+                <Link href={`/jobs/${job.id}`} className="flex items-center gap-3">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-surface-secondary">
                     <Building2 className="h-4 w-4 text-text-muted" />
                   </div>
@@ -111,12 +111,12 @@ export function JobsTable({ jobs, isLoading = false }: Props) {
                 </Link>
               </td>
               <td className="px-6 py-4">
-                <Link href={`/find-jobs/${job.id}`} className="block">
+                <Link href={`/jobs/${job.id}`} className="block">
                   <span className="text-sm text-text-primary">{job.title ?? "—"}</span>
                 </Link>
               </td>
               <td className="px-6 py-4">
-                <Link href={`/find-jobs/${job.id}`} className="block">
+                <Link href={`/jobs/${job.id}`} className="block">
                   {job.match_score !== null ? (
                     <MatchScoreBar score={job.match_score} />
                   ) : (
@@ -125,17 +125,17 @@ export function JobsTable({ jobs, isLoading = false }: Props) {
                 </Link>
               </td>
               <td className="px-6 py-4">
-                <Link href={`/find-jobs/${job.id}`} className="block">
+                <Link href={`/jobs/${job.id}`} className="block">
                   <span className="text-sm text-text-primary">{job.salary ?? "—"}</span>
                 </Link>
               </td>
               <td className="hidden px-6 py-4 sm:table-cell">
-                <Link href={`/find-jobs/${job.id}`} className="block">
+                <Link href={`/jobs/${job.id}`} className="block">
                   <SourceBadge source={job.source} />
                 </Link>
               </td>
               <td className="px-6 py-4">
-                <Link href={`/find-jobs/${job.id}`} className="block">
+                <Link href={`/jobs/${job.id}`} className="block">
                   <span className="text-sm text-text-muted">{formatDate(job.found_at)}</span>
                 </Link>
               </td>

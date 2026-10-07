@@ -14,13 +14,13 @@ export function JobActions({
   showBackLink = false,
   showApplyButton = false,
 }: Props) {
-  const resolvedUrl = applyUrl ?? "/find-jobs";
+  const resolvedUrl = applyUrl ?? "/jobs";
 
   return (
     <>
       {showBackLink && (
         <Link
-          href="/find-jobs"
+          href="/jobs"
           className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="h-4 w-4" />

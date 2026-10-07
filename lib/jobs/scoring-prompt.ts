@@ -147,11 +147,21 @@ Description: ${truncateAtWordBoundary(job.description, budget)}`,
       "jobId": "string — the id field from the job",
       "matchScore": number (0-100),
       "matchReason": "string — one concise paragraph explaining the match",
-      "matchedSkills": ["string"],
-      "missingSkills": ["string"]
+      "matchedSkills": ["string — skills the job requires that the candidate has"],
+      "missingSkills": ["string — skills the job requires that the candidate lacks"]
     }
   ]
 }
+
+How to score matchScore:
+- List every concrete skill the job explicitly requires or names (languages, frameworks, tools, platforms).
+- matchScore is the percentage of THOSE required skills the candidate's profile already covers.
+  * All required skills covered = 100.
+  * 6 of 8 required skills covered = 75.
+  * None covered = 0.
+- Ignore skills in the candidate profile that the job never mentions — they do not lower the score.
+- matchedSkills must be the required skills the candidate has; missingSkills the required skills they lack.
+- If the posting names no concrete skills, fall back to seniority, title and location fit and say so in matchReason.
 
 Candidate profile:
 ${buildProfileContext(input.profile)}

@@ -57,7 +57,7 @@ export function AiResumeClient({
               to match it, then hands you a ready-to-apply PDF.
             </p>
             <Button asChild variant="outline" size="sm" className="mt-4">
-              <a href="/dashboard" aria-label="Find a role to tailor a resume for">
+              <a href="/home" aria-label="Find a role to tailor a resume for">
                 <Sparkles className="h-4 w-4" />
                 Find a role
               </a>

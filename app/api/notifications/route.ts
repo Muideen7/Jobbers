@@ -4,9 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 
 /**
- * Recent activity for the dashboard navbar's notification bell: the latest
+ * Recent activity for the workspace AppShell's notification bell: the latest
  * completed agent search runs and company research passes, merged by time.
- * Shared by every page that renders DashboardNav so the bell is identical
+ * Shared by every workspace page via the global shell so the bell is identical
  * everywhere (no per-page data plumbing).
  */
 
@@ -63,14 +63,14 @@ export async function GET() {
       .map((r) => ({
         id: `run-${r.id}`,
         text: `Found ${r.jobs_found ?? 0} jobs for ${r.job_title_searched ?? "your search"}`,
-        href: "/find-jobs",
+        href: "/jobs",
         createdAt: r.completed_at!,
       }));
 
     const researchItems: NotificationItem[] = (researched ?? []).map((j) => ({
       id: `research-${j.id}`,
       text: `Researched ${j.company}`,
-      href: `/find-jobs/${j.id}`,
+      href: `/jobs/${j.id}`,
       createdAt: j.found_at,
     }));
 

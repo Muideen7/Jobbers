@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowRight, AlertCircle } from "lucide-react";
 import type { MissingField } from "@/types";
 
 type Props = {
@@ -11,77 +13,87 @@ export function ProfileAttentionBanner({
 }: Props) {
   if (completionPercent === 100) return null;
 
-  const radius = 34;
+  const radius = 28;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset =
     circumference - (completionPercent / 100) * circumference;
 
   return (
-    <section className="flex items-start justify-between gap-6 rounded-2xl border border-border bg-surface p-6 shadow-card">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            aria-hidden="true"
-          >
-            <circle cx="8" cy="8" r="8" fill="var(--color-warning)" />
-            <rect x="7" y="4" width="2" height="5" rx="1" fill="white" />
-            <rect x="7" y="10" width="2" height="2" rx="1" fill="white" />
-          </svg>
-          <h2 className="text-sm font-semibold text-text-primary">
-            Profile needs attention
-          </h2>
+    <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-card">
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning mt-0.5">
+          <AlertCircle className="h-4 w-4" />
         </div>
 
-        <p className="mt-1 text-sm text-text-secondary">
-          Complete the following fields to improve your chances of getting
-          quality resumes.
-        </p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-text-primary">
+              Profile Setup: {completionPercent}% Complete
+            </h2>
+          </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {missingFields.map((field) => (
-            <span
-              key={field}
-              className="rounded-sm bg-warning px-2 py-0.5 text-xs font-medium text-warning-foreground"
+          <p className="mt-0.5 text-xs text-text-secondary">
+            Fill missing fields to improve AI scoring and resume personalization accuracy.
+          </p>
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {missingFields.slice(0, 4).map((field) => (
+              <span
+                key={field}
+                className="rounded-md bg-surface-secondary border border-border/60 px-2 py-0.5 text-[11px] font-medium text-text-secondary"
+              >
+                {field}
+              </span>
+            ))}
+            {missingFields.length > 4 && (
+              <span className="text-[11px] text-text-muted">
+                +{missingFields.length - 4} more
+              </span>
+            )}
+
+            <Link
+              href="/profile"
+              className="ml-1 inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
             >
-              {field}
-            </span>
-          ))}
+              Finish setup
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="relative flex-shrink-0" style={{ width: 88, height: 88 }}>
-        <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden="true">
-          <circle
-            cx="44"
-            cy="44"
-            r={radius}
-            fill="none"
-            stroke="var(--color-border)"
-            strokeWidth="8"
-          />
-          <circle
-            cx="44"
-            cy="44"
-            r={radius}
-            fill="none"
-            stroke="var(--color-accent)"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            transform="rotate(-90 44 44)"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-semibold leading-none text-text-primary">
-            {completionPercent}%
-          </span>
+      <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+        <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>
+          <svg width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
+            <circle
+              cx="34"
+              cy="34"
+              r={radius}
+              fill="none"
+              stroke="var(--color-border)"
+              strokeWidth="6"
+            />
+            <circle
+              cx="34"
+              cy="34"
+              r={radius}
+              fill="none"
+              stroke="var(--color-accent)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              transform="rotate(-90 34 34)"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-sm font-bold leading-none text-text-primary">
+              {completionPercent}%
+            </span>
+          </div>
         </div>
       </div>
     </section>
   );
 }
+

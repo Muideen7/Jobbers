@@ -20,9 +20,11 @@
  * literal. tests/security-headers.test.ts asserts the two never drift.
  */
 export const PROXY_OWNED_ROUTE_PREFIXES = [
-  "/dashboard",
+  "/home",
+  "/jobs",
+  "/applications",
+  "/resumes",
   "/profile",
-  "/find-jobs",
 ] as const;
 
 /** Matches everything `PROXY_OWNED_ROUTE_PREFIXES` does not claim. */

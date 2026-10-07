@@ -189,7 +189,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
     });
 
-    revalidatePath(`/find-jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}`);
 
     return NextResponse.json({
       success: true,

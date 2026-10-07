@@ -31,7 +31,7 @@ const SALARY_FILTER_MIN = 150_000;
 /**
  * Cards the landing grid renders per fetch — a clean 3×3 at the `lg`
  * breakpoint. The rest of the matched set (the route's 48-result cap) stays
- * one click away behind "Browse all matched roles" → `/find-jobs`, which the
+ * one click away behind "Browse all matched roles" → `/jobs`, which the
  * proxy redirects to `/login?next=…` for anonymous visitors, so seeing more
  * always means signing in first.
  */

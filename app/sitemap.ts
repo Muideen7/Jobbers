@@ -7,8 +7,8 @@ const SITE_URL = (
 export const dynamic = "force-static";
 
 /**
- * Only genuinely public, indexable pages belong here. `/dashboard`,
- * `/profile` and `/find-jobs` are intentionally excluded — they are behind
+ * Only genuinely public, indexable pages belong here. `/home`,
+ * `/profile` and `/jobs` are intentionally excluded — they are behind
  * auth and serve one user's private data.
  */
 export default function sitemap(): MetadataRoute.Sitemap {

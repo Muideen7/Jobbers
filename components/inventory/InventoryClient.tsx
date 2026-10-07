@@ -101,7 +101,7 @@ export function InventoryClient({ jobs }: { jobs: Job[] }) {
           </p>
           {jobs.length === 0 && (
             <Button asChild variant="outline" className="mt-5">
-              <Link href="/dashboard">Search for jobs</Link>
+              <Link href="/home">Search for jobs</Link>
             </Button>
           )}
         </div>
@@ -144,7 +144,7 @@ function InventoryCard({ job }: { job: Job }) {
       </div>
 
       <Link
-        href={`/find-jobs/${job.id}`}
+        href={`/jobs/${job.id}`}
         className="text-base font-semibold leading-6 text-text-primary transition-colors hover:text-accent"
       >
         {title}
@@ -173,7 +173,7 @@ function InventoryCard({ job }: { job: Job }) {
 
       <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
         <Button asChild size="sm" variant="outline" className="flex-1">
-          <Link href={`/find-jobs/${job.id}`}>View details</Link>
+          <Link href={`/jobs/${job.id}`}>View details</Link>
         </Button>
         {job.external_apply_url && (
           <Button asChild size="sm" variant="outline" className="flex-1">

@@ -29,7 +29,7 @@ export function Hero() {
               Get started
             </Link>
             <Link
-              href="/find-jobs"
+              href="/jobs"
               className="btn btn-secondary"
             >
               See live matches

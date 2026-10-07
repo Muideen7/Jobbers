@@ -9,8 +9,8 @@ import { Logo } from "@/components/layout/Logo";
 import { PostHogLogoutLink } from "@/components/analytics/PostHogLogoutLink";
 
 const navigationItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/find-jobs", label: "Find Jobs" },
+  { href: "/home", label: "Dashboard" },
+  { href: "/jobs", label: "Find Jobs" },
   { href: "/profile", label: "Profile" },
 ];
 
@@ -45,8 +45,8 @@ export function Navbar({ isAuthenticated = false }: Props) {
   }, [menuOpen]);
 
   const isItemActive = (href: string) =>
-    href === "/find-jobs"
-      ? pathname.startsWith("/find-jobs")
+    href === "/jobs"
+      ? pathname.startsWith("/jobs")
       : pathname === href;
 
   return (

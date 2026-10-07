@@ -6,17 +6,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Phase 6 — Multi-Source Job Search Expansion
-**Last completed:** Dashboard workspace rebuild + nav pages ✅
-(3-column workspace: DashboardNav with 6 links/bell/InsForge chip/avatar menu,
-filter sidebar with resume drop-in + AI threshold + location/salary/job-type,
-gradient feed hero with live multi-source search, results-bar pills, responsive
-2–3 col job grid, auto-selected right-hand detail panel with match analysis +
-dossier + action row; `/inventory`, `/ai-resume`, `/company-research`,
-`/applications` created; shadcn/ui primitives hand-written against Jobbers
-tokens; **136/136 tests**, tsc/eslint/build green — commits `a30dbb8`,
-`dccd75b`, `92c89b6`)
-**Next:** Phase E (E0 scope docs first) of `context/job-search-expansion-plan.md` on branch `feat/multi-source-job-search`
+**Phase:** Workspace Revamp (prompt pack) — Prompt 1 complete
+**Last completed:** Prompt 0 (project rules) + Prompt 1 (navigation shell) ✅
+(Prompt 0: the prompt-pack rules — Stack, Design tokens, Backend, Production safety, Product rules, Workflow — were folded into `AGENTS.md`; `CLAUDE.md` is back to just `@AGENTS.md`. Prompt 1: routes moved via `git mv` — `/dashboard`→`/home`, `/find-jobs`→`/jobs` (with `[id]`), `/ai-resume`→`/resumes`; the five "coming soon" placeholders (`/matches`, `/interview-prep`, `/follow-ups`, `/analytics`, `/settings`) and `components/workspace/ComingSoonPage.tsx` deleted. `next.config.ts` now declares 13 **permanent** legacy redirects (`/dashboard`, `/find-jobs[/:id]`, `/matches`, `/inventory`, `/company-research`, `/dossiers[/:id]`, `/ai-resume`, `/interview-prep`, `/follow-ups`, `/analytics`, `/settings`) so every live URL keeps working. `PROXY_OWNED_ROUTE_PREFIXES` + `proxy.ts` matcher + the security test moved to `/home,/jobs,/applications,/resumes,/profile`; `lib/auth.ts` and the OAuth callback post-login land on `/home`; `robots.ts` disallows all five signed-in routes; all internal links rewired. `AppShell.tsx` rebuilt: exactly five links across **Workspace** (Home, Jobs, Applications) + **Tools** (Resumes, Profile), an Applications sub-nav (Saved/Applied/Interview/Offer, visible only on `/applications`), a **Coming up** block that becomes a get-started checklist for new users, count badges (hidden at 0, `99+` cap, dots when collapsed), a footer **Account / Sign out** menu, a persisted collapse (via `useSyncExternalStore`, no cascade), and a mobile drawer below `lg` (was `xl`). New `GET /api/sidebar-summary` + `useSidebarSummary` hook (focus + 60s revalidate) feed it; application fields are honest zeros until Prompt 2, onboarding flags are computed from real rows. Verified: `tsc --noEmit` clean, `eslint` 0/0, 154/154 tests, `next build` green.)
+**Next:** Prompt 2 — applications data layer (backend only). The additive migration SQL (`applications`, `application_events`, `profiles.last_jobs_visit_at` + RLS + grants) is written and awaiting the user's approval to run; then `GET/POST /api/applications`, `PATCH/DELETE /api/applications/[id]`, shared types, curl tests, and real values in `/api/sidebar-summary`.
 
 ---
 
@@ -149,7 +142,8 @@ tokens; **136/136 tests**, tsc/eslint/build green — commits `a30dbb8`,
   Applications, Profile — center search that deep-links to `/dashboard?q=…`,
   notification bell fed by `/api/notifications` = last 5 completed `agent_runs`
   + last 5 researched jobs merged top 6, green InsForge signed-in chip, avatar
-  menu with Profile + PostHogLogoutLink, mobile drawer), left `FilterSidebar`
+  menu with Profile + PostHogLogoutLink, mobile drawer; **superseded** by the
+  global `AppShell` shell under `app/(workspace)/`), left `FilterSidebar`
   (resume drop-in `ResumeDropzone` → upload → Gemini `extractProfile` →
   `ExtractedReviewDialog` → non-destructive `applyExtractedProfile` merge over
   the saved row; AI Match Threshold `Slider` 0–100 default 0; location input;
@@ -185,7 +179,24 @@ tokens; **136/136 tests**, tsc/eslint/build green — commits `a30dbb8`,
   dialog/slider/scroll-area/slot; `@theme` shadcn aliases added and mirrored
   verbatim into ui-tokens.md. **136/136 tests**, tsc/eslint/build green
   (`a30dbb8` ui primitives, `dccd75b` dashboard, `92c89b6` pages)
+- [x] Dashboard decluttering & workspace refinement — eliminated visual clutter across the 3-column workspace:
+  (1) `FilterSidebar` merged from 5 separate heavy boxes into 1 sleek Resume card + 1 cohesive Filters card with an active count badge and "Reset all" button;
+  (2) `FeedHero` condensed from a 250px-tall banner into an elegant, space-efficient live search bar with inline status;
+  (3) `ResultsBar` upgraded with active filter dismiss chips (`≥ 60% Match`, location) alongside quick-toggle pills;
+  (4) `JobCard` decluttered by removing 40 redundant footer buttons across the feed, making the card naturally selectable with clear active ring and subtle action indicators;
+  (5) `JobGrid` tuned to responsive 1–2 columns avoiding cramped text;
+  (6) `JobDetailPanel` refactored from nested bulky cards into a unified, executive master-detail layout displaying role summary, instant apply, AI match analysis, and company dossier natively;
+  (7) `ProfileAttentionBanner` normalized to token-compliant SVG fills.
 - [ ] E Auto-apply (E0 scope docs first — project-overview still lists it out of scope)
+
+---
+
+### Phase 7 — Workspace Revamp (prompt pack, `Jobbers_Claude_Code_Prompt_Pack.docx`)
+
+- [x] Prompt 0 — project rules folded into `AGENTS.md`; `CLAUDE.md` = `@AGENTS.md`
+- [x] Prompt 1 — navigation shell: routes moved (`/home`, `/jobs`, `/resumes`), 13 permanent redirects, placeholders deleted, `AppShell` rebuilt, `GET /api/sidebar-summary` + `useSidebarSummary`
+- [ ] Prompt 2 — applications data layer (backend only): additive migration + `/api/applications` routes + tests
+- [ ] Prompts 3–10 — Jobs page, detail tabs, Applications Kanban, Home, Profile tabs, Resume tailor, cleanup
 
 ---
 

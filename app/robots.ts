@@ -16,7 +16,7 @@ export default function robots(): MetadataRoute.Robots {
         // Signed-in routes render personal data. Disallow them so crawlers
         // never fetch a page that 307s to /login, and keep them out of the
         // index without relying on the per-page `noindex` meta tag alone.
-        disallow: ["/api/", "/dashboard", "/profile", "/find-jobs"],
+        disallow: ["/api/", "/home", "/jobs", "/applications", "/resumes", "/profile"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

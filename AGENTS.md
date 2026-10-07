@@ -46,6 +46,63 @@ Read in this exact order before any implementation:
 - `/remember save` — when a feature spans multiple sessions.
 - `/remember restore` — when returning after a multi-session feature.
 
+## Jobbers revamp rules (prompt pack)
+
+Stack: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4
+(design tokens live in the `@theme` block of `app/globals.css`), lucide-react,
+InsForge backend (database, auth, storage). PostHog for analytics. Google Gemini
+(via `lib/llm.ts`) for AI.
+
+### Design tokens
+
+- Use ONLY the design tokens already in the repo (CSS variables / Tailwind theme,
+  as used by the current sidebar).
+- Never hardcode hex colors, radii, shadows, or font sizes. If a token you need
+  does not exist, stop and ask.
+- Reuse existing components (cards, buttons, badges, empty states, skeletons)
+  before creating new ones.
+
+### Backend (InsForge)
+
+- Access InsForge the same way existing code already does. Follow the existing
+  client/helper patterns. Do not assume SDK method names.
+- Before any database change, inspect the current schema (InsForge MCP/tools or
+  migration files) and show what was found.
+- Every user-owned table has `user_id` and must be restricted to the signed-in
+  user: use row level security if this project uses it, and also check ownership
+  in every API route.
+- Validate all API input (use zod if the repo already has it).
+
+### Production safety
+
+- The live app (top nav: Dashboard, Find Jobs, Profile) has real users and data.
+  Work only on a feature branch and use preview deployments. Do not merge to
+  `main` until I say so.
+- Database changes must be additive: new tables and nullable columns only. Never
+  rename, drop, or change the type of existing tables or columns. Show me the
+  migration SQL before running it, and run it against a copy of the database
+  first.
+- Existing live URLs (/dashboard, /find-jobs, /find-jobs/[id], /profile) must keep
+  working through permanent redirects.
+
+### Product rules
+
+- No "coming soon" pages. Do not create a route unless it has real content.
+- Never delete a working feature. Move it. Old routes must redirect permanently
+  to their new home.
+- Never render fake or mock data in the UI. Empty states must guide the user to
+  the next action.
+- Every page needs loading, empty, and error states using existing tokens.
+- Mobile first. The sidebar becomes a drawer below the lg breakpoint.
+
+### Workflow
+
+- For any task touching more than 3 files, start in plan mode and wait for
+  approval.
+- After each task: run typecheck, lint, and build. List files changed. Give a
+  short manual test checklist.
+- Keep commits small. Do not refactor unrelated code.
+
 
 # InsForge SDK Documentation - Overview
 

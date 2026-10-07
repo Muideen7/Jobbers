@@ -365,22 +365,57 @@ Shared attribution line ("Jobs via JSearch · RemoteOK …") required by the job
 
 ### Job Details Page
 
-File: app/find-jobs/[id]/page.tsx (shell) + components/job-details/*.tsx (cards) and components/job-details/*
-Last updated: 2026-06-05
+File: app/find-jobs/[id]/page.tsx (shell) + components/job-details/*.tsx (cards)
+Last updated: 2026-10-07
 
 | Property         | Class                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| Page shell       | `mx-auto flex min-h-[calc(100vh-4rem)] max-w-[820px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-0` |
-| Cards            | `rounded-2xl border border-border bg-surface p-6 shadow-card` in `JobInfo`/`JobDescription`/`CompanyResearch`; `overflow-hidden` wraps the research header inside `CompanyResearch` |
+| Page shell       | `mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8`                       |
+| Layout           | `grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start` — description (`lg:col-span-2`, `lg:order-1`) beside the match/apply rail (`lg:col-span-1`, `lg:order-2`) |
+| Cards            | `rounded-2xl border border-border bg-surface p-6 shadow-card` in `JobInfo`/`JobDescription`/`MatchReasonCard`/`SkillMatchCard`; the rail's "Ready to apply" `<section>` uses the same shell |
 | Header icon      | `flex h-14 w-14 ... rounded-2xl border border-border bg-surface-secondary`; info icons use `h-10 w-10 rounded-xl` with token backgrounds |
-| Text — primary   | Page title `text-2xl font-semibold leading-8 text-text-primary`; card headings `text-base font-semibold leading-6 text-text-primary`; body `whitespace-pre-line text-sm font-medium leading-6 text-text-primary` |
+| Text — primary   | Page title `text-2xl font-semibold leading-8 text-text-primary`; card headings `text-base font-semibold leading-6 text-text-primary` |
 | Text — secondary | Section eyebrows `text-xs font-semibold uppercase leading-4 tracking-wide text-text-secondary`; labels `text-xs font-medium uppercase leading-4 tracking-wide text-text-muted` |
-| Buttons          | Primary CTA `min-h-12 w-full rounded-lg bg-accent px-4 py-3 text-sm font-medium text-accent-foreground`; secondary external link `min-h-10 rounded-lg border border-border bg-surface px-4 py-2` |
-| Badges           | Match score `rounded-full bg-success-lightest px-3 py-1 text-xs font-medium text-success-foreground`; matched skills `bg-success-lightest text-success-foreground`; gap skills `bg-accent-muted text-accent` |
-| Empty state      | `flex min-h-64 flex-col items-center justify-center px-6 py-14 text-center` with `h-12 w-12 rounded-2xl bg-surface-secondary` icon shell and `bg-accent-muted text-accent` helper badge |
+| Buttons          | Apply CTA `btn btn-primary w-full whitespace-nowrap`; dossier link `btn btn-secondary w-full whitespace-nowrap`; research `ResearchCompanyButton fullWidth` |
+| Badges           | Match score `getMatchBadgeVariant(match_score)`; matched skills `bg-success-lightest text-success-foreground`; gap skills `bg-accent-muted text-accent` |
 
 **Pattern notes:**
-Job detail pages use a narrow centered column rather than the full dashboard width. Job descriptions render the complete stored text with `whitespace-pre-line`, append any populated structured bullet sections, and show a bordered `View Full Job Post` notice when the saved Adzuna preview ends with `…` or `...`. Company research now renders a saved 9-field dossier read-only; once research exists, the generate action is hidden. Authenticated app pages pass `isAuthenticated` to `Navbar` so the top-right user icon and sign-out action match the signed-in designs.
+This page is **job-only** — JobActions, JobInfo, `MatchReasonCard`, `SkillMatchCard`, the "Ready to apply" card (Research Company + Apply Now, plus a "View company dossier" link once researched) and the description. It must **not** render company-research content; that lives on the dossier page. `MatchReasonCard` + `SkillMatchCard` replaced the old combined `MatchScore` export. The description renders scraped HTML as semantic blocks via `lib/job-description.ts` (`parseJobDescriptionHtml`) — never `dangerouslySetInnerHTML`. `proxy.ts` gates `/find-jobs`, so `requireUser()` is defence in depth.
+
+---
+
+### Dossiers (list + detail)
+
+Files: app/(workspace)/dossiers/page.tsx, app/(workspace)/dossiers/[id]/page.tsx
+Last updated: 2026-10-07
+
+| Property         | Class                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| List grid        | `grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3`; each dossier is a `rounded-2xl border border-border bg-surface p-5 shadow-card` card with `hover:-translate-y-0.5 hover:border-border-muted hover:shadow-md` |
+| List header      | `text-2xl font-bold tracking-tight text-text-primary` + `text-sm leading-6 text-text-secondary` |
+| Detail header    | `rounded-2xl border border-border bg-surface p-6 shadow-card`; company mark `h-14 w-14 rounded-2xl border border-border bg-accent-muted text-accent` |
+| Detail layout    | `grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start` — rail (`lg:order-2`) = Ready to apply → `YourEdgeCard` → `GapsToAddressCard`; main (`lg:order-1`) = `CompanyResearch` |
+| Buttons          | "View role" `btn btn-secondary`; "Apply Now" `btn btn-primary`; back link `inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary` |
+
+**Pattern notes:**
+The Dossiers list shows only jobs with `company_research !== null` (ordered by `match_score` desc) and links each card to `/dossiers/[id]`. The detail page owns everything that is *research + the candidate's own data* (edge, gaps, smart questions, interview prep) — so it is deliberately different from `/find-jobs/[id]`. `YourEdgeCard` and `GapsToAddressCard` are exported from `components/job-details/CompanyResearch.tsx` (and removed from that component's own grid) so the rail can sit them directly under "Ready to apply". The dossier detail renders the full `CompanyResearch` grid when research exists and an empty state with `ResearchCompanyButton` when it does not.
+
+---
+
+### Research queue
+
+File: app/(workspace)/company-research/page.tsx + components/company-research/ResearchQueue.tsx
+Last updated: 2026-10-07
+
+| Property         | Class                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| Grid             | `grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3`; card shell identical to the Dossiers card |
+| Viewed chip      | `inline-flex items-center gap-1.5 self-start rounded-full bg-surface-secondary px-2.5 py-1 text-[11px] font-medium text-text-secondary` with `Eye` icon |
+| Loading skeleton | `h-44 animate-pulse rounded-2xl border border-border bg-surface-secondary/40` × 3 |
+| Empty state      | `rounded-2xl border border-border bg-surface p-6 text-center shadow-card` with `bg-accent-muted` `SearchX` badge linking to `/find-jobs` |
+
+**Pattern notes:**
+The server page fetches the user's jobs with `.is("company_research", null)` and hands them to the client `<ResearchQueue>`, which intersects them with `getRecentlyViewedIds()` (localStorage, max 20) so it lists only roles the user opened but has not researched. localStorage is read through `useSyncExternalStore` (cached snapshot keyed by serialized ids) to satisfy `react-hooks/set-state-in-effect`; the server snapshot is `null` so the skeleton shows until hydration. The sidebar exposes both **Research** (`/company-research`, `Building2`) and **Dossiers** (`/dossiers`, `NotebookText`).
 
 ### Company Research Dossier
 
@@ -400,7 +435,7 @@ Last updated: 2026-06-05
 | Accent usage     | Button `bg-accent text-accent-foreground`; tech tags `bg-accent-muted text-accent`; section icon shells rotate between `bg-accent-muted`, `bg-success-lightest`, and `bg-info-lightest` token backgrounds |
 
 **Pattern notes:**
-The research card preserves the Feature 12 card shell and header, then swaps between an empty state with a client action and a dense read-only dossier. The client action lives in its own component, uses plain `fetch` plus `useTransition`, and calls `router.refresh()` after the API saves research. Dossier sections should stay compact, token-driven, and source-linked; do not add a refresh action unless Feature 13 scope changes. Since the dashboard rebuild the component accepts `showResearchButton?: boolean` (default `true`): the standalone find-jobs page keeps the in-card research action, but the dashboard's right-hand panel passes `showResearchButton={false}` so the panel's own Actions row owns it — never render two research buttons for the same job.
+The research card preserves the Feature 12 card shell and header, then swaps between an empty state with a client action and a dense read-only dossier. The client action lives in its own component, uses plain `fetch` plus `useTransition`, and calls `router.refresh()` after the API saves research. Dossier sections should stay compact, token-driven, and source-linked; do not add a refresh action unless Feature 13 scope changes. Since the dashboard rebuild the component accepts `showResearchButton?: boolean` (default `true`): the standalone find-jobs page keeps the in-card research action, but the dashboard's right-hand panel passes `showResearchButton={false}` so the panel's own Actions row owns it — never render two research buttons for the same job. The card grid deliberately excludes **Your Edge** and **Gaps to Address**; those are exported as standalone `YourEdgeCard` / `GapsToAddressCard` so the dossier page can place them in its rail under "Ready to apply".
 
 ---
 
@@ -457,39 +492,43 @@ token set, so they read as the app's design language:
 
 ---
 
-### DashboardNav
+### AppShell (global workspace shell)
 
-File: components/dashboard/DashboardNav.tsx
-Last updated: 2026-10-06
+File: components/layout/AppShell.tsx
+Last updated: 2026-10-07 (Prompt 1 revamp)
 
-| Property       | Class |
-| -------------- | ----- |
-| Background     | `sticky top-0 z-50 border-b border-border bg-surface/90 backdrop-blur-md` (mirrors App Navbar) |
-| Container      | `mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8` |
-| Nav links      | `whitespace-nowrap rounded-md text-sm font-medium`, active `text-accent`, idle `text-text-dark hover:text-text-primary`; horizontal at `xl`, mobile drawer below |
-| Search input   | `w-full rounded-full border border-ink bg-surface py-2 pl-10 pr-4 text-sm` `focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface` |
-| Bell badge     | `absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground`, count = notifications from the last 24h |
-| Menus          | popover panels `absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-surface p-4 shadow-xl`, closed by a transparent `fixed inset-0 z-40` backdrop button |
-| Avatar         | `flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-bold text-accent-foreground` with `getInitials`; hover `scale-105` |
-| InsForge chip  | `hidden lg:inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-text-secondary` with a `h-2 w-2 rounded-full bg-success` dot |
-| Drawer         | `fixed inset-0 z-[60] lg:hidden` — `bg-ink/40` scrim + `w-[min(20rem,85vw)] bg-surface p-6 shadow-xl` slide-in, rendered **outside** the header so `backdrop-blur` never becomes a containing block |
+| Property        | Class |
+| --------------- | ----- |
+| Shell           | `min-h-screen bg-surface` (matches the landing page's white canvas) |
+| Sidebar         | fixed left rail from **`lg`** (`lg:flex` / `lg:w-[240px]`, collapsed `lg:w-[72px]`), `border-r border-border bg-surface`; below `lg` it becomes a slide-in drawer |
+| Sidebar header  | `h-16 border-b border-border`; expanded shows `Logo` + `PanelLeftClose`; collapsed centres just the `PanelLeftOpen` toggle |
+| Nav groups      | **Workspace** (Home, Jobs, Applications) / **Tools** (Resumes, Profile) — exactly five links. Group labels `text-[10px] font-bold uppercase tracking-widest text-text-muted` |
+| Nav item        | `rounded-lg px-3 py-2.5 text-sm font-medium`, active `bg-accent-light text-accent shadow-xs` + `aria-current="page"`, idle `text-text-secondary hover:bg-surface-secondary hover:text-text-primary`; icon `h-5 w-5` |
+| Nav badge       | `ml-auto rounded-full bg-accent px-1.5 text-[10px] font-bold leading-4 text-accent-foreground`; hidden at 0, `99+` above 99, a `h-1.5 w-1.5 rounded-full bg-accent` dot when collapsed; skeletons `bg-muted` while loading |
+| Applications sub-nav | indented `border-l border-border pl-3` list of Saved/Applied/Interview/Offer, shown only while `pathname === "/applications"`; count `text-xs font-semibold text-text-muted` |
+| Coming up       | `section` under the nav: next 3 interviews (`CalendarClock`) / follow-ups (`BellRing`) → `/jobs/:id?tab=prep|follow-ups`, relative day via `formatRelativeDay`, overdue `text-warning`; falls back to the get-started checklist when there are no applications |
+| Get-started     | three checkable links (Upload your resume `/resumes`, Set target roles `/profile?tab=preferences`, Save your first job `/jobs`) driven by real onboarding flags; done items use `border-accent bg-accent` + line-through, hidden once all three pass |
+| Pro upgrade CTA | gradient card `rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary` with an `<Button size="sm">` (currently disabled — billing is a later release) |
+| Sidebar footer  | avatar initials (`bg-accent-light text-accent`) + **surname** + email; opens a menu (Account → `/profile?tab=account`, Sign out via `PostHogLogoutLink`). Collapsed shows the avatar only |
+| Top bar         | `sticky top-0 z-20 h-16 border-b border-border bg-surface/90 backdrop-blur`; hamburger + logo below `lg`, search `max-w-md` from `lg`, bell, account avatar. Search submits to `/jobs?q=<query>` |
 
 **Pattern notes:**
-- **Six links**: Find Jobs, Inventory, AI Resume, Company Research,
-  Applications, Profile. `/find-jobs` is active via `startsWith` (it has
-  dynamic children); the rest are exact matches. Profile also lives in the
-  avatar menu.
-- **Navbar search = instant feed filter**: submit pushes
-  `/dashboard?q=<query>`; `DashboardClient` adopts the new `initialQuery` via
-  the sanctioned adjust-state-during-render pattern (no
-  set-state-in-effect). On the dashboard this re-filters the already-loaded
-  feed; from any other page it lands on the filtered feed.
-- **Bell data**: fetched client-side from `/api/notifications` (last 5
-  completed `agent_runs` + last 5 researched jobs, merged by `completed_at` /
-  `found_at`, top 6). Identical bell on every workspace page.
-- **Hooks hygiene**: `Date.now()` is computed inside the fetch callback (not
-  render — `react-hooks/purity`), and `query` follows `initialQuery` with the
-  render-adjustment pattern rather than an effect.
+- **Global shell**: every workspace page lives under `app/(workspace)/` whose
+  `layout.tsx` renders `PostHogIdentify` + `<Suspense><AppShell><user>>`.
+  `requireUser()` + the profile fetch for nav identity live in the layout only;
+  pages render content and never their own nav. Pages must use a `<div>` content
+  wrapper (AppShell already provides `<main>`).
+- **Collapse is an external store**: `useSyncExternalStore` over a
+  `jobbers.sidebarCollapsed` localStorage key + same-tab custom event — no
+  mount-effect `setState` (which the React compiler lint rule forbids).
+- **Sidebar data**: `useSidebarSummary()` fetches `/api/sidebar-summary`
+  (badges, Coming up, onboarding) on mount, on window focus and every 60 s.
+  Before it resolves, badges and Coming up render skeletons — never fake numbers.
+- **Search syncs with `?q=`**: top-bar search submits to `/jobs?q=<query>`
+  (`/home` used to be the destination).
+- **Route map (Prompt 1)**: `/home`, `/jobs`, `/applications`, `/resumes`,
+  `/profile`. Legacy routes redirect 308 to these; the five former placeholder
+  routes and `ComingSoonPage` were deleted.
 
 ---
 
@@ -500,7 +539,7 @@ Last updated: 2026-10-06
 
 | Property | Class |
 | -------- | ----- |
-| Dropzone  | `cursor-pointer rounded-xl border-2 border-dashed p-4 text-center` — idle `border-ink/30 bg-surface-secondary`, dragging `border-accent bg-accent-muted` |
+| Dropzone  | `group relative flex cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed p-3.5 text-center` — idle `border-border bg-surface-secondary/40`, dragging `border-accent bg-accent-muted ring-2 ring-accent/20` |
 | States    | uploading/extracting show `Loader2 animate-spin text-accent`; parsed shows a `bg-success-lightest` ring + `FileText text-success` |
 | Dialog    | shadcn `Dialog` — header "Resume extracted", body summary card `rounded-xl border border-border bg-surface-secondary p-4`, skill `Badge variant="secondary"`, footer `DialogClose` "Discard" + "Apply to profile" |
 | Feedback  | applied state `rounded-xl border border-border bg-success-lightest p-4` with `Check` + "Profile updated"; errors `text-error` |
@@ -515,55 +554,66 @@ Last updated: 2026-10-06
 - `onApplied` is optional and only wired when a callback is actually passed
   (spread `{...(onApplied ? { onApplied } : {})}` — `exactOptionalPropertyTypes`
   forbids passing explicit `undefined`).
+- Designed as a compact, horizontal card in the sidebar to avoid pushing down filters.
 
 ---
 
 ### Dashboard workspace page
 
-File: app/dashboard/page.tsx
-Last updated: 2026-10-06
+File: app/(workspace)/dashboard/page.tsx
+Last updated: 2026-10-07
 
 | Property   | Class |
 | ---------- | ----- |
-| Shell      | `main.mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-8` + `flex flex-col gap-5` |
-| Workspace  | `grid grid-cols-1 gap-5 xl:grid-cols-[264px_minmax(0,1fr)_380px]` — left filters / center feed / right detail panel |
-| Sidebars   | `xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:self-start` (left, via FilterSidebar) and `xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)]` (right, via JobDetailPanel's ScrollArea) |
+| Shell      | `mx-auto w-full max-w-[1440px] flex flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8` — chrome (sidebar/top bar) comes entirely from `app/(workspace)/layout.tsx` |
 
 **Pattern notes:**
-- **Dashboard spec overrides the app language** (user decision): workspace
-  cards use `rounded-2xl` (16px), `shadow-sm`, charcoal `border-ink` borders
-  and ink buttons. New/placeholder pages keep the current app language
-  (`border-border`, `shadow-card`, `.btn` pills). `twMerge` keeps `border-ink`
-  over `border-border` when both are passed.
-- Server component fetches top-100 jobs `match_score desc
-  nullsFirst:false`, the profile (completion banner + nav identity), renders
-  `PostHogIdentify` + `DashboardNav` + optional `ProfileAttentionBanner` +
-  `DashboardClient`. `searchParams` is awaited (Next 16 async params).
-- The old `StatsBar` / `RecentActivity` / `AnalyticsCharts` dashboard widgets
-  were **deleted** (unused elsewhere); `recharts` remains only if other pages
-  use it — none currently do.
+- Server component fetches top-100 jobs `match_score desc nullsFirst:false`
+  and the profile (completion banner + greeting), then renders optional
+  `ProfileAttentionBanner` + `DashboardClient`. Auth + PostHog identity + nav
+  identity are handled by the `(workspace)` layout. No `searchParams` here —
+  AppShell's search submits to `/find-jobs`.
 
-### DashboardClient (workspace orchestrator)
+### DashboardClient (executive workspace overview)
 
 File: components/dashboard/DashboardClient.tsx
+Last updated: 2026-10-07
+
+| Property        | Class |
+| --------------- | ----- |
+| Shell           | `max-w-[1440px] flex flex-col gap-8` |
+| Stats           | 4 metric cards (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5`) with `mb-6` breathing room above the showcase: Total Roles, Avg Match Score, Highest Match, Researched Companies |
+| Stats cards     | **pastel** `rounded-[28px] border border-ink/[0.04] p-5 sm:p-6` rotating the Live Opportunities palette (`bg-pastel-{blue,mint,pink,lilac,cream,aqua}` by index); icon chip `bg-surface/70` frosted |
+| Job Showcase    | Strictly **at most 6 cards** (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5`) with interactive tabs: Top AI Matches, Recently Viewed, Applied / Saved; job cards use the same rotating pastel treatment |
+| Quick Tools     | none on the dashboard — Find Jobs / AI Resume / Research / Profile live only in the sidebar (`AppShell` nav) |
+| Persistence     | `lib/recent-jobs.ts` tracks viewed and applied job IDs in localStorage with SSR safety |
+| Greeting        | `Welcome back, {getSurname(profileName)}` — surname only |
+
+**Pattern notes:**
+- The pastel palette matches the landing page's Live Opportunities cards, and
+  the whole workspace shell is `bg-surface` (white) so the effect is identical
+  to the landing page.
+- Direct card actions: "Mark Applied" toggle button, "View Details" linking to
+  `/find-jobs/[id]`, and external apply link.
+- Redirects deep searching and full workspace filtering to `/find-jobs`.
+
+---
+
+### FindJobsClient (dedicated discovery workspace orchestrator)
+
+File: components/find-jobs/FindJobsClient.tsx
 Last updated: 2026-10-06
 
 | Property        | Class |
 | --------------- | ----- |
-| State           | `jobs`, `selectedId`, `filters` (`DashboardFilters` from `lib/dashboard-filters.ts`), `isSearching`, `searchMessage` |
-| Sync            | adopts `initialJobs` / `initialQuery` prop changes via **adjust-state-during-render** (`prevInitial*` refs) — fires after `router.refresh()` (research completed) or a `?q=` navigation |
-| Auto-select     | one-shot render adjustment: when `selectedId === null && filtered.length > 0` set the first filtered job's id (converges, no effect) |
-| Live search     | `POST /api/agent/find { jobTitle, location: "" }` → shows `successMessage` → `refetchJobs()` from `/api/jobs?limit=100` |
-| Applied resume  | `onAppliedResume` → `router.refresh()` so the attention banner + initial jobs re-render server-side |
-
-**Pattern notes:**
-- One shared `filters` object powers both the left sidebar and the results-bar
-  pills — `FilterSidebar` and `ResultsBar` both receive it plus an
-  `onChange(patch)`.
-- Selection is independent of filters: the panel keeps showing the selected
-  job even if it is filtered out of the grid.
-- Three `setState`-in-effect lint violations (jobs sync, query sync,
-  auto-select) were all converted to the sanctioned render-adjustment pattern.
+| Shell           | `max-w-[1600px] w-full flex flex-col gap-6 overflow-x-hidden` |
+| Discovery Hero  | Dual-input search bar (role/skill + location) with live multi-source scraping via `POST /api/agent/find` |
+| Filter Sidebar  | `FilterSidebar` (`w-64 shrink-0` on `xl:`, hidden on mobile/tablet) with score slider (0–100%), Job Type toggles, Salary floor, Location, and "Reset all" |
+| Results Bar     | Available roles count, active filter dismiss pills, quick toggles (`All`, `Remote`, `Full Time`, `$150k+`), and View Mode switcher (Split vs Grid) |
+| Split View      | Left: single-column feed (`max-w-[400px]` cards) with independent scroll; Right: sticky `JobDetailPanel` (`flex-1 min-w-0`) — eliminates desktop card squeezing and overflow |
+| Grid View       | Responsive 3-column grid (`grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`) for panoramic browsing |
+| Drawers         | Sliding backdrop drawers for filters and job details on viewports < 1280px |
+| Attribution     | `SourceCredits` resolves active providers (`JSearch`, `Adzuna`, `RemoteOK`, `Remotive`, `Jobicy`, `Arbeitnow`) |
 
 ### FilterSidebar + FeedHero + ResultsBar + JobGrid
 
@@ -572,22 +622,19 @@ Last updated: 2026-10-06
 
 | Property      | Class |
 | ------------- | ----- |
-| Sidebar cards | `rounded-2xl border border-ink bg-surface p-5 shadow-sm`, section headers `text-xs font-semibold uppercase tracking-wide text-text-secondary` |
-| Threshold     | shadcn `Slider` `min 0 max 100 step 5`, default 0 (keyword scores average ~33 — a 70 floor would hide everything), "Min match: {n}%" + Ghost "Reset" |
-| Location      | `w-full rounded-lg border border-ink bg-surface px-3 py-2 text-sm` `focus:ring-2 focus:ring-accent focus:ring-offset-2` |
-| Salary pills  | 3-col grid `Any / $100k+ / $150k+`, `Button size sm` `rounded-full`, active `default` variant |
-| Job-type pills| All / Full-Time / Remote / Contract, clicking the active pill toggles back to `all` |
-| FeedHero      | `overflow-hidden rounded-2xl border border-ink bg-gradient-to-br from-lavender via-lavender-soft to-peach p-6 shadow-sm sm:p-8` — `h1` "Find your match", pill search input, ink submit `Button rounded-full px-6` |
-| ResultsBar    | `h2 text-sm font-semibold text-text-darkest` "Available Positions ({count})" + quick pills All / Remote / Full Time / $150k+; toggling an active pill off resets the dimension (job type → `all`, salary → `0`) |
-| JobGrid       | `grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3`; empty state has `SearchX` icon + "Clear filters" button |
+| Sidebar cards | `rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-card`, consolidated into 1 Resume card + 1 unified Filters card with "Reset all" header affordance |
+| Threshold     | shadcn `Slider` `min 0 max 100 step 5`, default 0, pill badge `≥ {minScore}%` / `Any` |
+| Location      | `w-full rounded-xl border border-border bg-surface-secondary/40 py-2 pl-9 pr-8 text-xs` with MapPin icon and clear button |
+| Salary pills  | 3-col grid `Any / $100k+ / $150k+`, rounded segment buttons with `bg-ink text-accent-foreground` when active |
+| Job-type pills| All / Full-Time / Remote / Contract, rounded pill buttons with `bg-ink text-accent-foreground` when active |
+| FeedHero      | `relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-lavender/40 via-surface to-peach-soft/30 p-4 sm:p-5 shadow-card` — compact discovery header with single-line search and spinner |
+| ResultsBar    | Available Roles count + active filter tag dismiss pills + quick toggle pills (`bg-ink` when active) |
+| JobGrid       | `grid grid-cols-1 gap-3.5 xl:grid-cols-2`; empty state has `SearchX` icon + "Clear all filters" button |
 
 **Pattern notes:**
 - Match badges on cards live in a colored pill chosen by `getMatchBadgeVariant`
-  (green ≥70 / info 60–69 / warning <60 / secondary on null) — the wireframe's
-  "green 88% Match" is the ≥70 case, not the default.
-- The hero search is a *live discovery run* (`/api/agent/find`); the navbar
-  search is the *instant filter*. Both are documented here so they are not
-  conflated later.
+  (green ≥70 / info 60–69 / warning <60 / secondary on null).
+- Center feed grid is responsive 1–2 columns to prevent cramped text and awkward button wrapping in the 3-column layout.
 
 ### JobCard + JobDetailPanel
 
@@ -596,23 +643,19 @@ Last updated: 2026-10-06
 
 | Property       | Class |
 | -------------- | ----- |
-| Card shell     | `Card` `gap-0 overflow-hidden rounded-2xl border-ink py-0 shadow-sm`; selected `ring-2 ring-accent ring-offset-2 ring-offset-surface`, idle `hover:-translate-y-0.5 hover:shadow-md` |
-| Card header    | company-initials square `h-8 w-8 rounded-lg bg-accent-muted text-xs font-bold text-accent`, company name + `formatDate(found_at)` |
-| Card chips     | `inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-text-secondary` with `MapPin`/`DollarSign` at `h-3 w-3` |
-| Card footer    | `flex items-center gap-2 border-t border-ink/10 pt-3` — "View details" → `/find-jobs/{id}` and "Apply" (external, `target="_blank"`) as `Button size sm variant outline flex-1` |
-| Panel shell    | `overflow-hidden rounded-2xl border border-ink bg-surface shadow-sm xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)]`; content scrolls via `ScrollArea className="xl:h-[calc(100vh-7rem)]"` |
-| Panel header   | company box `h-10 w-10 rounded-xl bg-accent-muted text-sm font-bold text-accent`, company + title, match `Badge` right |
-| Actions        | [Tailor Resume PDF] = `Button disabled justify-between` with "Coming soon"; [Research Company] = `ResearchCompanyButton` wrapped in `[&_button]:w-full`; [Apply via Source] = external link button, falling back to a Jobbers detail link when `external_apply_url` is missing |
+| Card shell     | `group relative flex flex-col justify-between rounded-2xl border p-4 text-left shadow-card cursor-pointer`; selected `border-accent bg-accent-muted/15 ring-2 ring-accent/20`, idle `border-border bg-surface hover:border-border-muted hover:shadow-md hover:-translate-y-0.5` |
+| Card header    | company avatar `h-8 w-8 rounded-xl bg-surface-secondary border border-border/60 text-xs font-bold text-text-primary`, company name + `formatDate(found_at)`, match `Badge` right |
+| Card chips     | `inline-flex items-center gap-1 rounded-full bg-surface-secondary/80 px-2 py-0.5 text-[11px] font-medium text-text-secondary` with `MapPin`/`DollarSign` at `h-3 w-3` |
+| Card footer    | clean metadata row with job type / researched indicator on left, external apply + active indicator on right (no bulky duplicate buttons) |
+| Panel shell    | `overflow-hidden rounded-2xl border border-border bg-surface shadow-card xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)] flex flex-col`; content scrolls via `ScrollArea className="xl:h-[calc(100vh-7rem)]"` |
+| Panel header   | company avatar `h-11 w-11 rounded-xl bg-surface-secondary border border-border/80 text-sm font-bold text-text-primary`, role title, company name, match `Badge` right |
+| Actions        | Quick apply row with [Apply via Source] primary button, [Full Details] link, and [Research Company] action |
+| Panel sections | Native unified sections inside the panel without nested bulky cards: About The Role snippet, Gemini Match Analysis callout + matched/gap skill pills, Company Dossier overview, tech stack tags, culture, and candidate edge |
 
 **Pattern notes:**
-- The card is **not** wrapped in a `<button>` (the nested links would be
-  invalid HTML); only the header/title/chips region is the interactive select
-  region, and the footer links sit outside it.
-- The panel reuses `MatchScore` (match reasoning + matched/missing skill
-  pills) and `CompanyResearch` with `showResearchButton={false}` — the
-  Actions row owns the research action in the dashboard, avoiding a duplicate.
-- Auto-selects the top scored job on first load so the panel never renders the
-  "No job selected" empty state unless the feed is genuinely empty.
+- The entire card is interactively selectable, previewing the role in the detail panel.
+- The panel avoids nested card borders and bulky card frames, formatting match and company research natively for the 380px panel width.
+- Auto-selects the top scored job on first load so the panel is never empty.
 
 ### shadcn/radix dependencies
 

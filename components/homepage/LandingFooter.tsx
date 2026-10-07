@@ -22,17 +22,17 @@ const footerColumns: ReadonlyArray<{
     links: [
       { href: "/profile", label: "Build your profile" },
       { href: "/profile", label: "Resume & cover letters" },
-      { href: "/find-jobs", label: "Browse matched jobs" },
-      { href: "/find-jobs", label: "Company research" },
+      { href: "/jobs", label: "Browse matched jobs" },
+      { href: "/jobs", label: "Company research" },
       { href: "/login", label: "Get started" },
     ],
   },
   {
     heading: "Your account",
     links: [
-      { href: "/dashboard", label: "Dashboard" },
+      { href: "/home", label: "Dashboard" },
       { href: "/profile", label: "Profile settings" },
-      { href: "/find-jobs", label: "Saved matches" },
+      { href: "/jobs", label: "Saved matches" },
       { href: "/login", label: "Sign in" },
     ],
   },
@@ -99,7 +99,7 @@ export function LandingFooter() {
               Get started
             </Link>
             <Link
-              href="/find-jobs"
+              href="/jobs"
               className="btn btn-secondary"
             >
               See live matches

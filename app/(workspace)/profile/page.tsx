@@ -2,20 +2,18 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 
-import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
-import { Navbar } from "@/components/layout/Navbar";
 import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfilePageClient } from "@/components/profile/ProfilePageClient";
-import { privateMetadata } from "../private-metadata";
+import { requireUser } from "@/lib/auth";
+import { createInsforgeServer } from "@/lib/insforge-server";
+import { calculateCompletion } from "@/lib/profile-utils";
+import { privateMetadata } from "../../private-metadata";
+import type { Profile } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Profile",
   "Your Jobbers profile — the skills and experience used to score every role.",
 );
-import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
-import { calculateCompletion } from "@/lib/profile-utils";
-import type { Profile } from "@/types";
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -40,17 +38,13 @@ export default async function ProfilePage() {
   });
 
   return (
-    <>
-      <PostHogIdentify userId={user.id} />
-      <Navbar isAuthenticated />
-      <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1440px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-        <ProfileOverview
-          completionPercent={completionPercent}
-          missingFields={missingFields}
-          profile={profile ?? null}
-        />
-        <ProfilePageClient profile={profile ?? null} />
-      </main>
-    </>
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <ProfileOverview
+        completionPercent={completionPercent}
+        missingFields={missingFields}
+        profile={profile ?? null}
+      />
+      <ProfilePageClient profile={profile ?? null} />
+    </div>
   );
 }

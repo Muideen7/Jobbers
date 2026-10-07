@@ -16,8 +16,8 @@ type Props = {
 type Phase = "idle" | "uploading" | "extracting";
 
 /**
- * Sidebar resume drop-in: dropping a PDF uploads it, asks Gemini to extract a
- * profile, and opens a review dialog before anything is written.
+ * Compact resume dropzone for the sidebar: dropping or selecting a PDF uploads it,
+ * extracts profile data with Gemini, and opens the review dialog.
  */
 export function ResumeDropzone({ onApplied }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -100,12 +100,12 @@ export function ResumeDropzone({ onApplied }: Props) {
           if (!busy) void handleFile(e.dataTransfer.files[0]);
         }}
         className={cn(
-          "cursor-pointer rounded-xl border-2 border-dashed p-4 text-center transition-colors",
+          "group relative flex cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed p-3.5 text-center transition-all",
           busy
-            ? "border-text-muted bg-surface-secondary"
+            ? "border-text-muted bg-surface-secondary/70"
             : isDragging
-              ? "border-accent bg-accent-muted"
-              : "border-ink/30 bg-surface-secondary hover:border-accent hover:bg-accent-muted",
+              ? "border-accent bg-accent-muted ring-2 ring-accent/20"
+              : "border-border bg-surface-secondary/40 hover:border-accent hover:bg-accent-muted/20",
         )}
       >
         <input
@@ -117,29 +117,38 @@ export function ResumeDropzone({ onApplied }: Props) {
         />
 
         {busy ? (
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-6 w-6 animate-spin text-accent" />
+          <div className="flex items-center gap-2 py-1">
+            <Loader2 className="h-4 w-4 animate-spin text-accent" />
             <p className="text-xs font-medium text-text-secondary">
-              {phase === "uploading" ? "Uploading…" : "Extracting with Gemini…"}
+              {phase === "uploading" ? "Uploading PDF…" : "Gemini extracting…"}
             </p>
           </div>
         ) : extracted ? (
-          <div className="flex flex-col items-center gap-1.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success-lightest">
-              <FileText className="h-4 w-4 text-success" />
+          <div className="flex items-center gap-2 py-0.5">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success-lightest">
+              <FileText className="h-3.5 w-3.5 text-success" />
             </span>
-            <p className="text-xs font-medium text-text-primary">
-              {fileName ?? "Resume parsed"}
-            </p>
+            <div className="text-left">
+              <p className="max-w-[170px] truncate text-xs font-semibold text-text-primary">
+                {fileName ?? "Resume parsed"}
+              </p>
+              <p className="text-[11px] text-text-muted">Click to replace</p>
+            </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <CloudUpload className="h-6 w-6 text-text-muted" />
-            <p className="text-xs font-semibold text-text-primary">Drop your resume</p>
-            <p className="flex items-center gap-1 text-xs text-text-muted">
-              <Sparkles className="h-3 w-3 text-accent" />
-              Gemini extracts your profile instantly
-            </p>
+          <div className="flex items-center gap-2.5 py-0.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-text-muted transition-colors group-hover:text-accent">
+              <CloudUpload className="h-4 w-4" />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-medium text-text-primary group-hover:text-accent transition-colors">
+                Drop resume PDF or browse
+              </p>
+              <p className="flex items-center gap-1 text-[11px] text-text-muted">
+                <Sparkles className="h-2.5 w-2.5 text-accent" />
+                Auto-fills profile with AI
+              </p>
+            </div>
           </div>
         )}
       </div>

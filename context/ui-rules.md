@@ -51,15 +51,17 @@ Three navigation surfaces, deliberately separate files:
 | | File | Used by |
 | --- | --- | --- |
 | Marketing | `components/homepage/LandingNavbar.tsx` | `/` |
-| In-app | `components/layout/Navbar.tsx` | `/profile`, `/find-jobs`, `/login` |
-| Workspace | `components/dashboard/DashboardNav.tsx` | `/dashboard`, `/inventory`, `/ai-resume`, `/company-research`, `/applications` |
+| In-app | `components/layout/Navbar.tsx` | `/login` and other non-workspace auth surfaces |
+| Workspace | `components/layout/AppShell.tsx` (via `app/(workspace)/layout.tsx`) | `/dashboard`, `/find-jobs`, `/inventory`, `/ai-resume`, `/company-research`, `/applications`, `/profile` |
 
-The workspace nav adds a center global search (submits to
-`/dashboard?q=…`), a notification bell (data from `/api/notifications`), the
-green InsForge signed-in chip, an avatar menu with Profile + sign-out, and
-six links: Find Jobs, Inventory, AI Resume, Company Research, Applications,
-Profile. `/profile` keeps the in-app `Navbar` (dashboard decision — Profile is
-reachable from the workspace avatar menu).
+The workspace shell (`AppShell`) is the single global nav for every
+authenticated workspace page: a sectioned sidebar (Workspace / Tools /
+Settings) that collapses/expands with a persisted toggle — the collapsed rail
+is icon-only with no logo and no avatar — a slim top bar with center global
+search (submits to `/find-jobs?q=…`), a notification bell (data from
+`/api/notifications`), an account avatar menu with Profile + sign-out (the
+avatar renders only in the top bar, never in the sidebar), and surname-only
+identity in the sidebar footer.
 
 Both shared chrome conventions apply to all three: `h-16`, `sticky top-0
 z-50`, `bg-surface/90 backdrop-blur-md`, `border-b border-border`, and the

@@ -179,7 +179,7 @@ export function AiMatcher() {
                   </div>
 
                   <Link
-                    href="/find-jobs"
+                    href="/jobs"
                     className="btn btn-primary btn-sm"
                   >
                     View role

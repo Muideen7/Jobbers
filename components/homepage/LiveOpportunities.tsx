@@ -604,7 +604,7 @@ export function LiveOpportunities() {
         ) : null}
 
         <div className="mt-12 text-center">
-          <Link href="/find-jobs" className="btn btn-secondary cursor-pointer">
+          <Link href="/jobs" className="btn btn-secondary cursor-pointer">
             Browse all matched roles
           </Link>
         </div>

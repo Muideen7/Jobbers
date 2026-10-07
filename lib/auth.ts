@@ -39,5 +39,5 @@ export async function getPostLoginRedirectPath(userId: string): Promise<string> 
     return "/profile";
   }
 
-  return "/dashboard";
+  return "/home";
 }

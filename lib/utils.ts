@@ -8,6 +8,15 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
+/** The surname (last word) of a display name; null when there is no name. */
+export function getSurname(nameOrEmail: string | null | undefined): string | null {
+  const value = (nameOrEmail ?? "").trim();
+  if (!value) return null;
+  const words = value.split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1];
+  return last && last.length > 0 ? last : null;
+}
+
 /** Two-letter avatar initials from a display name or email address. */
 export function getInitials(nameOrEmail: string | null | undefined): string {
   const value = (nameOrEmail ?? "").trim();

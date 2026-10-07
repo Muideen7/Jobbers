@@ -111,8 +111,53 @@ test("C5: ordering — strong match well above weak and mismatch", () => {
     "Next.js",
     "Tailwind CSS",
   ]);
-  assert.match(strong.matchReason, /4\/4 of your skills/);
+  assert.match(strong.matchReason, /4\/4 required skills covered/);
   assert.ok(strong.matchReason.length <= 260);
+});
+
+test("coverage: extra profile skills the posting never names do not dilute the score", () => {
+  const wideProfile: ProfileScoreContext = {
+    ...profile,
+    skills: [
+      "React",
+      "TypeScript",
+      "Next.js",
+      "Tailwind CSS",
+      "GraphQL",
+      "Jest",
+      "Docker",
+      "AWS",
+    ],
+  };
+  const score = keywordScore(strongJob, wideProfile);
+  assert.equal(wideProfile.skills?.length, 8);
+  // Only the four skills the posting names count — 4/4, not 4/8.
+  assert.equal(score.matchScore, 100, `wide profile was ${score.matchScore}`);
+  assert.deepEqual(score.matchedSkills, [
+    "React",
+    "TypeScript",
+    "Next.js",
+    "Tailwind CSS",
+  ]);
+});
+
+test("coverage: 6 of the 8 required skills is 75%", () => {
+  const job = makeJob({
+    source: "jsearch",
+    externalId: "eight",
+    title: "Full Stack Engineer",
+    description:
+      "Build with React, TypeScript, Next.js, Node.js, PostgreSQL, Docker, " +
+      "Kubernetes and AWS in production.",
+  });
+  const sixOfEight: ProfileScoreContext = {
+    ...profile,
+    skills: ["React", "TypeScript", "Next.js", "Node.js", "PostgreSQL", "Docker"],
+  };
+  const score = keywordScore(job, sixOfEight);
+  assert.equal(score.matchScore, 75, JSON.stringify(score));
+  assert.equal(score.matchedSkills.length, 6);
+  assert.deepEqual(score.missingSkills, ["AWS", "Kubernetes"]);
 });
 
 test("C5: gap skills list posting tech the profile lacks", () => {

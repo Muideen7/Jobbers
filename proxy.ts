@@ -110,5 +110,11 @@ export const config = {
   // Must stay a static literal: Next.js parses `config` at build time, so it
   // cannot be derived from PROXY_OWNED_ROUTE_PREFIXES. tests/security-headers
   // .test.ts asserts the two lists stay identical.
-  matcher: ["/dashboard/:path*", "/profile/:path*", "/find-jobs/:path*"],
+  matcher: [
+    "/home/:path*",
+    "/jobs/:path*",
+    "/applications/:path*",
+    "/resumes/:path*",
+    "/profile/:path*",
+  ],
 };

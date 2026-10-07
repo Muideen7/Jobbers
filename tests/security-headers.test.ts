@@ -113,12 +113,21 @@ test("nonces are unpredictable and unique per call", () => {
 test("the non-proxy source excludes every session-gated route", () => {
   const pattern = new RegExp(`^${NON_PROXY_OWNED_SOURCE.replace(/^\/:path\(/, "").replace(/\)$/, "")}$`);
 
-  for (const owned of ["/dashboard", "/dashboard/jobs", "/profile", "/find-jobs", "/find-jobs/abc"]) {
+  for (const owned of [
+    "/home",
+    "/home/anything",
+    "/profile",
+    "/jobs",
+    "/jobs/abc",
+    "/applications",
+    "/resumes",
+    "/resumes/abc",
+  ]) {
     const path = owned.slice(1);
     assert.ok(!pattern.test(path), `${owned} must not match the static-CSP source`);
   }
 
-  for (const unowned of ["", "login", "api/jobs", "about", "find-jobsomething", "dashboards"]) {
+  for (const unowned of ["", "login", "api/jobs", "about", "jobsomething", "homes", "resumess"]) {
     assert.ok(pattern.test(unowned), `${unowned || "/"} should match the static-CSP source`);
   }
 });

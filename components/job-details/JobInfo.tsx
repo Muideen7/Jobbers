@@ -60,7 +60,7 @@ function InfoCard({ item }: { item: InfoItem }) {
 export function JobInfo({ job }: Props) {
   const company = job.company ?? "Unknown company";
   const matchScore = job.match_score ?? 0;
-  const applyUrl = job.external_apply_url ?? job.source_url ?? "/find-jobs";
+  const applyUrl = job.external_apply_url ?? job.source_url ?? "/jobs";
   const infoItems: InfoItem[] = [
     {
       label: "Salary Est.",
@@ -118,8 +118,8 @@ export function JobInfo({ job }: Props) {
 
           <Link
             href={applyUrl}
-            target={applyUrl === "/find-jobs" ? undefined : "_blank"}
-            rel={applyUrl === "/find-jobs" ? undefined : "noreferrer"}
+            target={applyUrl === "/jobs" ? undefined : "_blank"}
+            rel={applyUrl === "/jobs" ? undefined : "noreferrer"}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-secondary"
           >
             <ExternalLink className="h-4 w-4" />
