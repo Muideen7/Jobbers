@@ -32,6 +32,26 @@ test("every optional remote script is opted out of", () => {
   assert.equal(config.autocapture, false);
 });
 
+test("heatmaps and surveys are off, so their bundles are never fetched", () => {
+  const config = buildPostHogConfig();
+
+  // Regression guard for two console errors seen on /home:
+  //   [Dead Clicks] failed to load script
+  //   [Surveys] Failed to fetch config
+  // Measured against posthog-js 1.434.18 with the live remote config:
+  //   capture_dead_clicks: false alone still requested
+  //   us-assets.i.posthog.com/static/.../dead-clicks-autocapture.js,
+  //   because dead-click autocapture ships inside the *heatmaps* bundle and
+  //   the SDK resolves the bundle from its defaults before any narrower flag
+  //   or the remote config has a say. `capture_heatmaps: false` is the flag
+  //   that actually stops the request; `disable_surveys: true` is the one
+  //   that stops surveys.js.
+  // Verified: with both set, a page load makes zero requests to
+  // us-assets.i.posthog.com other than remote config.
+  assert.equal(config.capture_heatmaps, false);
+  assert.equal(config.disable_surveys, true);
+});
+
 test("pageview capture stays on", () => {
   // The one feature the app does rely on. Guarded so a future edit cannot
   // disable analytics along with the unused scripts.
