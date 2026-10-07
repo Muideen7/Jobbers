@@ -177,6 +177,15 @@ export type ApplicationListItem = Application & {
   job: ApplicationJobSummary | null;
 };
 
+/**
+ * The reference a feed card needs to render a status chip and to un-save the
+ * row again. Keyed by job id on the /jobs surface (Prompt 3).
+ */
+export interface ApplicationRef {
+  id: string;
+  status: ApplicationStatus;
+}
+
 /** Body for `POST /api/applications`: track a saved job or a manual role. */
 export interface CreateApplicationPayload {
   jobId?: string;

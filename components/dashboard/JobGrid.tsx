@@ -1,10 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { SearchX } from "lucide-react";
 
 import { JobCard } from "@/components/dashboard/JobCard";
 import { Button } from "@/components/ui/button";
-import type { Job } from "@/types";
+import type { ApplicationRef, Job } from "@/types";
 
 type Props = {
   jobs: Job[];
@@ -12,11 +13,23 @@ type Props = {
   onSelect: (id: string) => void;
   onClearFilters: () => void;
   layout?: "single" | "grid";
+  /** Application row per job id, used for the card's status chip. */
+  applications: Record<string, ApplicationRef>;
+  /** Job ids whose save/unsave request is still in flight. */
+  savingIds: ReadonlySet<string>;
+  onToggleSave: (job: Job) => void;
+  /**
+   * Replaces the built-in "no roles match your filters" copy when the feed is
+   * empty because the tab itself has nothing in it — the fix then is a
+   * different tab, not a looser filter.
+   */
+  emptyState?: ReactNode;
 };
 
 /**
  * Responsive job feed supporting single-column list (Split View)
- * or multi-column responsive grid (Grid View).
+ * or multi-column responsive grid (Grid View). Both layouts render the same
+ * JobCard, so /jobs has exactly one list component.
  */
 export function JobGrid({
   jobs,
@@ -24,8 +37,14 @@ export function JobGrid({
   onSelect,
   onClearFilters,
   layout = "grid",
+  applications,
+  savingIds,
+  onToggleSave,
+  emptyState,
 }: Props) {
   if (jobs.length === 0) {
+    if (emptyState) return <>{emptyState}</>;
+
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface px-6 py-14 text-center shadow-card">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-secondary">
@@ -64,6 +83,9 @@ export function JobGrid({
           job={job}
           isSelected={job.id === selectedId}
           onSelect={onSelect}
+          application={applications[job.id] ?? null}
+          isSaving={savingIds.has(job.id)}
+          onToggleSave={onToggleSave}
         />
       ))}
     </div>

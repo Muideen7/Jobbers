@@ -1,14 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, MapPin, Search, Sparkles, X } from "lucide-react";
+import {
+  Bookmark,
+  CheckCircle2,
+  FlaskConical,
+  Loader2,
+  MapPin,
+  Search,
+  Sparkles,
+  SearchX,
+  X,
+} from "lucide-react";
 
 import { FilterSidebar } from "@/components/dashboard/FilterSidebar";
 import { JobGrid } from "@/components/dashboard/JobGrid";
 import { ResultsBar, type SortOrder } from "@/components/dashboard/ResultsBar";
+import { JobTabs } from "@/components/find-jobs/JobTabs";
 import { JobsPagination } from "@/components/find-jobs/JobsPagination";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Toast } from "@/components/ui/toast";
 import { SourceCredits } from "@/components/shared/SourceCredits";
 import {
   DEFAULT_DASHBOARD_FILTERS,
@@ -16,26 +31,89 @@ import {
   type DashboardFilters,
 } from "@/lib/dashboard-filters";
 import { resolveSourceCredits } from "@/lib/source-attribution";
-import type { Job } from "@/types";
+import type { JobsTab } from "@/lib/workspace/jobs-tab";
+import { NEW_MATCH_SCORE_THRESHOLD } from "@/lib/workspace/constants";
+import type { ApplicationRef, Job } from "@/types";
 
 const PAGE_SIZE = 20;
 
+/**
+ * Session-scoped guard for the `last_jobs_visit_at` write (STEP 3). Keyed on
+ * sessionStorage so tab switches within /jobs — or a back/forward within the
+ * same tab — do not keep pushing the sidebar's "new" window forward.
+ */
+const JOBS_VISIT_KEY = "jobbers:jobs-visit-recorded";
+
 type Props = {
-  initialJobs: Job[];
-  initialTotalCount: number;
+  /** Server-scoped feed for the active `?tab=` / `?researched=` view. */
+  jobs: Job[];
   initialQuery?: string;
+  tab: JobsTab;
+  researched: boolean;
+  /** Application rows for this user, keyed by job id. */
+  applications: Record<string, ApplicationRef>;
+  /** Drives the For You empty state: are target roles on the profile yet? */
+  hasTargetRoles: boolean;
 };
 
 type ViewMode = "split" | "grid";
 
+function readVisitFlag(): boolean {
+  try {
+    return window.sessionStorage.getItem(JOBS_VISIT_KEY) === "1";
+  } catch {
+    return false; // private mode: fall back to once per mount
+  }
+}
+
+function writeVisitFlag() {
+  try {
+    window.sessionStorage.setItem(JOBS_VISIT_KEY, "1");
+  } catch {
+    /* private mode — the write simply does not stick */
+  }
+}
+
+function FeedEmpty({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  body: string;
+  action: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface px-6 py-14 text-center shadow-card">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-secondary">
+        {icon}
+      </div>
+      <p className="mt-5 text-sm font-semibold text-text-primary">{title}</p>
+      <p className="mt-2 max-w-sm text-sm leading-6 text-text-muted">{body}</p>
+      <div className="mt-5">{action}</div>
+    </div>
+  );
+}
+
+/**
+ * The merged /jobs surface: For You, All and Saved in one list, plus the
+ * `?researched=1` filter that used to be the Dossiers wall.
+ *
+ * Tab and research state live in the URL and are resolved server-side, so the
+ * feed can never disagree with a deep link. Filters, sort, view mode and
+ * pagination stay client-side over whatever the server scoped.
+ */
 export function FindJobsClient({
-  initialJobs,
-  initialTotalCount,
+  jobs,
   initialQuery = "",
+  tab,
+  researched,
+  applications,
+  hasTargetRoles,
 }: Props) {
   const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
-  const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [isSearching, setIsSearching] = useState(false);
   const [searchMessage, setSearchMessage] = useState<string | null>(null);
 
@@ -61,14 +139,70 @@ export function FindJobsClient({
   // Mobile / tablet filter drawer
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Optimistic save/unsave. `null` means "we just removed it and the server
+  // has not confirmed yet"; an entry here always wins over `applications`.
+  const [overrides, setOverrides] = useState<Record<string, ApplicationRef | null>>({});
+  const [savingIds, setSavingIds] = useState<ReadonlySet<string>>(new Set());
+  const [pendingUnsave, setPendingUnsave] = useState<{
+    job: Job;
+    application: ApplicationRef;
+  } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const dismissToast = useCallback(() => setToast(null), []);
+
+  function applicationFor(jobId: string): ApplicationRef | null {
+    if (Object.prototype.hasOwnProperty.call(overrides, jobId)) {
+      return overrides[jobId] ?? null;
+    }
+    return applications[jobId] ?? null;
+  }
+
+  function markSaving(jobId: string, saving: boolean) {
+    setSavingIds((prev) => {
+      const next = new Set(prev);
+      if (saving) {
+        next.add(jobId);
+      } else {
+        next.delete(jobId);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * STEP 3 — read the sidebar summary first, then close the "new matches"
+   * window. Reading before writing is what keeps the badge (and any per-card
+   * marker) visible for this visit: once `last_jobs_visit_at` moves, jobs found
+   * earlier stop counting as new.
+   */
+  const visitInFlight = useRef(false);
+  useEffect(() => {
+    if (visitInFlight.current || readVisitFlag()) return;
+    visitInFlight.current = true;
+
+    fetch("/api/sidebar-summary", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("summary"))))
+      .then(() => fetch("/api/sidebar-summary/visit", { method: "POST" }))
+      .then((res) => {
+        if (!res.ok) throw new Error("visit");
+        writeVisitFlag();
+      })
+      .catch(() => {
+        visitInFlight.current = false; // let the next mount retry
+      });
+  }, []);
+
   // Compute active filters
   const filteredJobs = useMemo(
     () => filterDashboardJobs(jobs, filters),
     [jobs, filters],
   );
 
-  // Order the filtered feed by the quick-pill sort before paginating.
-  const sortedJobs = useMemo(() => {
+  // For You arrives already ranked by match score; every other tab honours the
+  // newest/oldest pills.
+  const orderedJobs = useMemo(() => {
+    if (tab === "for-you") return filteredJobs;
     const copy = [...filteredJobs];
     copy.sort((a, b) => {
       const at = new Date(a.found_at ?? "").getTime() || 0;
@@ -76,14 +210,26 @@ export function FindJobsClient({
       return sort === "newest" ? bt - at : at - bt;
     });
     return copy;
-  }, [filteredJobs, sort]);
+  }, [filteredJobs, sort, tab]);
 
-  // Paginate the sorted feed. `page` is clamped so a shrinking result set
+  // Paginate the ordered feed. `page` is clamped so a shrinking result set
   // never strands the user on an empty page.
-  const totalPages = Math.max(1, Math.ceil(sortedJobs.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(orderedJobs.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pagedJobs = sortedJobs.slice(pageStart, pageStart + PAGE_SIZE);
+  const pagedJobs = orderedJobs.slice(pageStart, pageStart + PAGE_SIZE);
+
+  // Card state: the optimistic overrides folded back into a lookup record.
+  const cardApplications = useMemo(() => {
+    const resolved: Record<string, ApplicationRef> = {};
+    for (const job of jobs) {
+      const ref = Object.prototype.hasOwnProperty.call(overrides, job.id)
+        ? overrides[job.id]
+        : (applications[job.id] ?? null);
+      if (ref) resolved[job.id] = ref;
+    }
+    return resolved;
+  }, [jobs, overrides, applications]);
 
   // Any filter change starts the feed from the top.
   function applyFilters(patch: Partial<DashboardFilters>) {
@@ -91,7 +237,13 @@ export function FindJobsClient({
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
-  // Live multi-source scraping via agent
+  function handleClearFilters() {
+    setPage(1);
+    setFilters((prev) => ({ ...DEFAULT_DASHBOARD_FILTERS, query: prev.query }));
+  }
+
+  // Live multi-source scraping via agent. The server component owns the feed,
+  // so a successful run just revalidates it rather than patching local state.
   async function handleLiveDiscovery(e: React.FormEvent) {
     e.preventDefault();
     const title = searchTitle.trim();
@@ -123,17 +275,8 @@ export function FindJobsClient({
 
       if (json.data) {
         setSearchMessage(json.data.successMessage);
-        // Refresh jobs from API to get all scored roles
-        const refreshRes = await fetch("/api/jobs?limit=100&sortOption=score");
-        const refreshJson = (await refreshRes.json()) as {
-          success: boolean;
-          data?: { jobs: Job[]; totalCount: number };
-        };
-        if (refreshJson.success && refreshJson.data) {
-          setJobs(refreshJson.data.jobs);
-          setTotalCount(refreshJson.data.totalCount);
-          setPage(1);
-        }
+        setPage(1);
+        startTransition(() => router.refresh());
       }
     } catch {
       setSearchMessage("Network error. Please check your connection and try again.");
@@ -147,9 +290,68 @@ export function FindJobsClient({
     router.push(`/jobs/${jobId}`);
   }
 
-  function handleClearFilters() {
-    setPage(1);
-    setFilters((prev) => ({ ...DEFAULT_DASHBOARD_FILTERS, query: prev.query }));
+  async function saveJob(job: Job) {
+    const previous = applicationFor(job.id);
+    markSaving(job.id, true);
+    setOverrides((prev) => ({ ...prev, [job.id]: { id: "", status: "saved" } }));
+
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, status: "saved" }),
+      });
+      const json = (await res.json()) as {
+        success: boolean;
+        data?: { application: ApplicationRef };
+        error?: string;
+      };
+      const created = json.data?.application;
+      if (!res.ok || !json.success || !created) {
+        throw new Error(json.error ?? "save failed");
+      }
+      setOverrides((prev) => ({ ...prev, [job.id]: created }));
+    } catch {
+      setOverrides((prev) => ({ ...prev, [job.id]: previous }));
+      setToast("Couldn't save this role. Please try again.");
+    } finally {
+      markSaving(job.id, false);
+    }
+  }
+
+  async function unsaveJob(job: Job, application: ApplicationRef) {
+    markSaving(job.id, true);
+    setOverrides((prev) => ({ ...prev, [job.id]: null }));
+
+    try {
+      const res = await fetch(`/api/applications/${application.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("delete failed");
+    } catch {
+      setOverrides((prev) => ({ ...prev, [job.id]: application }));
+      setToast("Couldn't remove this role from Saved. Please try again.");
+    } finally {
+      markSaving(job.id, false);
+    }
+  }
+
+  function handleToggleSave(job: Job) {
+    const current = applicationFor(job.id);
+    if (!current) {
+      void saveJob(job);
+      return;
+    }
+    // Anything past "saved" has history worth confirming before it is dropped.
+    if (current.status !== "saved") {
+      setPendingUnsave({ job, application: current });
+      return;
+    }
+    void unsaveJob(job, current);
+  }
+
+  function confirmUnsave() {
+    if (pendingUnsave) void unsaveJob(pendingUnsave.job, pendingUnsave.application);
   }
 
   // Attribution credits
@@ -169,9 +371,68 @@ export function FindJobsClient({
     (filters.salaryFloor > 0 ? 1 : 0) +
     (filters.minScore > 0 ? 1 : 0);
 
+  const resultsHeading = researched
+    ? "Researched roles"
+    : tab === "for-you"
+      ? "Top matches"
+      : tab === "saved"
+        ? "Saved roles"
+        : "Available Roles";
+
+  // Only shown when the tab itself came back empty — an empty *filtered* feed
+  // keeps JobGrid's "clear your filters" state instead.
+  const tabEmptyState: ReactNode =
+    jobs.length === 0 ? (
+      researched ? (
+        <FeedEmpty
+          icon={<FlaskConical className="h-6 w-6 text-text-muted" />}
+          title="No researched roles yet"
+          body="Researching happens from a job's Company tab — open a role and run the research there, then it appears under this filter."
+          action={
+            <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Link href="/jobs?tab=all">Browse all jobs</Link>
+            </Button>
+          }
+        />
+      ) : tab === "saved" ? (
+        <FeedEmpty
+          icon={<Bookmark className="h-6 w-6 text-text-muted" />}
+          title="Nothing saved yet"
+          body="Bookmark a role from the All tab and it lands here with its application status."
+          action={
+            <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Link href="/jobs?tab=all">Browse all jobs</Link>
+            </Button>
+          }
+        />
+      ) : !hasTargetRoles ? (
+        <FeedEmpty
+          icon={<Sparkles className="h-6 w-6 text-text-muted" />}
+          title="No recommendations yet"
+          body="Tell Jobbers which roles you are after and every listing gets scored against your profile."
+          action={
+            <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Link href="/profile?tab=preferences">Set target roles</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <FeedEmpty
+          icon={<SearchX className="h-6 w-6 text-text-muted" />}
+          title="No strong matches yet"
+          body={`No role is scoring ${NEW_MATCH_SCORE_THRESHOLD}% or higher against your profile right now. Widen your target roles to cast a bigger net.`}
+          action={
+            <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Link href="/profile?tab=preferences">Adjust target roles</Link>
+            </Button>
+          }
+        />
+      )
+    ) : null;
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Live Discovery Header */}
+      {/* Page header: title, live search, then the tab bar */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-lavender/40 via-surface to-peach-soft/30 p-5 sm:p-6 shadow-card">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -182,10 +443,10 @@ export function FindJobsClient({
               </span>
             </div>
             <h1 className="mt-1.5 text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
-              Search Open Roles Scored by AI
+              Jobs
             </h1>
             <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
-              Index and match positions across JSearch, Adzuna, RemoteOK, Remotive, and Arbeitnow.
+              Search, filter and save roles scored against your Jobbers profile.
             </p>
           </div>
 
@@ -240,6 +501,8 @@ export function FindJobsClient({
         )}
       </section>
 
+      <JobTabs activeTab={tab} researched={researched} />
+
       {/* Main Workspace Layout — two columns at xl (filter | feed). The role
           detail now lives on its own page, so there is no third preview column. */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[264px_minmax(0,1fr)] items-start">
@@ -256,7 +519,7 @@ export function FindJobsClient({
         <div className="flex min-w-0 flex-col gap-4">
           {/* Results Bar with active filters, quick toggles, and view switcher */}
           <ResultsBar
-            count={sortedJobs.length}
+            count={orderedJobs.length}
             filters={filters}
             onChange={applyFilters}
             sort={sort}
@@ -264,45 +527,40 @@ export function FindJobsClient({
               setPage(1);
               setSort(next);
             }}
+            heading={resultsHeading}
+            showSort={tab !== "for-you"}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onToggleMobileFilters={() => setMobileFiltersOpen(true)}
             mobileFilterCount={activeFilterCount}
           />
 
-          {/* Feed Content — single-column list for Split, cards for Grid */}
-          {viewMode === "split" ? (
-            <div className="flex min-w-0 flex-col gap-3.5">
-              <JobGrid
-                jobs={pagedJobs}
-                selectedId={null}
-                onSelect={handleSelectJob}
-                onClearFilters={handleClearFilters}
-                layout="single"
-              />
-            </div>
-          ) : (
-            <div className="min-w-0">
-              <JobGrid
-                jobs={pagedJobs}
-                selectedId={null}
-                onSelect={handleSelectJob}
-                onClearFilters={handleClearFilters}
-                layout="grid"
-              />
-            </div>
-          )}
+          {/* Feed Content — single-column list for Split, cards for Grid.
+              Both layouts render the one JobCard, so there is no second list. */}
+          <div className="min-w-0">
+            <JobGrid
+              jobs={pagedJobs}
+              selectedId={null}
+              onSelect={handleSelectJob}
+              onClearFilters={handleClearFilters}
+              layout={viewMode === "split" ? "single" : "grid"}
+              applications={cardApplications}
+              savingIds={savingIds}
+              onToggleSave={handleToggleSave}
+              emptyState={tabEmptyState}
+            />
+          </div>
 
           {/* Feed Pagination — 20 roles per page in both layouts */}
           <JobsPagination
             currentPage={currentPage}
-            totalCount={filteredJobs.length}
+            totalCount={orderedJobs.length}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
           />
 
           {/* Sources Attribution */}
-          {totalCount > 0 && <SourceCredits credits={credits} />}
+          {credits.length > 0 && <SourceCredits credits={credits} />}
         </div>
       </div>
 
@@ -343,6 +601,21 @@ export function FindJobsClient({
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingUnsave !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingUnsave(null);
+        }}
+        title="Remove this tracked application?"
+        description="This drops the role out of your pipeline along with its status history and follow-ups. Saving it again afterwards starts a fresh record."
+        confirmLabel="Remove application"
+        cancelLabel="Keep it"
+        tone="destructive"
+        onConfirm={confirmUnsave}
+      />
+
+      <Toast message={toast} onDismiss={dismissToast} />
     </div>
   );
 }

@@ -14,6 +14,13 @@ type Props = {
   onChange: (patch: Partial<DashboardFilters>) => void;
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
+  /**
+   * The For You tab has a fixed ranking (match score descending), so it hides
+   * the newest/oldest pills rather than showing controls that do nothing.
+   */
+  showSort?: boolean;
+  /** Replaces "Available Roles" so the count reads correctly on every tab. */
+  heading?: string;
   viewMode?: "split" | "grid";
   onViewModeChange?: (mode: "split" | "grid") => void;
   onToggleMobileFilters?: () => void;
@@ -31,6 +38,8 @@ export function ResultsBar({
   onChange,
   sort,
   onSortChange,
+  showSort = true,
+  heading = "Available Roles",
   viewMode,
   onViewModeChange,
   onToggleMobileFilters,
@@ -57,7 +66,7 @@ export function ResultsBar({
         )}
 
         <h2 className="text-sm font-semibold text-text-primary">
-          Available Roles
+          {heading}
         </h2>
         <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-semibold text-text-secondary">
           {count}
@@ -94,27 +103,29 @@ export function ResultsBar({
 
       <div className="flex flex-wrap items-center gap-2 sm:self-auto">
         {/* Sort Pills — filtering lives in the sidebar, this only orders the feed */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {SORT_PILLS.map((pill) => {
-            const active = sort === pill.key;
-            return (
-              <button
-                key={pill.key}
-                type="button"
-                onClick={() => onSortChange(pill.key)}
-                aria-pressed={active}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer",
-                  active
-                    ? "bg-ink text-accent-foreground shadow-xs"
-                    : "bg-surface border border-border text-text-secondary hover:border-border-muted hover:text-text-primary",
-                )}
-              >
-                {pill.label}
-              </button>
-            );
-          })}
-        </div>
+        {showSort && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {SORT_PILLS.map((pill) => {
+              const active = sort === pill.key;
+              return (
+                <button
+                  key={pill.key}
+                  type="button"
+                  onClick={() => onSortChange(pill.key)}
+                  aria-pressed={active}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer",
+                    active
+                      ? "bg-ink text-accent-foreground shadow-xs"
+                      : "bg-surface border border-border text-text-secondary hover:border-border-muted hover:text-text-primary",
+                  )}
+                >
+                  {pill.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* View Mode Switcher (Desktop) */}
         {viewMode && onViewModeChange && (
