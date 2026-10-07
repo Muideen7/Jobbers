@@ -386,6 +386,11 @@ This page is **job-only** — JobActions, JobInfo, `MatchReasonCard`, `SkillMatc
 
 ### Dossiers (list + detail)
 
+> ⚠️ **Legacy (Prompt 3).** The list no longer renders: `/dossiers` →
+> 308 `/jobs?tab=all&researched=1` and `/dossiers/:id` → 308
+> `/jobs/:id?tab=company`. The page files stay on disk until Prompt 10.
+> `YourEdgeCard` / `GapsToAddressCard` are still consumed by Prompt 5 scope.
+
 Files: app/(workspace)/dossiers/page.tsx, app/(workspace)/dossiers/[id]/page.tsx
 Last updated: 2026-10-07
 
@@ -403,6 +408,10 @@ The Dossiers list shows only jobs with `company_research !== null` (ordered by `
 ---
 
 ### Research queue
+
+> ⚠️ **Legacy (Prompt 3).** `/company-research` → 308 `/jobs?tab=all`. The
+> queue's "unresearched" concept is not carried over — `/jobs?tab=all` is the
+> redirect target Prompt 1 chose. Page files stay on disk until Prompt 10.
 
 File: app/(workspace)/company-research/page.tsx + components/company-research/ResearchQueue.tsx
 Last updated: 2026-10-07
@@ -441,8 +450,8 @@ The research card preserves the Feature 12 card shell and header, then swaps bet
 
 ### shadcn/ui Primitives (Jobbers-mapped)
 
-Files: components/ui/{button,badge,card,slider,scroll-area,dialog}.tsx
-Last updated: 2026-10-06
+Files: components/ui/{button,badge,card,slider,scroll-area,dialog,toast,confirm-dialog}.tsx
+Last updated: 2026-10-07 (Prompt 3 added `toast` + `confirm-dialog`)
 
 Hand-written `shadcn/ui`-style primitives (the CLI/`init` **never ran** — it would
 have rewritten `app/globals.css`). They mirror the classic shadcn API
@@ -485,6 +494,24 @@ token set, so they read as the app's design language:
   dashboard side columns.
 - **Dialog**: radix overlay `bg-ink/40 backdrop-blur-sm`, content
   `rounded-2xl border border-border bg-surface`, header/footer slots.
+- **Toast** (`components/ui/toast.tsx`): `fixed inset-x-0 bottom-0 z-[60]
+  flex justify-center px-4 pb-4 sm:justify-end sm:px-6 sm:pb-6` wrapper with
+  `pointer-events-none`, inner `pointer-events-auto flex w-full max-w-sm
+  items-start gap-3 rounded-2xl border border-ink bg-surface px-4 py-3
+  shadow-card`; `role="alert"` for `tone="error"` (default) and `role="status"`
+  for success; `AlertTriangle text-error` / `text-success-dark`; auto-dismiss
+  after `durationMs` (6000 default, `0` = sticky) via a `setTimeout` **inside**
+  the callback so `react-hooks/set-state-in-effect` stays happy. `onDismiss`
+  must be a `useCallback` — the timer re-arms on every render otherwise.
+  Currently the only consumer is `FindJobsClient`'s save/unsave rollback.
+- **ConfirmDialog** (`components/ui/confirm-dialog.tsx`): `Dialog` + `DialogHeader`
+  /`Footer` with `DialogClose asChild` on **Keep it** and a destructive
+  `Button` for the confirm; `tone="destructive"` swaps `default`→`destructive`
+  variants. It closes itself (`onOpenChange(false)`) *before* firing
+  `onConfirm`, so the parent's `onConfirm` closure still sees the state from
+  the render in which the dialog opened. Chosen over `window.confirm` because
+  the native one renders outside the design system and cannot be styled for
+  mobile. Used by the card's un-save-past-`saved` flow.
 - These primitives are `"use client"`-free for pure presentational ones;
   components that need state or radix interactivity are marked client. They
   deliberately live alongside — not instead of — the `.btn` system: `.btn
@@ -604,26 +631,78 @@ Last updated: 2026-10-07
 
 ---
 
-### FindJobsClient (dedicated discovery workspace orchestrator)
+### FindJobsClient (the merged /jobs surface)
 
 File: components/find-jobs/FindJobsClient.tsx
-Last updated: 2026-10-06
+Last updated: 2026-10-07 (Prompt 3 revamp)
 
 | Property        | Class |
 | --------------- | ----- |
-| Shell           | `max-w-[1600px] w-full flex flex-col gap-6 overflow-x-hidden` |
-| Discovery Hero  | Dual-input search bar (role/skill + location) with live multi-source scraping via `POST /api/agent/find` |
-| Filter Sidebar  | `FilterSidebar` (`w-64 shrink-0` on `xl:`, hidden on mobile/tablet) with score slider (0–100%), Job Type toggles, Salary floor, Location, and "Reset all" |
-| Results Bar     | Available roles count, active filter dismiss pills, quick toggles (`All`, `Remote`, `Full Time`, `$150k+`), and View Mode switcher (Split vs Grid) |
-| Split View      | Left: single-column feed (`max-w-[400px]` cards) with independent scroll; Right: sticky `JobDetailPanel` (`flex-1 min-w-0`) — eliminates desktop card squeezing and overflow |
-| Grid View       | Responsive 3-column grid (`grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`) for panoramic browsing |
-| Drawers         | Sliding backdrop drawers for filters and job details on viewports < 1280px |
-| Attribution     | `SourceCredits` resolves active providers (`JSearch`, `Adzuna`, `RemoteOK`, `Remotive`, `Jobicy`, `Arbeitnow`) |
+| Shell           | `flex flex-col gap-6` inside the page's `max-w-[1600px] px-4 sm:px-6 lg:px-8` |
+| Header          | `relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-lavender/40 via-surface to-peach-soft/30 p-5 sm:p-6 shadow-card` — `Live Job Discovery` pill, `h1` **Jobs**, dual-input live search (`POST /api/agent/find`), then the `searchMessage` strip (`rounded-xl border border-border/80 bg-surface/90`) |
+| Tab bar         | `<JobTabs>` sits **below** the header card and **above** the filters row |
+| Filter Sidebar  | `FilterSidebar` in `hidden xl:block` + the existing `<xl` slide-over drawer |
+| Layout          | `grid grid-cols-1 gap-6 xl:grid-cols-[264px_minmax(0,1fr)] items-start` — no third preview column (the role detail is its own page) |
+| Split / Grid    | one `JobGrid` with `layout={viewMode === "split" ? "single" : "grid"}`; single = `flex flex-col gap-3.5 xl:max-w-[75%]`, grid = `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4` |
+| Results bar     | `heading` reads `Top matches` / `Available Roles` / `Saved roles` / `Researched roles`; `showSort={tab !== "for-you"}` |
+| Attribution     | `SourceCredits` renders only when `resolveSourceCredits(...)` is non-empty (Saved can be all-manual and credit nothing) |
 
-### FilterSidebar + FeedHero + ResultsBar + JobGrid
+**Pattern notes:**
+- **State split.** `?tab=` and `?researched=1` are resolved *server-side*;
+  filters, sort, view mode, pagination and the search inputs are client state.
+  Nothing mirrors a server prop into `useState`, so a tab switch can never
+  leave the list showing the previous tab's rows.
+- **Optimistic save.** `overrides: Record<jobId, ApplicationRef | null>` always
+  beats the server-supplied `applications` map. `saveJob` writes an optimistic
+  `{id:"", status:"saved"}` entry, `POST`s, and either replaces it with the real
+  row or rolls back to the previous value + `setToast`. `unsaveJob` mirrors it
+  with `DELETE`. `savingIds: ReadonlySet<jobId>` disables just the card in
+  flight (an `id:""` placeholder can never be `DELETE`d because the button is
+  disabled while it is in flight).
+- `handleToggleSave` only opens `ConfirmDialog` when `status !== "saved"`;
+  un-saving a plain `saved` row is one click.
+- **STEP 3 ordering.** the mount effect `GET`s `/api/sidebar-summary` *then*
+  `POST`s `/api/sidebar-summary/visit`, once per session
+  (`sessionStorage["jobbers:jobs-visit-recorded"]`, with an in-flight ref so a
+  failed write retries on the next mount). Read-before-write is what keeps the
+  badge visible for the visit.
+- **Two different empties.** `jobs.length === 0` (the tab itself is empty) gets
+  a `FeedEmpty` with a tab-specific CTA; `orderedJobs.length === 0` after
+  filters keeps `JobGrid`'s "No roles match your filters" + Clear all.
+- `handleLiveDiscovery` calls `router.refresh()` inside `startTransition`
+  instead of patching local state — the server component owns the feed.
 
-Files: components/dashboard/{FilterSidebar,FeedHero,ResultsBar,JobGrid}.tsx
-Last updated: 2026-10-06
+### JobTabs + `lib/workspace/jobs-tab.ts`
+
+Files: components/find-jobs/JobTabs.tsx, lib/workspace/jobs-tab.ts
+Last updated: 2026-10-07 (Prompt 3 revamp)
+
+| Property   | Class / value |
+| ---------- | ------------- |
+| Wrapper    | `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between` |
+| Tab row    | `<nav aria-label="Job views" class="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">` — one line at 320px, scrolls rather than wraps |
+| Tab pill   | `rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all`; active `bg-ink text-accent-foreground shadow-xs`, idle `border border-border bg-surface text-text-secondary hover:border-border-muted hover:text-text-primary`; `focus-visible:outline-2 outline-offset-[3px] outline-accent`; `disabled:opacity-70` while `isPending` |
+| Chip pill  | `inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-xs font-semibold` + `FlaskConical h-3.5 w-3.5`; active `bg-accent-light text-accent shadow-xs`, idle `border border-border bg-surface` |
+| Vocabulary | `JOBS_TABS = ["for-you","all","saved"]`, `DEFAULT_JOBS_TAB = "for-you"` |
+
+**Pattern notes:**
+- Deliberately **not** `role="tablist"`/`role="tab"`: there is no `tabpanel`
+  element to pair with them, and a tab with no panel is announced as dead.
+  `<nav>` + `aria-current="page"` says what is actually true.
+- `jobsTabQueryString()` drops the default tab, so `/jobs?tab=for-you` normalises
+  to `/jobs`.
+- **The tab strings are a redirect contract.** `next.config.ts` sends
+  `/matches`→`?tab=for-you`, `/inventory`→`?tab=saved`,
+  `/company-research`→`?tab=all`, `/dossiers`→`?tab=all&researched=1`.
+  `tests/jobs-tab.test.ts` reads `next.config.ts` and fails if any of those
+  destinations names a tab that no longer exists.
+
+### FilterSidebar + ResultsBar + JobGrid
+
+Files: components/dashboard/{FilterSidebar,ResultsBar,JobGrid}.tsx
+(`FeedHero.tsx` still exists on disk but is no longer imported — its gradient
+header shell lives inline in `FindJobsClient`; removal is Prompt 10 scope.)
+Last updated: 2026-10-07 (Prompt 3 revamp)
 
 | Property      | Class |
 | ------------- | ----- |
@@ -633,34 +712,54 @@ Last updated: 2026-10-06
 | Salary pills  | 3-col grid `Any / $100k+ / $150k+`, rounded segment buttons with `bg-ink text-accent-foreground` when active |
 | Job-type pills| All / Full-Time / Remote / Contract, rounded pill buttons with `bg-ink text-accent-foreground` when active |
 | FeedHero      | `relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-lavender/40 via-surface to-peach-soft/30 p-4 sm:p-5 shadow-card` — compact discovery header with single-line search and spinner |
-| ResultsBar    | Available Roles count + active filter tag dismiss pills + quick toggle pills (`bg-ink` when active) |
-| JobGrid       | `grid grid-cols-1 gap-3.5 xl:grid-cols-2`; empty state has `SearchX` icon + "Clear all filters" button |
+| ResultsBar    | `heading` slot (defaults to `Available Roles`; `/jobs` passes Top matches / Available Roles / Saved roles / Researched roles) + active filter tag dismiss pills + quick toggle pills (`bg-ink` when active) + optional `showSort` (For You hides the Newest/Oldest pills — its ranking is fixed by the server) + the view-mode switcher |
+| JobGrid       | `grid grid-cols-1 gap-3.5 xl:grid-cols-2`; empty state has `SearchX` icon + "Clear all filters" button, **unless** an `emptyState` node is passed (the /jobs tabs use this for their tab-specific copy). Both layouts render the same `JobCard`. Props: `applications: Record<jobId, ApplicationRef>`, `savingIds: ReadonlySet<jobId>`, `onToggleSave` |
 
 **Pattern notes:**
 - Match badges on cards live in a colored pill chosen by `getMatchBadgeVariant`
   (green ≥70 / info 60–69 / warning <60 / secondary on null).
 - Center feed grid is responsive 1–2 columns to prevent cramped text and awkward button wrapping in the 3-column layout.
 
-### JobCard + JobDetailPanel
+### JobCard (the one /jobs list card) + JobDetailPanel (orphaned)
 
-Files: components/dashboard/{JobCard,JobDetailPanel}.tsx
-Last updated: 2026-10-06
+Files: components/dashboard/JobCard.tsx. `JobDetailPanel.tsx` remains on disk
+but is no longer imported — the preview panel went away when `/jobs/[id]`
+became a real page; removal is Prompt 10 scope.
+Last updated: 2026-10-07 (Prompt 3 revamp)
 
 | Property       | Class |
 | -------------- | ----- |
-| Card shell     | `group relative flex flex-col justify-between rounded-2xl border p-4 text-left shadow-card cursor-pointer`; selected `border-accent bg-accent-muted/15 ring-2 ring-accent/20`, idle `border-border bg-surface hover:border-border-muted hover:shadow-md hover:-translate-y-0.5` |
-| Card header    | company avatar `h-8 w-8 rounded-xl bg-surface-secondary border border-border/60 text-xs font-bold text-text-primary`, company name + `formatDate(found_at)`, match `Badge` right |
-| Card chips     | `inline-flex items-center gap-1 rounded-full bg-surface-secondary/80 px-2 py-0.5 text-[11px] font-medium text-text-secondary` with `MapPin`/`DollarSign` at `h-3 w-3` |
-| Card footer    | clean metadata row with job type / researched indicator on left, external apply + active indicator on right (no bulky duplicate buttons) |
+| Card shell     | `group relative flex flex-col justify-between rounded-2xl border p-4 text-left shadow-card cursor-pointer`; selected `border-accent bg-accent-muted/15 ring-2 ring-accent/20`, idle `border-border bg-surface hover:border-border-muted hover:shadow-md hover:-translate-y-0.5` — **no `role="button"`** (see pattern notes) |
+| Card header    | company avatar `h-8 w-8 rounded-xl bg-surface-secondary border border-border/60 text-xs font-bold text-text-primary`, company name + `formatDate(found_at)`, match `Badge` right (`getMatchBadgeVariant`; `Not scored` on null) |
+| Title          | `h3 mt-2.5 text-sm sm:text-base font-semibold leading-snug line-clamp-1` + `group-hover:text-accent`; the `<Link href="/jobs/{id}">` inside it is the accessible route to the detail page and `stopPropagation`s so it does not double-navigate |
+| Card chips     | `inline-flex items-center gap-1 rounded-full bg-surface-secondary/80 px-2 py-0.5 text-[11px] font-medium text-text-secondary` with `MapPin`/`DollarSign` at `h-3 w-3`; **Remote** = `bg-info-light text-info-medium` + `Wifi`; **Researched** = `bg-accent-muted text-accent` + `FlaskConical` |
+| Skill chips    | `Top match` label + up to 2 `matched_skills` as `rounded-full bg-accent-light px-2 py-0.5 text-[11px] font-medium text-accent` |
+| Card footer    | `mt-3.5 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5 text-xs` — status `Badge` + `sourceLabel · job_type` on the left; bookmark **Save** toggle + external `Apply` link on the right |
+| Save toggle    | `inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold`; saved `border-accent bg-accent-light text-accent` with a `fill-current` bookmark, idle `border-border bg-surface text-text-secondary`; `aria-pressed`, disabled while in flight |
+| Status variants| `saved`→`secondary`, `applied`→`info`, `interview`→`warning`, `offer`→`success`, `closed`→`outline` (`STATUS_LABEL` / `STATUS_VARIANT` maps in the card) |
 | Panel shell    | `overflow-hidden rounded-2xl border border-border bg-surface shadow-card xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100vh-7rem)] flex flex-col`; content scrolls via `ScrollArea className="xl:h-[calc(100vh-7rem)]"` |
 | Panel header   | company avatar `h-11 w-11 rounded-xl bg-surface-secondary border border-border/80 text-sm font-bold text-text-primary`, role title, company name, match `Badge` right |
 | Actions        | Quick apply row with [Apply via Source] primary button, [Full Details] link, and [Research Company] action |
 | Panel sections | Native unified sections inside the panel without nested bulky cards: About The Role snippet, Gemini Match Analysis callout + matched/gap skill pills, Company Dossier overview, tech stack tags, culture, and candidate edge |
 
 **Pattern notes:**
-- The entire card is interactively selectable, previewing the role in the detail panel.
-- The panel avoids nested card borders and bulky card frames, formatting match and company research natively for the 380px panel width.
-- Auto-selects the top scored job on first load so the panel is never empty.
+- **Card click vs card role.** The div keeps `onClick` for mouse users but no
+  `role="button"` / `tabIndex` / `onKeyDown`: a button role marks its
+  descendants presentational, which would hide the Save toggle and the apply
+  link from screen readers. The title `<Link>` is the keyboard route in, and
+  every control inside (`Link`, Save, external `Apply`) calls
+  `e.stopPropagation()` so acting on a card control never navigates.
+- `sourceLabel()` returns `SOURCE_ATTRIBUTION[source].label` and falls back to
+  `Saved by you` for `source:"url"` and for `source:"manual"` rows (written by
+  `POST /api/applications` but absent from the `JobSourceId` union).
+- `isRemoteListing(job)` from `lib/dashboard-filters.ts` drives the Remote chip
+  — there is no `remote` column, it is derived from title/location/job type.
+- One card, three tabs: `JobGrid` supplies `application`, `isSaving` and
+  `onToggleSave`, so no tab renders its own list component.
+- *(Orphaned panel)* The panel avoided nested card borders and formatted match
+  and company research natively for the 380px width, and auto-selected the top
+  scored job so it was never empty — carried here for the day the preview
+  panel is reintroduced.
 
 ### shadcn/radix dependencies
 
@@ -674,6 +773,11 @@ etc. are hand-rolled in the workspace components to avoid dragging in more).
 ---
 
 ### Inventory page
+
+> ⚠️ **Legacy (Prompt 3).** `/inventory` → 308 `/jobs?tab=saved`. The Saved
+> tab replaces it: same "every tracked role" idea, but driven by the
+> `applications` rows rather than by scanning all jobs. The page file and
+> `InventoryClient` stay on disk until Prompt 10.
 
 File: app/inventory/page.tsx (server) + components/inventory/InventoryClient.tsx (client)
 Last updated: 2026-10-06
