@@ -159,10 +159,12 @@ function NavBadge({
   loading: boolean;
 }) {
   if (loading) {
+    // `bg-muted` and `bg-surface-secondary` are both #f4f4f5 — invisible on the
+    // white sidebar. `border-muted` (#d4d4d8) is the token that actually reads.
     return collapsed ? (
-      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-muted" aria-hidden />
+      <span className="ml-auto h-1.5 w-1.5 animate-pulse rounded-full bg-border-muted" aria-hidden />
     ) : (
-      <span className="ml-auto h-4 w-8 rounded-full bg-muted" aria-hidden />
+      <span className="ml-auto h-4 w-8 animate-pulse rounded-full bg-border-muted" aria-hidden />
     );
   }
 
@@ -184,7 +186,7 @@ export function AppShell({ user, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { summary, isLoading } = useSidebarSummary();
+  const { summary, isLoading, error } = useSidebarSummary();
 
   const collapsed = useSyncExternalStore(
     subscribeCollapsed,
@@ -319,13 +321,32 @@ export function AppShell({ user, children }: Props) {
   );
 
   const renderComingUp = (opts: { collapsed: boolean; onNavigate?: () => void }) => {
+    // A failed first load used to leave `summary` null forever, which fell
+    // through to the skeleton and looked like an empty sidebar. Say so.
+    if (error && !summary) {
+      return (
+        <div className="rounded-lg border border-border bg-surface-secondary/60 px-3 py-3">
+          <p className="text-xs font-semibold text-text-secondary">
+            Couldn&apos;t load your sidebar
+          </p>
+          <p className="mt-1 text-xs leading-5 text-text-muted">
+            Refocus this tab to try again.
+          </p>
+        </div>
+      );
+    }
+
     if (isLoading || !summary) {
       return (
-        <ul className="flex flex-col gap-2 px-1">
+        <ul className="flex flex-col gap-2 px-1" aria-busy="true">
+          <li className="sr-only">Loading your upcoming items</li>
           {[0, 1].map((index) => (
-            <li key={index} className="flex items-center gap-3 px-1 py-1">
-              <span className="h-4 w-4 shrink-0 rounded bg-muted" aria-hidden />
-              <span className="h-3 w-full rounded bg-muted" aria-hidden />
+            <li
+              key={index}
+              className="flex items-center gap-3 rounded-lg border border-border bg-surface-secondary px-2 py-2"
+            >
+              <span className="h-4 w-4 shrink-0 animate-pulse rounded bg-border-muted" aria-hidden />
+              <span className="h-3 flex-1 animate-pulse rounded bg-border-muted" aria-hidden />
             </li>
           ))}
         </ul>
@@ -373,7 +394,27 @@ export function AppShell({ user, children }: Props) {
     }
 
     const allDone = ONBOARDING_ITEMS.every((entry) => summary.onboarding[entry.key]);
-    if (allDone) return null;
+    if (allDone) {
+      // Was `return null`, which left the "Coming up" heading over a blank
+      // gap. An empty region should still look like a region.
+      return (
+        <div className="rounded-lg border border-border bg-surface-secondary/60 px-3 py-3">
+          <p className="text-xs font-semibold text-text-secondary">
+            You&apos;re all caught up
+          </p>
+          <p className="mt-1 text-xs leading-5 text-text-muted">
+            Follow-ups and interviews will land here.
+          </p>
+          <Link
+            href="/jobs"
+            {...(opts.onNavigate ? { onClick: opts.onNavigate } : {})}
+            className="mt-2 inline-block text-xs font-semibold text-accent transition-colors hover:text-accent-dark"
+          >
+            Browse jobs
+          </Link>
+        </div>
+      );
+    }
 
     return (
       <ul className="flex flex-col gap-1">
