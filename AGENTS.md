@@ -66,8 +66,9 @@ InsForge backend (database, auth, storage). PostHog for analytics. Google Gemini
 
 - Access InsForge the same way existing code already does. Follow the existing
   client/helper patterns. Do not assume SDK method names.
-- Before any database change, inspect the current schema (InsForge MCP/tools or
-  migration files) and show what was found.
+- Before any database change, inspect the current schema (InsForge CLI or
+  migration files) and show what was found. Do not use the MCP `run-raw-sql`
+  tool for this project — see the note in the InsForge section below.
 - Every user-owned table has `user_id` and must be restricted to the signed-in
   user: use row level security if this project uses it, and also check ownership
   in every API route.
@@ -249,6 +250,7 @@ This project uses [InsForge](https://insforge.dev): an all-in-one, open-source P
   - `insforge-integrations`: wiring external auth providers (Clerk, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
   - `find-skills`: discovering additional skills on demand.
 - **Credentials:** app code reads keys from `.env.local`; the CLI reads `.insforge/project.json`. Never hardcode or commit keys.
+- **Database access: use the CLI only** (`npx -y @insforge/cli db query`). The MCP `run-raw-sql` / `get-table-schema` tools are pointed at a *different* InsForge project: the workspace-level config at `/home/frontendgeek/Downloads/Project/opencode.json` sets `API_BASE_URL=https://gq35cmzq.us-east.insforge.app` (the `zenith-access` project), while Jobbers is `https://y7fvq3ie.us-east.insforge.app`. Queries through MCP therefore return an unrelated schema. Diagnosed 2026-10-07; decision: leave the MCP config alone and use the CLI, which reads the correct key from `.insforge/project.json`.
 
 Key patterns:
 
