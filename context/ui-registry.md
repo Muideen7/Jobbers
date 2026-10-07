@@ -524,6 +524,11 @@ Last updated: 2026-10-07 (Prompt 1 revamp)
 - **Sidebar data**: `useSidebarSummary()` fetches `/api/sidebar-summary`
   (badges, Coming up, onboarding) on mount, on window focus and every 60 s.
   Before it resolves, badges and Coming up render skeletons — never fake numbers.
+  Since Prompt 2 the payload is **real**: stage counts and `dueCount` come from
+  the `applications` table, `comingUp` is the next 3 interviews/follow-ups
+  (overdue first, dates through `formatRelativeDay`), and `newMatches` counts
+  jobs above `NEW_MATCH_SCORE_THRESHOLD` found after
+  `profiles.last_jobs_visit_at` (cleared by `POST /api/sidebar-summary/visit`).
 - **Search syncs with `?q=`**: top-bar search submits to `/jobs?q=<query>`
   (`/home` used to be the destination).
 - **Route map (Prompt 1)**: `/home`, `/jobs`, `/applications`, `/resumes`,
