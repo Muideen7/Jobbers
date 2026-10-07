@@ -259,7 +259,7 @@ export function DashboardClient({
               <Eye className="h-3.5 w-3.5" />
               Recently Viewed
               {recentJobs.length > 0 && (
-                <span className={cn(
+                <span suppressHydrationWarning className={cn(
                   "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
                   activeTab === "recent" ? "bg-surface text-ink" : "bg-surface-secondary text-text-primary"
                 )}>
@@ -281,7 +281,7 @@ export function DashboardClient({
               <CheckCircle2 className="h-3.5 w-3.5" />
               Applied / Saved
               {appliedJobs.length > 0 && (
-                <span className={cn(
+                <span suppressHydrationWarning className={cn(
                   "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
                   activeTab === "applied" ? "bg-surface text-ink" : "bg-surface-secondary text-text-primary"
                 )}>
