@@ -43,12 +43,38 @@ export const PERMANENT_SECURITY_HEADERS = [
   },
 ];
 
-// The only external origin the browser talks to. Adzuna and Browserbase are
+// The only external origins the browser talks to. Adzuna and Browserbase are
 // called server-side and need no directive. next/font self-hosts Mona Sans, so
 // there is no font CDN here.
 const posthogHost = (
   process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com"
 ).replace(/\/+$/, "");
+
+/**
+ * posthog-js talks to two hosts, not one. `api_host` handles capture and flags;
+ * the assets host is derived from it (requestRouter.endpointFor("assets")) and
+ * serves the remote config (`array/<token>/config.js` plus its JSON fallback)
+ * and every lazily-loaded feature bundle:
+ *
+ *   https://us.i.posthog.com   -> https://us-assets.i.posthog.com
+ *
+ * Allowlisting only `api_host` left every remote-config request blocked by
+ * CSP, which surfaced as `[PostHog.js] [Dead Clicks] failed to load script`
+ * and `[PostHog.js] TypeError: Failed to fetch`, and stopped `$pageview`
+ * reaching the project at all.
+ *
+ * A custom/self-hosted `api_host` serves assets from itself (posthog's own
+ * region detection falls back to the configured host), so it maps to itself.
+ */
+export function posthogAssetsHost(apiHost: string): string {
+  const match = /^(https:\/\/)([a-z0-9-]+)\.i\.posthog\.com$/i.exec(apiHost);
+  if (!match) {
+    return apiHost;
+  }
+  return `${match[1]}${match[2]}-assets.i.posthog.com`;
+}
+
+const posthogAssets = posthogAssetsHost(posthogHost);
 
 type CspOptions = {
   /** Present for dynamically rendered routes; enables strict script-src. */
@@ -72,14 +98,19 @@ export function buildContentSecurityPolicy({
 }: CspOptions = {}): string {
   const scriptSrc = nonce
     ? ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"]
-    : ["'self'", "'unsafe-inline'"];
+    : // The static policy has no nonce, so third-party scripts need an explicit
+      // origin. Under a nonce, `'strict-dynamic'` already trusts scripts that
+      // nonced code injects (posthog-js appends its own <script>), and it makes
+      // host allowlists a no-op for script-src-elem — so the origin is only
+      // added here, where it actually applies.
+      ["'self'", "'unsafe-inline'", posthogAssets];
 
   // React reconstructs server error stacks with eval in development only.
   if (isDev) {
     scriptSrc.push("'unsafe-eval'");
   }
 
-  const connectSrc = ["'self'", posthogHost];
+  const connectSrc = [...new Set(["'self'", posthogHost, posthogAssets])];
   if (isDev) {
     connectSrc.push("ws:", "wss:");
   }

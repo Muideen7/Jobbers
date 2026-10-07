@@ -8,6 +8,7 @@ import {
   buildContentSecurityPolicy,
   buildStrictTransportSecurity,
   createNonce,
+  posthogAssetsHost,
 } from "../lib/security-headers.ts";
 
 function directive(policy: string, name: string): string {
@@ -29,7 +30,45 @@ test("nonce policy removes unsafe-inline from script-src", () => {
 test("static fallback policy is used only when no nonce is supplied", () => {
   const policy = buildContentSecurityPolicy();
 
-  assert.equal(directive(policy, "script-src"), "script-src 'self' 'unsafe-inline'");
+  const scriptSrc = directive(policy, "script-src");
+  assert.ok(scriptSrc.startsWith("script-src 'self' 'unsafe-inline'"), scriptSrc);
+  // Without a nonce there is no 'strict-dynamic', so posthog's remote config
+  // has to be named explicitly or the browser blocks it.
+  assert.ok(scriptSrc.includes("us-assets.i.posthog.com"), scriptSrc);
+});
+
+test("posthog's assets host is reachable from both directives", () => {
+  for (const policy of [
+    buildContentSecurityPolicy(),
+    buildContentSecurityPolicy({ nonce: "abc123" }),
+  ]) {
+    const connect = directive(policy, "connect-src");
+    assert.ok(connect.includes("us.i.posthog.com"), connect);
+    assert.ok(connect.includes("us-assets.i.posthog.com"), connect);
+  }
+
+  // The nonce policy must stay byte-identical: 'strict-dynamic' already
+  // covers scripts posthog injects, and host allowlists are ignored alongside
+  // it, so adding the origin there would be dead weight.
+  assert.equal(
+    directive(buildContentSecurityPolicy({ nonce: "abc123" }), "script-src"),
+    "script-src 'self' 'nonce-abc123' 'strict-dynamic'",
+  );
+});
+
+test("a custom posthog host maps to itself instead of inventing an assets host", () => {
+  assert.equal(
+    posthogAssetsHost("https://us.i.posthog.com"),
+    "https://us-assets.i.posthog.com",
+  );
+  assert.equal(
+    posthogAssetsHost("https://eu.i.posthog.com"),
+    "https://eu-assets.i.posthog.com",
+  );
+  assert.equal(
+    posthogAssetsHost("https://proxy.example.com"),
+    "https://proxy.example.com",
+  );
 });
 
 test("both policies agree on the directives that are not script-src", () => {
