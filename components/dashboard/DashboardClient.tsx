@@ -17,6 +17,18 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
+// recharts imports reserved for future analytics chart rendering
+// import {
+//   Area,
+//   AreaChart,
+//   Bar,
+//   BarChart,
+//   CartesianGrid,
+//   ResponsiveContainer,
+//   Tooltip,
+//   XAxis,
+//   YAxis,
+// } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -412,6 +424,41 @@ export function DashboardClient({
             })}
           </div>
         )}
+      </section>
+
+      {/* Analytics Charts */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
+            Analytics
+          </h2>
+          <p className="mt-0.5 text-sm text-text-secondary">
+            Track job discovery and research activity over time
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55">
+            <p className="text-sm font-semibold text-text-primary">Jobs Found Over Time</p>
+            <p className="text-xs text-text-muted">Last 30 days</p>
+            <div className="flex flex-1 items-center justify-center text-center">
+              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
+            </div>
+          </div>
+          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55">
+            <p className="text-sm font-semibold text-text-primary">Match Score Distribution</p>
+            <p className="text-xs text-text-muted">Jobs found</p>
+            <div className="flex flex-1 items-center justify-center text-center">
+              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
+            </div>
+          </div>
+          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55 md:col-span-2">
+            <p className="text-sm font-semibold text-text-primary">Company Research Activity</p>
+            <p className="text-xs text-text-muted">Last 7 days</p>
+            <div className="flex flex-1 items-center justify-center text-center">
+              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );
