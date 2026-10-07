@@ -1,3 +1,8 @@
+import type {
+  ApplicationEventType,
+  ApplicationStatus,
+  ClosedReason,
+} from "@/lib/workspace/constants";
 import type { JobSourceId } from "@/lib/jobs/types";
 
 export type MissingField =
@@ -36,6 +41,8 @@ export interface Profile {
   linkedin_context_id: string | null;
   linkedin_connected: boolean;
   is_complete: boolean;
+  /** Last time the user opened /jobs (Prompt 2); null = never visited. */
+  last_jobs_visit_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +129,72 @@ export interface AgentLog {
   level: "info" | "success" | "warning" | "error";
   job_id: string | null;
   created_at: string;
+}
+
+/** A tracked application row (`applications`), one per saved job per user. */
+export interface Application {
+  id: string;
+  user_id: string;
+  job_id: string;
+  status: ApplicationStatus;
+  closed_reason: ClosedReason | null;
+  applied_at: string | null;
+  interview_at: string | null;
+  next_follow_up_at: string | null;
+  notes: string | null;
+  /** Sort order inside a Kanban column. */
+  position: number;
+  /** Interview-prep output; shape is defined by the prep feature (later prompt). */
+  prep: unknown | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Immutable audit row (`application_events`). */
+export interface ApplicationEvent {
+  id: string;
+  application_id: string;
+  user_id: string;
+  type: ApplicationEventType;
+  from_status: ApplicationStatus | null;
+  to_status: ApplicationStatus | null;
+  created_at: string;
+}
+
+/** The subset of `jobs` embedded in an application list item. */
+export interface ApplicationJobSummary {
+  id: string;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  source: string | null;
+  match_score: number | null;
+  company_research: CompanyResearchDossier | null;
+}
+
+/** An application joined with the job it points at, as returned by the API. */
+export type ApplicationListItem = Application & {
+  job: ApplicationJobSummary | null;
+};
+
+/** Body for `POST /api/applications`: track a saved job or a manual role. */
+export interface CreateApplicationPayload {
+  jobId?: string;
+  status?: ApplicationStatus;
+  company?: string;
+  role?: string;
+  url?: string;
+}
+
+/** Body for `PATCH /api/applications/[id]`. Only provided fields are applied. */
+export interface UpdateApplicationPayload {
+  status?: ApplicationStatus;
+  closed_reason?: ClosedReason | null;
+  position?: number;
+  applied_at?: string | null;
+  interview_at?: string | null;
+  next_follow_up_at?: string | null;
+  notes?: string | null;
 }
 
 /** Unauthenticated job search result used by the public landing page. */
