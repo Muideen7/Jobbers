@@ -2,241 +2,86 @@
 
 ## About the Project
 
-Jobbers is a full stack AI-powered job hunting assistant. The user sets up their profile once, uploads their resume, and the agent automatically discovers relevant jobs from Adzuna — scoring each one against the user's profile using Gemini. For jobs they're interested in, the agent researches the company across their public web pages and builds a structured dossier — company overview, tech stack, culture, why the role exists, and interview prep. The user reviews everything and applies with one click.
+Jobbers is a full-stack, AI-powered job hunting assistant built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, and InsForge. Candidates set up their profile once, upload their resume, and the agent automatically discovers relevant jobs across multi-source networks (JSearch, Arbeitnow, RemoteOK, Remotive, Jobicy, Adzuna) — scoring each role against the user's profile using Google Gemini. 
 
-The entire process is tracked on a dashboard with PostHog-powered analytics and a recent activity feed.
-
----
-
-## The Problem It Solves
-
-Job hunting is one of the most repetitive and time-consuming tasks a developer faces. Reading dozens of job descriptions, deciding if a role fits, researching each company from scratch — all of this before even clicking apply.
-
-Jobbers eliminates all of that preparation work. The agent finds the jobs, scores them intelligently against the user's actual skills, and researches each company so the user arrives at every application fully informed. The user just decides which ones to apply to and clicks.
+Applications are managed across a 4-stage pipeline (Saved → Applied → Interview → Offer), while detailed company research dossiers prepare candidates for interviews.
 
 ---
 
-## Pages
+## 9 Core Navigation Features
+
+The application is structured around **9 clean, primary features** organized into 3 sidebar navigation groups:
+
+### 1. Workspace
+- **Home (`/home`)**: High-level metrics, candidate stats bar, and top recommended job cards.
+- **Jobs (`/jobs`)**: Multi-source live job discovery feed with Gemini scoring, filters, and automatic initial search for new users with profile target roles.
+- **Applications (`/applications`)**: Pipeline tracking board with 4 stage columns (Saved, Applied, Interview, Offer) and inline status migration.
+
+### 2. Tools
+- **Resumes (`/resumes`)**: AI resume parsing from PDF upload and instant tailored PDF resume rendering using Gemini + `@react-pdf/renderer`.
+- **Analytics (`/analytics`)**: Dedicated analytics workspace featuring data-driven charts (Jobs Over Time, Match Score Distribution, Research Activity).
+- **Research (`/company-research`)**: Company dossiers & research queue for viewed roles awaiting background investigation.
+
+### 3. Account
+- **Profile (`/profile`)**: Candidate profile setup (personal info, target roles, work history, skills) & profile completion progress.
+- **Settings (`/settings`)**: User account management, email preferences, notification toggles, and account actions.
+
+*(Plus `/jobs/[id]` job detail view).*
+
+---
+
+## Sidebar Navigation Layout
+
+Responsive left sidebar navigation with collapsible desktop state (`lg:w-[240px]` collapsed to `72px`) and drawer on mobile screens:
 
 ```
-/                  → Homepage
-/login             → Auth page (Google + GitHub OAuth)
-/dashboard         → Overview, recent activity, analytics
-/find-jobs         → Search controls + full jobs list
-/find-jobs/[id]    → Individual job details page + company research
-/profile           → Profile form, resume management
-```
+[Logo]
+├── Workspace
+│   ├── Home (/home)
+│   ├── Jobs (/jobs)
+│   └── Applications (/applications)
+├── Tools
+│   ├── Resumes (/resumes)
+│   ├── Analytics (/analytics)
+│   └── Research (/company-research)
+└── Account
+    ├── Profile (/profile)
+    └── Settings (/settings)
 
----
-
-## Navigation
-
-Top navbar. Clean and minimal. Three navigation items:
-
-```
-Dashboard    Find Jobs    Profile
-```
-
-Full width layout on all pages. No sidebar.
-
----
-
-## Core User Flow
-
-### Homepage
-
-- Hero section
-- Logged in users → redirect to dashboard
-- Logged out users → redirect to login
-
-### Onboarding
-
-- User signs up via InsForge auth (Google or GitHub OAuth)
-- On login → redirect to /dashboard
-- Dashboard shows incomplete profile banner if profile not finished
-
-### Profile Setup
-
-- User fills profile form — all standard resume fields
-- User uploads their existing resume PDF
-- Two options on upload:
-  - "Extract from Resume" → Gemini parses resume and auto-fills profile form fields
-  - "Skip" → resume stored as-is, profile unchanged
-- User can manually edit any profile field at any time
-- User can generate a clean professional PDF resume from their current profile data using Gemini
-
-### Finding Jobs — Adzuna Discovery
-
-- User goes to Find Jobs page
-- Enters job title and location
-- Clicks Find Jobs button
-- Agent calls Adzuna API with user's search criteria
-- Gemini scores each job 0-100 against user profile
-- Jobs appear in the job list below
-- After search completes a message shows: "Found 8 jobs and saved 4 strong matches"
-
-### Job Matching
-
-- Gemini scores each job 0-100 against user profile
-- Returns: score, match reason, matched skills array, missing skills array
-- All jobs visible in Find Jobs page regardless of score
-- High scoring jobs visually highlighted
-- Low scoring jobs still accessible — user decides what to do
-
-### Job Details Page
-
-- Full structured job information:
-  - Title, company, location, salary, job type, source, date found
-  - About the role
-  - Responsibilities (bullet points)
-  - Requirements (bullet points)
-  - Nice to have (if present)
-  - Benefits (if present)
-  - About the company
-- Match score section:
-  - Score number prominently displayed
-  - Visual score indicator
-  - Matched skills — green tags
-  - Missing skills — red tags
-  - Match reason paragraph from Gemini
-- Company Research section:
-  - Empty state with Research Company button
-  - After research: structured dossier showing company overview, tech stack, culture, why this role exists, interview prep talking points
-  - Powered by Browserbase + Stagehand browsing the company's public pages
-- Apply Now button — opens external apply URL in new tab
-
-### Company Research Flow
-
-- User clicks Research Company on job details page
-- Single Browserbase session opens with Stagehand
-- Agent navigates to company homepage — extracts overview, nav links, tech mentions
-- Agent visits About, Blog, Engineering pages if they exist
-- Gemini synthesizes all extracted content into structured dossier
-- Dossier displayed on job details page
-- If company site cannot be found — Gemini generates best dossier from company name and job description alone
-
-### Dashboard
-
-- Stats bar — 4 cards: Total Jobs Found, Avg. Match Rate, Companies Researched, Jobs This Week
-- Recent activity — list of last 5-10 user actions pulled from DB
-- Analytics section (PostHog powered):
-  - Jobs found over time — line chart
-  - Match score distribution — bar chart
-  - Company research activity — bar chart
-
-### Find Jobs Page
-
-- Search controls at top:
-  - Job title input
-  - Location input
-  - Find Jobs button
-  - Success message after search: "Found 8 jobs and saved 4 strong matches"
-- Full paginated job list below:
-  - Filter: All Matches / High Match / Low Match dropdown
-  - Sort dropdown: Match Score / Newest / Oldest
-  - Each job row: company, title, match score badge, salary, source badge, date found
-  - Click job row → opens job details page
-  - Pagination — 20 jobs per page
-  - "Jobs by Adzuna" credit displayed on job listings
-
----
-
-## Data Architecture
-
-### Main Profile Data
-
-- Lives in `profiles` table
-- Only changes when user explicitly edits profile page or uploads resume and selects "Extract from Resume"
-- Used for job matching
-- Never modified by any agent operation
-
-### Company Research Data
-
-- Stored in `jobs.company_research` jsonb column
-- Generated per job when user clicks Research Company
-- Never affects profile data or match score
-
----
-
-## Features In Scope
-
-- Homepage with hero, how it works, features, footer
-- Top navbar — Dashboard, Find Jobs, Profile
-- InsForge authentication (Google + GitHub OAuth)
-- Redirect to dashboard after login
-- Profile form with all standard resume fields
-- Resume PDF upload with optional profile auto-fill via Gemini
-- Resume PDF generation from profile data using Gemini
-- Adzuna API job discovery — searches by title and location, category filtered to IT jobs
-- Gemini job matching with score, reason, matched skills, missing skills
-- Job details page with full structured description
-- Company Research Agent — single Browserbase session browses company public pages, Gemini builds dossier
-- Find Jobs page with search controls, filter, sort dropdown, pagination
-- Dashboard with stats bar, recent activity, analytics charts
-- PostHog event tracking throughout
-- PostHog analytics charts on dashboard
-- Incomplete profile banner on dashboard
-- "Jobs by Adzuna" credit on all job listings
-
----
-
-## Features Out of Scope
-
-- Auto apply — agent does not fill or submit application forms
-- LinkedIn scraping or LinkedIn account connection
-- URL input for manual job import
-- Cover letter generation
-- Resume tailoring per job
-- Score recalculation after tailoring
-- Previous Job + Next Job navigation
-- Sidebar navigation — top navbar only
-- Separate analytics page — charts live on dashboard
-- Live browser embed on dashboard
-- Live agent feed / realtime log
-- Job-specific profile form on job details page
-- Dismiss job feature
-- Email or push notifications
-- Mobile app
-- Team or multi-user accounts
-- Scheduled agent runs — manually triggered only
-- Multiple saved resume versions — one active resume per user at a time
-- Payment or subscription system
-- Browser extension
-
----
-
-## PostHog Events
-
-```typescript
-job_search_started; // { userId, jobTitle, location }
-job_found; // { userId, source, matchScore }
-profile_completed; // { userId }
-company_researched; // { userId, jobId, company }
+[Unlock Jobbers Pro Card]
+[Take the Tour Button]
+[Sign Out Button]
 ```
 
 ---
 
-## Target User
+## Core User Flows
 
-A developer or technical job seeker who:
+### 1. New Candidate Onboarding & Auto-Search
+- User signs up / logs in via InsForge auth (Email/Password or OAuth).
+- Navigates to `/jobs` or finishes setting target roles in `/profile`.
+- If a candidate has 0 saved jobs, `/jobs` automatically triggers a server-side initial search using their primary target role — presenting live scored opportunities on first render.
 
-- Is actively applying to jobs
-- Has an existing resume they want to use
-- Wants intelligent job matching based on their actual skills
-- Wants to research companies quickly before applying
-- Is comfortable with a modern web application
+### 2. Interactive Tour Guide
+- Clicking **Take the tour** in the sidebar opens `TourModal` (a 2/4 screen footprint modal using exact `@theme` design tokens).
+- Guides candidates step-by-step through Job Discovery, Applications Pipeline, AI Resumes, and Company Research.
+
+### 3. Application Pipeline & Stage Transitions
+- Candidate bookmarks roles or logs applications.
+- On `/applications`, jobs are grouped by pipeline status (**Saved**, **Applied**, **Interview**, **Offer**).
+- Changing status in the card dropdown instantly updates the record via `PATCH /api/applications/[id]`.
+
+### 4. AI Resume PDF Generation
+- Candidate uploads existing resume PDF to populate profile data via Gemini.
+- Clicking "Generate AI Resume PDF" calls `POST /api/resume/generate`, invoking Gemini to write achievement bullet points and rendering a download-ready PDF via `@react-pdf/renderer`.
 
 ---
 
-## Success Criteria
+## Technology Stack
 
-- User can sign up, fill profile, upload resume, and start finding jobs in under 5 minutes
-- Adzuna job discovery returns relevant tech jobs for any title and location search
-- Gemini match scores feel accurate and the reasoning makes sense
-- Company Research Agent returns a useful dossier for well-known tech companies
-- Company Research Agent gracefully handles companies with minimal web presence
-- Job details page displays clean structured job information
-- Dashboard analytics charts show meaningful data after several searches
-- All job data stored correctly in InsForge with full structured fields
-- PostHog events fire correctly for all key user actions
-- UI is visually consistent across all pages
+- **Framework**: Next.js 16 (App Router, Turbopack), React 19, TypeScript
+- **Styling**: Tailwind CSS v4 (`@theme` variables in `app/globals.css`), lucide-react
+- **Backend & Auth**: InsForge (Postgres database, RLS, Storage, Auth)
+- **AI Gateway**: Google Gemini via `@google/genai` (centralized in `lib/llm.ts`)
+- **Analytics**: PostHog server & client tracking
+- **PDF Rendering**: `@react-pdf/renderer`

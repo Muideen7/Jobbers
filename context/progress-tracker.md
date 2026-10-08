@@ -6,43 +6,28 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Workspace Revamp (prompt pack) — Phase 5 complete (Features 14–17 done)
-**Last completed:** Feature 17 — Analytics Charts (empty states added) ✅
-(`/jobs` now serves three deep-linkable views through `?tab=` — `for-you` (default), `all`,
-`saved` — plus a `?researched=1` chip. Vocabulary lives in `lib/workspace/jobs-tab.ts` and is
-normalised **server-side** in `app/(workspace)/jobs/page.tsx`, because each tab is a different
-slice of the account: narrowing the top-100-by-score pool and calling it "Saved" would silently
-hide a saved role that ranks low. `for-you` = `match_score >= NEW_MATCH_SCORE_THRESHOLD` (60)
-ordered by score; `saved` = jobs reached through this user's `applications` rows (range 0–499,
-the width Inventory used); `researched` = `.not("company_research","is",null)` (the Dossiers set);
-`all` keeps Find Jobs exactly as it was — job-fetching backend untouched (Arbeitnow, RemoteOK,
-Remotive, Jobicy), same `filterDashboardJobs` filters, newest/oldest sort, `PAGE_SIZE 20`.
-`components/find-jobs/JobTabs.tsx` is a `<nav aria-label="Job views">` with `aria-current="page"`
-(not `role="tablist"` — there is no `tabpanel` to pair with it, and claiming the pattern we do not
-implement makes screen readers announce a dead tab) that rewrites the query string; the feed then
-re-renders from the server. Sort pills are hidden on For You via the new `ResultsBar showSort`
-prop, since that ranking is fixed. `ResultsBar` also gained `heading`, so the count no longer
-reads "Available Roles" over a Saved list. **One list component:** `JobCard` — title is a real
-`<Link>` to `/jobs/[id]` (the card keeps a mouse click but dropped `role="button"`, whose
-presentational-children semantics would have hidden the Save toggle and apply link from AT),
-company + `formatDate` + match badge, location / remote (`isRemoteListing`) / salary /
-Researched chips, top-2 `matched_skills`, and a footer carrying the application status `Badge`,
-source credit + job type, and the bookmark **Save**. Both split and grid layouts render that same
-card through `JobGrid`. Save is optimistic (`POST /api/applications {status:"saved"}` into an
-`overrides` map) and rolls back to the previous value with an error toast from the new
-`components/ui/toast.tsx` on failure; un-saving anything past `saved` first asks through the new
-`components/ui/confirm-dialog.tsx`, then `DELETE /api/applications/[id]`. Status chips come from
-one `applications` query keyed by `job_id`, so they appear on every tab. STEP 3: on mount `/jobs`
-**reads** `/api/sidebar-summary` and only then `POST /api/sidebar-summary/visit`, guarded once per
-session by `sessionStorage` — read-before-write so the sidebar's `newMatches` badge is seen before
-`last_jobs_visit_at` moves. STEP 4 empty states: For You → `/profile?tab=preferences`, Saved →
-`/jobs?tab=all`, Researched → points at a role's Company tab; an empty *filtered* feed still uses
-JobGrid's "clear filters" state, so the two are never confused. `ApplicationRef` added to
-`types/index.ts`; `tests/jobs-tab.test.ts` (5 tests) guards the vocabulary **and** asserts every
-permanent redirect landing on `/jobs` targets a known tab. Verified: `tsc --noEmit` clean,
-`eslint` 0 errors, **166/166 tests**, `next build` green.)
-**Prompt 0 (project rules) ✅:** the prompt-pack rules — Stack, Design tokens, Backend, Production safety, Product rules, Workflow — were folded into `AGENTS.md`; `CLAUDE.md` is back to just `@AGENTS.md`. **Prompt 1 (navigation shell) ✅:** routes moved via `git mv` — `/dashboard`→`/home`, `/find-jobs`→`/jobs` (with `[id]`), `/ai-resume`→`/resumes`; the five "coming soon" placeholders (`/matches`, `/interview-prep`, `/follow-ups`, `/analytics`, `/settings`) and `components/workspace/ComingSoonPage.tsx` deleted. `next.config.ts` now declares 13 **permanent** legacy redirects (`/dashboard`, `/find-jobs[/:id]`, `/matches`, `/inventory`, `/company-research`, `/dossiers[/:id]`, `/ai-resume`, `/interview-prep`, `/follow-ups`, `/analytics`, `/settings`) so every live URL keeps working. `PROXY_OWNED_ROUTE_PREFIXES` + `proxy.ts` matcher + the security test moved to `/home,/jobs,/applications,/resumes,/profile`; `lib/auth.ts` and the OAuth callback post-login land on `/home`; `robots.ts` disallows all five signed-in routes; all internal links rewired. `AppShell.tsx` rebuilt: exactly five links across **Workspace** (Home, Jobs, Applications) + **Tools** (Resumes, Profile), an Applications sub-nav (Saved/Applied/Interview/Offer, visible only on `/applications`), a **Coming up** block that becomes a get-started checklist for new users, count badges (hidden at 0, `99+` cap, dots when collapsed), a footer **Account / Sign out** menu, a persisted collapse (via `useSyncExternalStore`, no cascade), and a mobile drawer below `lg` (was `xl`). New `GET /api/sidebar-summary` + `useSidebarSummary` hook (focus + 60s revalidate) feed it; application fields are honest zeros until Prompt 2, onboarding flags are computed from real rows. Verified: `tsc --noEmit` clean, `eslint` 0/0, 154/154 tests, `next build` green.
-**Prompt 2 (applications data layer) ✅:** Migration `migrations/20261007000000_create-applications.sql` **approved → backed up (`backups create --name before-prompt2-applications`, `20261007_122245.sql.gz`) → executed** (run it via `db query "$(printf '\n'; cat <file>)"` — the CLI parser treats a leading `--` as an option flag). Verified in the DB: `applications` (RLS on, 4 policies) + `application_events` (RLS on, 3 policies), `profiles.last_jobs_visit_at` added, all check constraints/FKs/`UNIQUE(user_id,job_id)`/`applications_set_updated_at` trigger present, and `anon`/`authenticated` grants applied automatically by the schema's default ACLs. API: `GET/POST /api/applications` and `PATCH/DELETE /api/applications/[id]` with ownership checks in every handler (zod-validated, idempotent create, status transitions writing `application_events`, auto `next_follow_up_at` = applied + 7 days); shared `Application`/payload types in `types/index.ts`; pure rules in `lib/workspace/application-rules.ts` (+ 5 unit tests); `/api/sidebar-summary` returns real stage counts, `dueCount`, `comingUp` and `newMatches` (scoped by `last_jobs_visit_at`) with pre-migration fallback; `POST /api/sidebar-summary/visit` clears the new-matches badge. **Live acceptance run (2 signed-in users, all rows cleaned up afterwards):** 12/12 route checks correct (empty state → 201 create → idempotent `created:false` → 400 bad uuid → `applied` auto-sets `applied_at` + 7-day follow-up → interview/notes → 400 closing without reason → 200 with reason → 404 unknown id → sidebar `dueCount:1`/`activeApplications:1`/`comingUp` populated → `visit` drops `newMatches` 10 → 0); cross-user (user B) GET = `[]`, PATCH/DELETE = 404, POST with A's job = 404, direct PostgREST read of A's row = `[]`, A's row untouched throughout. Verified: tsc/eslint clean, 159/159 tests, `next build` green.
+**Phase:** Jobbers Scope Revamp — Completed ✅
+**Scope:** 9 Clean Features across 3 Navigation Groups
+
+### 9 Core Navigation Features
+1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers. (Analytics section moved out).
+2. **Jobs (`/jobs`)** — Multi-source live discovery feed with automatic instant search for new users with target roles.
+3. **Job Details (`/jobs/[id]`)** — Full role breakdown, profile score alignment, company research dossier.
+4. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions.
+5. **Resumes (`/resumes`)** — AI resume extraction from upload + instant PDF resume generation via Gemini and `@react-pdf/renderer`.
+6. **Analytics (`/analytics`)** — Dedicated tools page with 3 data-driven charts (Jobs Over Time, Score Distribution, Company Research).
+7. **Research (`/company-research`)** — Company research dossiers & queue of viewed roles awaiting research.
+8. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills) & completion tracker.
+9. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
+
+### Summary of Revamp Work Done:
+- **Navigation Shell**: Updated `AppShell.tsx` to streamline the sidebar — moved **Settings** (`/settings`) directly into the dedicated bottom action slot below the Pro card (replacing "Take the tour"), giving it prominent, permanent placement.
+- **Shared UI & DRY Architecture**: Extracted reusable `StatCard` component (`components/shared/StatCard.tsx`) shared across Dashboard and Applications Tracker.
+- **Applications Page & Stage Color Themes**: Color-coded and harmonized each stage (Saved: Pastel Blue / Info, Applied: Pastel Mint / Success, Interviews: Pastel Pink / Rose, Offers: Pastel Lilac / Accent) across top stat cards, section headers, badges, and card border accents.
+- **Dashboard "Mark Applied" Sync**: Wired dashboard "Mark Applied" action to persist directly to `/api/applications` so applied jobs immediately show in the Tracker.
+- **No Dead End / Placeholders**: Removed legacy redirects & all "Coming soon" tags; rewired `/analytics`, `/settings`, `/company-research`, `/applications`, `/resumes` to fully functional pages.
+- **New User Job Search Fix**: Added automatic server-side first-run discovery search on `/jobs` when a new user lands with 0 jobs but profile target roles set.
+- **Profile Page Form Unification**: Consolidated the Identity profile page into 2 clean forms: **Personal** (personal details, address, demographics) and **Work** (merged links, application defaults, work authorization, and voluntary EEO identification).
 **Next:** Prompt 4 — Applications board (Kanban). The data layer, the
 `?tab=` vocabulary and the status vocabulary (`APPLICATION_STAGES`) it needs
 already exist; Prompt 5 (job detail, five tabs) follows, and note that
@@ -237,6 +222,38 @@ linked to but not yet read — they land with Prompts 5 and 8.
 - [x] Prompt 0 — project rules folded into `AGENTS.md`; `CLAUDE.md` = `@AGENTS.md`
 - [x] Prompt 1 — navigation shell: routes moved (`/home`, `/jobs`, `/resumes`), 13 permanent redirects, placeholders deleted, `AppShell` rebuilt, `GET /api/sidebar-summary` + `useSidebarSummary`
 - [x] Prompt 2 — applications data layer (backend only): migration applied (backup taken first), API routes, types, tests, real sidebar data, 2-user acceptance run
+- [x] Theme toggler (Light / Dark / System default) — `components/layout/ThemeToggler.tsx`
+  rendered in `AppShell`'s top bar directly **before the notification bell**.
+  Global token flip, not per-component styling: an **unlayered `.dark { … }`
+  block** in `app/globals.css` overrides the `--color-*` custom properties at
+  runtime (Tailwind utilities are `var()` references, so one class recolours
+  the whole app). Dark mode's card surface **is the landing footer colour**
+  (`--color-inverse` `#2d2f33`) and the page shell sits one step darker
+  (`--color-inverse-sunken` `#1c1e22`), so dark reads as the footer's family.
+  Every dark value derives from an existing token via `color-mix()`; the only
+  new literals are two `:root` accent-source aliases (`--color-accent-source`
+  / `--color-accent-dark-source`) added to avoid a circular `color-mix` when
+  lightening the accent (accent → 70% source + 30% white ≈ `#9a88dd` so purple
+  text on dark surfaces stays ≥ 4.5:1; `accent-foreground` stays white for ink
+  buttons/pills; `accent-light`/`accent-muted` flip to dark lavenders; pastels
+  darken with their hue at a deliberately mid saturation (blue 38 / mint 36 /
+  pink 36 / lilac 40 / cream 30 / aqua 34% over `--color-inverse`) so they read
+  as real colours in dark mode without becoming standard swatches — driven from
+  the shared `--color-pastel-*` tokens so the dashboard `StatCard`s and the
+  Applications tracker stage cards stay in lock-step (DRY; **no per-page
+  overrides**); success/info light pills are deliberately left as dark-on-light
+  — readable in both modes). The toggler
+  reuses the sidebar-collapse external-store pattern: `useSyncExternalStore`
+  over `jobbers.theme` localStorage + `jobbers:theme` custom event, `storage`
+  listener for cross-tab, `matchMedia("(prefers-color-scheme: dark)")` for live
+  OS switching; DOM class mutation in an effect, no render `setState`. Menu
+  shell matches the bell/avatar menus. Branch is now **error-free**: `npx tsc
+  --noEmit` clean, `npx eslint .` 0 errors/0 warnings, `npm run build` green.
+  (The 3 pre-existing lint errors in the in-progress Phase 7 files were fixed:
+  `AiResumeClient` `any` → `unknown`; `AnalyticsPage` `Date.now()` in render →
+  `now` prop computed on the server; `IdentityProfileClient` sync setState in
+  effect → deferred via a microtask.) Context mirrors written:
+  ui-tokens.md dark block, ui-registry.md ThemeToggler entry.
 - [ ] Prompts 3–10 — Jobs page, detail tabs, Applications Kanban, Home, Profile tabs, Resume tailor, cleanup
 
 ---

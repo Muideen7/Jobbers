@@ -30,6 +30,7 @@ import {
 //   YAxis,
 // } from "recharts";
 
+import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,23 +60,6 @@ function InfoChip({ icon, children }: { icon: "map" | "pay"; children: React.Rea
 }
 
 /**
- * Rotating pastel palette — reserved for the top stat cards only. The job
- * showcase cards below mirror the Find Jobs job-card look (surface + border).
- */
-const PASTEL_CARD_BACKGROUNDS = [
-  "bg-pastel-blue",
-  "bg-pastel-mint",
-  "bg-pastel-pink",
-  "bg-pastel-lilac",
-  "bg-pastel-cream",
-  "bg-pastel-aqua",
-] as const;
-
-function pastelFor(index: number) {
-  return PASTEL_CARD_BACKGROUNDS[index % PASTEL_CARD_BACKGROUNDS.length];
-}
-
-/**
  * Clean, uncluttered Dashboard overview.
  * Displays candidate stats, workspace shortcuts, and at most 6 cards
  * with tabs for Top AI Matches, Recently Viewed, and Applied/Saved roles.
@@ -93,9 +77,22 @@ export function DashboardClient({
   const [recentIds, setRecentIds] = useState<string[]>(() => getRecentlyViewedIds());
   const [appliedIds, setAppliedIds] = useState<string[]>(() => getAppliedJobIds());
 
-  function handleToggleApplied(jobId: string) {
-    toggleAppliedJob(jobId);
+  async function handleToggleApplied(jobId: string) {
+    const isNowApplied = toggleAppliedJob(jobId);
     setAppliedIds(getAppliedJobIds());
+
+    // Sync to backend /api/applications so it persists and appears in Applications Tracker
+    try {
+      if (isNowApplied) {
+        await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId, status: "applied" }),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to sync application status:", err);
+    }
   }
 
   function handleViewJob(jobId: string) {
@@ -166,65 +163,40 @@ export function DashboardClient({
 
       {/* Stats Bar */}
       <section className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className={`rounded-[28px] border border-ink/[0.04] ${pastelFor(0)} p-5 sm:p-6`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Total Roles Found
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface/70 text-text-secondary">
-              <Briefcase className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl sm:text-3xl font-bold text-text-primary">
-            {totalJobsCount}
-          </p>
-          <p className="mt-1 text-xs text-text-muted">Indexed across live sources</p>
-        </div>
+        <StatCard
+          index={0}
+          title="Total Roles Found"
+          value={totalJobsCount}
+          subtitle="Indexed across live sources"
+          icon={Briefcase}
+        />
 
-        <div className={`rounded-[28px] border border-ink/[0.04] ${pastelFor(1)} p-5 sm:p-6`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Avg Match Score
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface/70 text-accent">
-              <Percent className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl sm:text-3xl font-bold text-text-primary">
-            {avgMatchRate > 0 ? `${avgMatchRate}%` : "—"}
-          </p>
-          <p className="mt-1 text-xs text-text-muted">Based on your skills & profile</p>
-        </div>
+        <StatCard
+          index={1}
+          title="Avg Match Score"
+          value={avgMatchRate > 0 ? `${avgMatchRate}%` : "—"}
+          subtitle="Based on your skills & profile"
+          icon={Percent}
+          iconClassName="text-accent"
+        />
 
-        <div className={`rounded-[28px] border border-ink/[0.04] ${pastelFor(2)} p-5 sm:p-6`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Highest Match
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface/70 text-success">
-              <TrendingUp className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl sm:text-3xl font-bold text-text-primary">
-            {highestScore > 0 ? `${highestScore}%` : "—"}
-          </p>
-          <p className="mt-1 text-xs text-text-muted">Top candidate alignment</p>
-        </div>
+        <StatCard
+          index={2}
+          title="Highest Match"
+          value={highestScore > 0 ? `${highestScore}%` : "—"}
+          subtitle="Top candidate alignment"
+          icon={TrendingUp}
+          iconClassName="text-success"
+        />
 
-        <div className={`rounded-[28px] border border-ink/[0.04] ${pastelFor(3)} p-5 sm:p-6`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Researched Companies
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface/70 text-info-medium">
-              <Building2 className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl sm:text-3xl font-bold text-text-primary">
-            {researchedCount}
-          </p>
-          <p className="mt-1 text-xs text-text-muted">AI dossiers ready</p>
-        </div>
+        <StatCard
+          index={3}
+          title="Researched Companies"
+          value={researchedCount}
+          subtitle="AI dossiers ready"
+          icon={Building2}
+          iconClassName="text-info-medium"
+        />
       </section>
 
       {/* Workspace Jobs Showcase (At Most 6 Cards with Tabs) */}
@@ -426,40 +398,6 @@ export function DashboardClient({
         )}
       </section>
 
-      {/* Analytics Charts */}
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
-            Analytics
-          </h2>
-          <p className="mt-0.5 text-sm text-text-secondary">
-            Track job discovery and research activity over time
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55">
-            <p className="text-sm font-semibold text-text-primary">Jobs Found Over Time</p>
-            <p className="text-xs text-text-muted">Last 30 days</p>
-            <div className="flex flex-1 items-center justify-center text-center">
-              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
-            </div>
-          </div>
-          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55">
-            <p className="text-sm font-semibold text-text-primary">Match Score Distribution</p>
-            <p className="text-xs text-text-muted">Jobs found</p>
-            <div className="flex flex-1 items-center justify-center text-center">
-              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
-            </div>
-          </div>
-          <div className="flex h-[220px] flex-col rounded-2xl border border-border bg-surface p-4 shadow-card sm:h-55 md:col-span-2">
-            <p className="text-sm font-semibold text-text-primary">Company Research Activity</p>
-            <p className="text-xs text-text-muted">Last 7 days</p>
-            <div className="flex flex-1 items-center justify-center text-center">
-              <p className="px-6 text-xs text-text-muted">No data exists yet</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

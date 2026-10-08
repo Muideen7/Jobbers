@@ -20,14 +20,11 @@ const LEGACY_REDIRECTS: { source: string; destination: string }[] = [
   { source: "/find-jobs/:id", destination: "/jobs/:id" },
   { source: "/matches", destination: "/jobs?tab=for-you" },
   { source: "/inventory", destination: "/jobs?tab=saved" },
-  { source: "/company-research", destination: "/jobs?tab=all" },
   { source: "/dossiers", destination: "/jobs?tab=all&researched=1" },
   { source: "/dossiers/:id", destination: "/jobs/:id?tab=company" },
   { source: "/ai-resume", destination: "/resumes" },
   { source: "/interview-prep", destination: "/applications?stage=interview" },
   { source: "/follow-ups", destination: "/home" },
-  { source: "/analytics", destination: "/home" },
-  { source: "/settings", destination: "/profile?tab=account" },
 ];
 
 const nextConfig: NextConfig = {

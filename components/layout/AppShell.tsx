@@ -4,11 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  BarChart2,
   Bell,
-  BellRing,
-  CalendarClock,
-  Check,
-  ChevronDown,
+  Building2,
   Columns3,
   FileText,
   LayoutDashboard,
@@ -17,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Settings2,
   User,
   X,
   type LucideIcon,
@@ -24,10 +23,12 @@ import {
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 
 import { PostHogLogoutLink } from "@/components/analytics/PostHogLogoutLink";
+import { PricingModal } from "@/components/layout/PricingModal";
 import { Logo } from "@/components/layout/Logo";
+import { ThemeToggler } from "@/components/layout/ThemeToggler";
 import { useSidebarSummary } from "@/components/layout/useSidebarSummary";
 import { Button } from "@/components/ui/button";
-import { formatDate, getInitials, getSurname } from "@/lib/utils";
+import { formatDate, getInitials } from "@/lib/utils";
 import type { ApplicationStage } from "@/lib/workspace/constants";
 import type { SidebarSummary } from "@/lib/workspace/types";
 
@@ -43,12 +44,6 @@ type Props = {
   children: React.ReactNode;
 };
 
-/**
- * Workspace navigation. Five destinations across two groups (Workspace,
- * Tools), plus an Applications sub-nav, a "Coming up" block and the Pro card /
- * user footer. Badges and Coming up read from `/api/sidebar-summary`; before it
- * resolves the badges and Coming up render skeletons, never fake numbers.
- */
 const NAV_GROUPS: {
   label: string;
   items: { href: string; label: string; icon: LucideIcon }[];
@@ -65,6 +60,13 @@ const NAV_GROUPS: {
     label: "Tools",
     items: [
       { href: "/resumes", label: "Resumes", icon: FileText },
+      { href: "/analytics", label: "Analytics", icon: BarChart2 },
+      { href: "/company-research", label: "Research", icon: Building2 },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
       { href: "/profile", label: "Profile", icon: User },
     ],
   },
@@ -75,16 +77,6 @@ const STAGE_ITEMS: { stage: ApplicationStage; label: string }[] = [
   { stage: "applied", label: "Applied" },
   { stage: "interview", label: "Interview" },
   { stage: "offer", label: "Offer" },
-];
-
-const ONBOARDING_ITEMS: {
-  key: "hasResume" | "hasTargetRoles" | "hasSavedJob";
-  label: string;
-  href: string;
-}[] = [
-  { key: "hasResume", label: "Upload your resume", href: "/resumes" },
-  { key: "hasTargetRoles", label: "Set target roles", href: "/profile?tab=preferences" },
-  { key: "hasSavedJob", label: "Save your first job", href: "/jobs" },
 ];
 
 function formatBadge(count: number): string | null {
@@ -130,19 +122,6 @@ function badgeFor(href: string, summary: SidebarSummary | null): number {
   return 0;
 }
 
-/** "Today" / "Tomorrow" / "Thu", or "Overdue" for past dates. */
-function formatRelativeDay(iso: string): string {
-  const date = new Date(iso);
-  const startOfDay = (value: Date) =>
-    new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-  const diffDays = Math.round((startOfDay(date) - startOfDay(new Date())) / 86_400_000);
-
-  if (diffDays < 0) return "Overdue";
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  return date.toLocaleDateString("en-US", { weekday: "short" });
-}
-
 function isItemActive(pathname: string, href: string): boolean {
   if (href === "/home") return pathname === "/home";
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -186,7 +165,7 @@ export function AppShell({ user, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { summary, isLoading, error } = useSidebarSummary();
+  const { summary, isLoading } = useSidebarSummary();
 
   const collapsed = useSyncExternalStore(
     subscribeCollapsed,
@@ -194,7 +173,7 @@ export function AppShell({ user, children }: Props) {
     getCollapsedServerSnapshot,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<"notifications" | "account" | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
@@ -202,14 +181,12 @@ export function AppShell({ user, children }: Props) {
 
   const closeTransientChrome = () => {
     setDrawerOpen(false);
-    setUserMenuOpen(false);
     setOpenMenu(null);
   };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setUserMenuOpen(false);
         setDrawerOpen(false);
         setOpenMenu(null);
       }
@@ -234,7 +211,6 @@ export function AppShell({ user, children }: Props) {
   }, []);
 
   const userInitials = getInitials(user.name ?? user.email);
-  const displayName = user.name ?? getSurname(user.email) ?? "Your account";
 
   const renderNav = (opts: { collapsed: boolean; onNavigate?: () => void }) => (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-3 py-4">
@@ -307,172 +283,8 @@ export function AppShell({ user, children }: Props) {
           </ul>
         </nav>
       ))}
-
-      {/* Coming up / get-started checklist. */}
-      {!opts.collapsed && (
-        <section aria-label="Coming up" className="px-1">
-          <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-            Coming up
-          </p>
-          {renderComingUp(opts)}
-        </section>
-      )}
     </div>
   );
-
-  const renderComingUp = (opts: { collapsed: boolean; onNavigate?: () => void }) => {
-    // A failed first load used to leave `summary` null forever, which fell
-    // through to the skeleton and looked like an empty sidebar. Say so.
-    if (error && !summary) {
-      return (
-        <div className="rounded-lg border border-border bg-surface-secondary/60 px-3 py-3">
-          <p className="text-xs font-semibold text-text-secondary">
-            Couldn&apos;t load your sidebar
-          </p>
-          <p className="mt-1 text-xs leading-5 text-text-muted">
-            Refocus this tab to try again.
-          </p>
-        </div>
-      );
-    }
-
-    if (isLoading || !summary) {
-      return (
-        <ul className="flex flex-col gap-2 px-1" aria-busy="true">
-          <li className="sr-only">Loading your upcoming items</li>
-          {[0, 1].map((index) => (
-            <li
-              key={index}
-              className="flex items-center gap-3 rounded-lg border border-border bg-surface-secondary px-2 py-2"
-            >
-              <span className="h-4 w-4 shrink-0 animate-pulse rounded bg-border-muted" aria-hidden />
-              <span className="h-3 flex-1 animate-pulse rounded bg-border-muted" aria-hidden />
-            </li>
-          ))}
-        </ul>
-      );
-    }
-
-    if (summary.comingUp.length > 0) {
-      return (
-        <ul className="flex flex-col gap-1">
-          {summary.comingUp.slice(0, 3).map((item) => {
-            const Icon = item.type === "interview" ? CalendarClock : BellRing;
-            const href =
-              item.type === "interview"
-                ? `/jobs/${item.jobId}?tab=prep`
-                : `/jobs/${item.jobId}?tab=follow-ups`;
-            return (
-              <li key={`${item.type}-${item.jobId}-${item.at}`}>
-                <Link
-                  href={href}
-                  {...(opts.onNavigate ? { onClick: opts.onNavigate } : {})}
-                  className="flex items-start gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-surface-secondary"
-                >
-                  <Icon
-                    className={`mt-0.5 h-4 w-4 shrink-0 ${
-                      item.overdue ? "text-warning" : "text-text-muted"
-                    }`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-text-primary">
-                      {item.company} · {item.role}
-                    </span>
-                    <span
-                      className={`text-xs ${item.overdue ? "text-warning" : "text-text-muted"}`}
-                    >
-                      {formatRelativeDay(item.at)}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      );
-    }
-
-    const allDone = ONBOARDING_ITEMS.every((entry) => summary.onboarding[entry.key]);
-    if (allDone) {
-      // Was `return null`, which left the "Coming up" heading over a blank
-      // gap. An empty region should still look like a region.
-      return (
-        <div className="rounded-lg border border-border bg-surface-secondary/60 px-3 py-3">
-          <p className="text-xs font-semibold text-text-secondary">
-            You&apos;re all caught up
-          </p>
-          <p className="mt-1 text-xs leading-5 text-text-muted">
-            Follow-ups and interviews will land here.
-          </p>
-          <Link
-            href="/jobs"
-            {...(opts.onNavigate ? { onClick: opts.onNavigate } : {})}
-            className="mt-2 inline-block text-xs font-semibold text-accent transition-colors hover:text-accent-dark"
-          >
-            Browse jobs
-          </Link>
-        </div>
-      );
-    }
-
-    return (
-      <ul className="flex flex-col gap-1">
-        {ONBOARDING_ITEMS.map((item) => {
-          const done = summary.onboarding[item.key];
-          return (
-            <li key={item.key}>
-              <Link
-                href={item.href}
-                {...(opts.onNavigate ? { onClick: opts.onNavigate } : {})}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-surface-secondary"
-              >
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    done
-                      ? "border-accent bg-accent text-accent-foreground"
-                      : "border-border-muted"
-                  }`}
-                  aria-hidden
-                >
-                  {done && <Check className="h-3 w-3" />}
-                </span>
-                <span className={done ? "text-text-muted line-through" : "text-text-primary"}>
-                  {item.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    );
-  };
-
-  const renderUserMenu = (opts: { collapsed: boolean }) => {
-    if (userMenuOpen) {
-      return (
-        <>
-          {!opts.collapsed && <div className="fixed inset-0 z-20" onClick={() => setUserMenuOpen(false)} aria-hidden />}
-          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 rounded-xl border border-border bg-surface p-1 shadow-card">
-            <Link
-              href="/profile?tab=account"
-              onClick={() => setUserMenuOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
-            >
-              <User className="h-4 w-4" aria-hidden /> Account
-            </Link>
-            <PostHogLogoutLink
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
-              onClick={() => setUserMenuOpen(false)}
-            >
-              <LogOut className="h-4 w-4" aria-hidden /> Sign out
-            </PostHogLogoutLink>
-          </div>
-        </>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="min-h-screen bg-surface">
@@ -504,9 +316,9 @@ export function AppShell({ user, children }: Props) {
 
         {renderNav({ collapsed, onNavigate: closeTransientChrome })}
 
-        {/* Pro upgrade card. TODO: hide when a plan flag says the user is Pro. */}
+        {/* Pro upgrade card — centered between Settings and Take the tour with balanced spacing */}
         {!collapsed && (
-          <div className="mx-3 mb-3 rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary p-4">
+          <div className="mx-3 my-6 rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary p-4 shadow-sm">
             <div className="flex items-center gap-2 text-accent">
               <ArrowRight className="h-4 w-4" aria-hidden />
               <p className="text-sm font-semibold text-text-primary">Unlock Jobbers Pro</p>
@@ -517,50 +329,30 @@ export function AppShell({ user, children }: Props) {
             <Button
               type="button"
               size="sm"
-              className="mt-3 w-full"
-              disabled
-              title="Billing arrives in a later release"
+              onClick={() => setPricingOpen(true)}
+              className="mt-3 w-full font-medium"
             >
               Upgrade
             </Button>
           </div>
         )}
 
-        {/* User footer → Account / Sign out */}
-        <div className="relative mt-auto border-t border-border p-3">
-          {renderUserMenu({ collapsed })}
-          <button
-            type="button"
-            onClick={() => setUserMenuOpen((value) => !value)}
-            aria-haspopup="menu"
-            aria-expanded={userMenuOpen}
-            aria-label="Account menu"
-            className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-secondary ${
-              collapsed ? "justify-center" : ""
-            }`}
+        {/* Settings button — in place of Take the tour */}
+        <div className="px-3 pb-4">
+          <Link
+            href="/settings"
+            onClick={closeTransientChrome}
+            title={collapsed ? "Settings" : undefined}
+            aria-current={pathname === "/settings" ? "page" : undefined}
+            className={`flex w-full items-center gap-2.5 rounded-xl border border-border px-3 py-2.5 text-xs font-semibold transition-all ${
+              pathname === "/settings"
+                ? "bg-accent-light text-accent border-accent/40"
+                : "bg-surface-secondary text-text-primary hover:border-accent/50 hover:bg-surface hover:shadow-sm"
+            } ${collapsed ? "justify-center px-2" : ""}`}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-light text-xs font-bold text-accent">
-              {userInitials}
-            </span>
-            {!collapsed && (
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-text-primary">
-                  {displayName}
-                </span>
-                {user.email && (
-                  <span className="block truncate text-xs text-text-muted">{user.email}</span>
-                )}
-              </span>
-            )}
-            {!collapsed && (
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${
-                  userMenuOpen ? "rotate-180" : ""
-                }`}
-                aria-hidden
-              />
-            )}
-          </button>
+            <Settings2 className="h-4 w-4 text-accent shrink-0" />
+            {!collapsed && <span>Settings</span>}
+          </Link>
         </div>
       </aside>
 
@@ -602,7 +394,11 @@ export function AppShell({ user, children }: Props) {
             />
           </form>
 
-          <div className="relative ml-auto">
+          <div className="ml-auto">
+            <ThemeToggler />
+          </div>
+
+          <div className="relative">
             <button
               type="button"
               onClick={() => setOpenMenu((value) => (value === "notifications" ? null : "notifications"))}
@@ -653,7 +449,7 @@ export function AppShell({ user, children }: Props) {
             aria-label="Account menu"
             aria-haspopup="menu"
             aria-expanded={openMenu === "account"}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-light text-xs font-bold text-accent"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-light text-xs font-bold text-accent cursor-pointer"
           >
             {userInitials}
           </button>
@@ -675,8 +471,13 @@ export function AppShell({ user, children }: Props) {
                 >
                   Preferences
                 </Link>
-                <PostHogLogoutLink className="flex items-center rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary">
-                  Sign out
+                <div className="my-1 border-t border-border" />
+                <PostHogLogoutLink
+                  onClick={closeTransientChrome}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-error cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
+                  <span>Sign out</span>
                 </PostHogLogoutLink>
               </div>
             </>
@@ -710,6 +511,9 @@ export function AppShell({ user, children }: Props) {
           </div>
         </div>
       )}
+
+      {/* Pricing Modal */}
+      <PricingModal open={pricingOpen} onOpenChange={setPricingOpen} />
     </div>
   );
 }

@@ -18,6 +18,41 @@ After building any component — update this file with the component name, file 
 
 ## Components
 
+### Shared StatCard
+
+File: components/shared/StatCard.tsx
+Last updated: 2026-10-08
+
+| Property         | Class / Rule                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Background       | Rotating pastel palette (`bg-pastel-blue`, `bg-pastel-mint`, `bg-pastel-pink`, `bg-pastel-lilac`, `bg-pastel-cream`, `bg-pastel-aqua`) |
+| Border           | `border border-ink/[0.04]`                                                                             |
+| Border radius    | `rounded-[28px]`                                                                                       |
+| Text — primary   | `text-2xl sm:text-3xl font-bold text-text-primary`                                                      |
+| Text — secondary | `text-xs font-semibold uppercase tracking-wide text-text-secondary` label, `text-xs text-text-muted` subtitle |
+| Spacing          | `p-5 sm:p-6`                                                                                           |
+| Icon Squircle    | `flex h-7 w-7 items-center justify-center rounded-lg bg-surface/70` with `h-3.5 w-3.5` glyph           |
+
+**Pattern notes:**
+Standardized metric summary card reused across Dashboard overview (`DashboardClient.tsx`) and Application Pipeline tracker (`ApplicationsPageClient.tsx`). Accepts `title`, `value`, `subtitle`, `icon`, `iconClassName`, and optional `index` for automatic pastel background assignment.
+
+### Applications Tracker Stage Colors
+
+File: components/applications/ApplicationsPageClient.tsx
+Last updated: 2026-10-08
+
+| Stage | Top Card / Header Icon Pill | Badge / Label | Job Card Background & Border |
+| --- | --- | --- | --- |
+| **Saved** | `bg-pastel-blue` + `text-info-medium` | `bg-surface text-info-medium border-border` | `bg-pastel-blue border-info-light hover:border-info-medium/60` |
+| **Applied** | `bg-pastel-mint` + `text-success-dark` | `bg-surface text-success-dark border-border` | `bg-pastel-mint border-success-light hover:border-success/60` |
+| **Interview** | `bg-pastel-pink` + `text-rose-strong` | `bg-surface text-rose-strong border-border` | `bg-pastel-pink border-rose-soft hover:border-rose/60` |
+| **Offer** | `bg-pastel-lilac` + `text-accent-dark` | `bg-surface text-accent-dark border-border` | `bg-pastel-lilac border-lavender hover:border-accent/60` |
+
+**Pattern notes:**
+Visual hierarchy and stage differentiation in `/applications` map directly to the 4 pastel tokens (`bg-pastel-blue`, `bg-pastel-mint`, `bg-pastel-pink`, `bg-pastel-lilac`), matching top stat cards with section header icons, and full background tint on each job card in the stage.
+
+**Dark mode — shared pastel tokens (DRY):** these colour-coded surfaces use the same `bg-pastel-*` tokens as the shared `StatCard`, so dark mode is driven entirely by the `.dark` pastel overrides in `app/globals.css` — the hue share (blue 38 / mint 36 / pink 36 / lilac 40 / cream 30 / aqua 34% over `--color-inverse`) makes them noticeably more saturated than the light tint while staying clearly pastel, not standard colours. Do **not** special-case this page (e.g. a per-page "keep light" scope); any colour change must come from the shared token so the dashboard `StatCard`s and the tracker stay in lock-step.
+
 ### Login Card
 
 File: components/auth/LoginCard.tsx
@@ -522,22 +557,21 @@ token set, so they read as the app's design language:
 ### AppShell (global workspace shell)
 
 File: components/layout/AppShell.tsx
-Last updated: 2026-10-07 (Prompt 1 revamp)
+Last updated: 2026-10-08
 
 | Property        | Class |
 | --------------- | ----- |
 | Shell           | `min-h-screen bg-surface` (matches the landing page's white canvas) |
 | Sidebar         | fixed left rail from **`lg`** (`lg:flex` / `lg:w-[240px]`, collapsed `lg:w-[72px]`), `border-r border-border bg-surface`; below `lg` it becomes a slide-in drawer |
 | Sidebar header  | `h-16 border-b border-border`; expanded shows `Logo` + `PanelLeftClose`; collapsed centres just the `PanelLeftOpen` toggle |
-| Nav groups      | **Workspace** (Home, Jobs, Applications) / **Tools** (Resumes, Profile) — exactly five links. Group labels `text-[10px] font-bold uppercase tracking-widest text-text-muted` |
+| Nav groups      | **Workspace** (Home, Jobs, Applications), **Tools** (Resumes, Analytics, Research), **Account** (Profile). Group labels `text-[10px] font-bold uppercase tracking-widest text-text-muted` |
 | Nav item        | `rounded-lg px-3 py-2.5 text-sm font-medium`, active `bg-accent-light text-accent shadow-xs` + `aria-current="page"`, idle `text-text-secondary hover:bg-surface-secondary hover:text-text-primary`; icon `h-5 w-5` |
 | Nav badge       | `ml-auto rounded-full bg-accent px-1.5 text-[10px] font-bold leading-4 text-accent-foreground`; hidden at 0, `99+` above 99, a `h-1.5 w-1.5 rounded-full bg-accent` dot when collapsed; skeletons `bg-muted` while loading |
 | Applications sub-nav | indented `border-l border-border pl-3` list of Saved/Applied/Interview/Offer, shown only while `pathname === "/applications"`; count `text-xs font-semibold text-text-muted` |
-| Coming up       | `section` under the nav: next 3 interviews (`CalendarClock`) / follow-ups (`BellRing`) → `/jobs/:id?tab=prep|follow-ups`, relative day via `formatRelativeDay`, overdue `text-warning`; falls back to the get-started checklist when there are no applications |
-| Get-started     | three checkable links (Upload your resume `/resumes`, Set target roles `/profile?tab=preferences`, Save your first job `/jobs`) driven by real onboarding flags; done items use `border-accent bg-accent` + line-through, hidden once all three pass |
-| Pro upgrade CTA | gradient card `rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary` with an `<Button size="sm">` (currently disabled — billing is a later release) |
-| Sidebar footer  | avatar initials (`bg-accent-light text-accent`) + **surname** + email; opens a menu (Account → `/profile?tab=account`, Sign out via `PostHogLogoutLink`). Collapsed shows the avatar only |
-| Top bar         | `sticky top-0 z-20 h-16 border-b border-border bg-surface/90 backdrop-blur`; hamburger + logo below `lg`, search `max-w-md` from `lg`, bell, account avatar. Search submits to `/jobs?q=<query>` |
+| Pro upgrade CTA | gradient card `rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary` with an `<Button size="sm">` |
+| Settings action | `flex w-full items-center gap-2.5 rounded-xl border border-border px-3 py-2.5 text-xs font-semibold` anchored directly below Upgrade Pro at bottom |
+| Sidebar footer  | Direct sign out link via `PostHogLogoutLink` with `LogOut` icon. Collapsed shows icon only |
+| Top bar         | `sticky top-0 z-20 h-16 border-b border-border bg-surface/90 backdrop-blur`; hamburger + logo below `lg`, search `max-w-md` from `lg`, then **ThemeToggler → notification bell → account avatar** in that order. Search submits to `/jobs?q=<query>` |
 
 **Pattern notes:**
 - **Global shell**: every workspace page lives under `app/(workspace)/` whose
@@ -561,6 +595,41 @@ Last updated: 2026-10-07 (Prompt 1 revamp)
 - **Route map (Prompt 1)**: `/home`, `/jobs`, `/applications`, `/resumes`,
   `/profile`. Legacy routes redirect 308 to these; the five former placeholder
   routes and `ComingSoonPage` were deleted.
+
+---
+
+### ThemeToggler
+
+File: components/layout/ThemeToggler.tsx
+Last updated: 2026-10-08
+
+| Property        | Class |
+| --------------- | ----- |
+| Trigger         | `rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary`, icon `h-5 w-5` (Sun when light, Moon when dark) |
+| Menu            | `absolute right-0 z-30 mt-2 w-48 rounded-xl border border-border bg-surface p-1 shadow-card` — identical shell to the bell/avatar menus |
+| Menu label      | `px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-text-muted` ("Theme" + check-marked items) |
+| Menu item       | `role="menuitemradio"`, `flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm`, active `text-accent` + trailing `Check text-accent`, idle `text-text-secondary hover:bg-surface-secondary hover:text-text-primary`; icon `h-4 w-4 shrink-0` |
+| Close           | backdrop `fixed inset-0 z-20` overlay, Escape key handler while open |
+| Accessibility   | Trigger `aria-label="Theme" aria-haspopup="menu" aria-expanded`; items `aria-checked` |
+
+**Pattern notes:**
+- The three options are **Light / Dark / System default** (`Sun` / `Moon` /
+  `Monitor`). "System default" follows the OS via `matchMedia("(prefers-color-scheme:
+  dark)")` and re-renders live when the OS switches while it is selected.
+- Rendered in `AppShell`'s top bar **directly before the notification bell**
+  (search → ThemeToggler → bell → avatar), so it inherits the same `h-16`
+  header and `rounded-lg p-2` icon-button language as the bell.
+- **Same external-store pattern as the sidebar collapse**: `useSyncExternalStore`
+  over the `jobbers.theme` localStorage key + `jobbers:theme` custom event,
+  subscribed to `storage` (cross-tab) + the media query + the custom event.
+  Preference is written in the click handler and the `<html>` class is mutated
+  in an effect (`document.documentElement.classList.toggle("dark", resolved === "dark")`)
+  — never a cascading render `setState`, so `react-hooks/set-state-in-effect`
+  stays happy.
+- The `.dark` class flips the whole token set via the unlayered `.dark { … }`
+  block in `app/globals.css` — the component owns **no** colors of its own.
+  See `context/ui-tokens.md` → "Dark mode" for the palette (cards are the
+  footer's `--color-inverse` family).
 
 ---
 
@@ -832,16 +901,50 @@ researched. 🎉".
 
 ---
 
-### Applications page
+### Applications Page
 
-File: app/applications/page.tsx (server)
-Last updated: 2026-10-06
+File: `app/(workspace)/applications/page.tsx` (server) & `components/applications/ApplicationsPageClient.tsx` (client)
+Last updated: 2026-10-07
 
-Honest placeholder — tracking ships with the Phase E auto-apply scope. A card
-explains the plan and links to `/inventory` ("Ready to apply") and
-`/find-jobs` ("Find more roles") as `group` hoverable cards
-(`rounded-2xl border border-border bg-surface p-5 hover:border-accent` with an
-`ArrowRight` that nudges `group-hover:translate-x-0.5`).
+| Property | Class / Token |
+| --- | --- |
+| Header | `text-2xl font-bold tracking-tight text-text-primary` |
+| Pipeline summary | 4-column metric grid `grid grid-cols-2 gap-3 sm:grid-cols-4`, card `rounded-2xl border border-border bg-surface p-4 shadow-card` |
+| Stage headers | `flex items-center gap-2 border-b border-border pb-3`, `text-lg font-semibold text-text-primary`, stage count badge `rounded-full border border-border bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-secondary` |
+| Application cards | `rounded-2xl border border-border bg-surface p-5 shadow-card transition-colors hover:border-accent/50` |
+| Stage selector | `<select>` `rounded-lg border border-border bg-surface-secondary px-2.5 py-1 text-xs font-medium text-text-primary focus:border-accent focus:outline-none` |
+| Match badge | `rounded-full bg-accent-muted px-2 py-0.5 text-xs font-bold text-accent` |
+
+---
+
+### Tour Modal Component
+
+File: `components/layout/TourModal.tsx`
+Last updated: 2026-10-07
+
+| Property | Class / Token |
+| --- | --- |
+| Backdrop | `fixed inset-0 bg-ink/50 backdrop-blur-sm` |
+| Container | `w-full max-w-[600px] rounded-[32px] bg-gradient-to-b from-surface via-surface-tertiary to-surface-secondary/40 border border-border/80 shadow-2xl p-8 sm:p-12` |
+| Icon squircle | `bg-ink text-surface shadow-lg rounded-2xl h-16 w-16` |
+| Indicator dots | Active: `w-6 h-1.5 bg-ink rounded-full`; Inactive: `w-1.5 h-1.5 bg-border rounded-full` |
+| Action button | `bg-ink hover:bg-ink-hover text-accent-foreground rounded-full px-6 py-2.5 shadow-md` ("Next →") |
+
+---
+
+### Pricing / Upgrade Modal Component
+
+File: `components/layout/PricingModal.tsx`
+Last updated: 2026-10-07
+
+| Property | Class / Token |
+| --- | --- |
+| Backdrop | `fixed inset-0 bg-ink/60 backdrop-blur-md` |
+| Container | `w-full max-w-5xl rounded-[32px] border border-border bg-surface p-6 sm:p-10 shadow-2xl` |
+| Icon badge | `bg-gradient-to-br from-peach via-amber/20 to-lavender p-3 text-amber` |
+| Billing toggle | `rounded-full border border-border bg-surface-secondary p-1` |
+| Pro / Ultra card | `rounded-3xl border border-border bg-surface-tertiary/60 p-6 shadow-card` |
+| Max card (primary) | `rounded-3xl border-2 border-accent bg-accent text-accent-foreground p-6 shadow-xl` |
 
 ---
 

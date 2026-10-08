@@ -1,80 +1,54 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Briefcase, FileText } from "lucide-react";
 
+import { ApplicationsPageClient } from "@/components/applications/ApplicationsPageClient";
 import { requireUser } from "@/lib/auth";
+import { createInsforgeServer } from "@/lib/insforge-server";
+import { applicationStageRank } from "@/lib/workspace/application-rules";
 import { privateMetadata } from "../../private-metadata";
+import type { Application, ApplicationJobSummary, ApplicationListItem } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Applications",
-  "Track every job you have applied to across sources.",
+  "Track your job application pipeline across every stage.",
 );
 
-/**
- * Honest placeholder: application tracking ships with the auto-apply phase.
- * Until then, point users at the two places that make applying easier today.
- */
+const JOB_SUMMARY_COLUMNS = "id, title, company, location, source, match_score, company_research";
+
 export default async function ApplicationsPage() {
-  await requireUser();
+  const user = await requireUser();
+  const insforge = await createInsforgeServer();
 
-  return (
-    <div className="mx-auto w-full max-w-[720px] px-4 pb-12 pt-6 sm:px-6 lg:px-0">
-      <div className="flex flex-col gap-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-            Applications
-          </h1>
-          <p className="mt-1 text-sm leading-6 text-text-secondary">
-            One place to see every role you have applied to — coming with the
-            auto-apply phase.
-          </p>
-        </header>
+  const { data: applicationRows } = await insforge.database
+    .from("applications")
+    .select("*")
+    .eq("user_id", user.id);
 
-        <div className="rounded-2xl border border-border bg-surface p-6 shadow-card">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-muted">
-              <Briefcase className="h-5 w-5 text-accent" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold leading-6 text-text-primary">
-                Tracking is on its way
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-text-secondary">
-                When auto-apply ships, every submission lands here: where you
-                applied, when, and the source it went through. For now, keep
-                moving with the two workflows that get you to an application.
-              </p>
-            </div>
-          </div>
+  const applications = (applicationRows as Application[] | null) ?? [];
 
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Link
-              href="/jobs?tab=saved"
-              className="group flex flex-col gap-2 rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-accent">
-              <p className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                <FileText className="h-4 w-4 text-accent" />
-                Ready to apply
-                <ArrowRight className="ml-auto h-4 w-4 text-text-muted transition-transform group-hover:translate-x-0.5" />
-              </p>
-              <p className="text-sm leading-6 text-text-muted">
-                Every saved role where you interviewed the company already.
-              </p>
-            </Link>
-            <Link
-              href="/jobs"
-              className="group flex flex-col gap-2 rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-accent">
-              <p className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                <Briefcase className="h-4 w-4 text-accent" />
-                Find more roles
-                <ArrowRight className="ml-auto h-4 w-4 text-text-muted transition-transform group-hover:translate-x-0.5" />
-              </p>
-              <p className="text-sm leading-6 text-text-muted">
-                Fresh multi-source jobs scored against your profile.
-              </p>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const jobIds = [...new Set(applications.map((app) => app.job_id))];
+  const jobs: ApplicationJobSummary[] = [];
+  if (jobIds.length > 0) {
+    const { data: jobRows } = await insforge.database
+      .from("jobs")
+      .select(JOB_SUMMARY_COLUMNS)
+      .eq("user_id", user.id)
+      .in("id", jobIds);
+
+    jobs.push(...((jobRows as ApplicationJobSummary[] | null) ?? []));
+  }
+
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
+  const items: ApplicationListItem[] = applications
+    .map((app) => ({
+      ...app,
+      job: jobById.get(app.job_id) ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        applicationStageRank(a.status) - applicationStageRank(b.status) ||
+        a.position - b.position ||
+        a.created_at.localeCompare(b.created_at),
+    );
+
+  return <ApplicationsPageClient initialApplications={items} />;
 }

@@ -174,6 +174,136 @@ className="bg-purple-500 text-gray-600"
 }
 ```
 
+### Dark mode — verbatim mirror of the `.dark` block
+
+> Same "add it in globals.css, add it here" rule applies. `app/globals.css`
+> carries two additions after `@theme`: a `:root` block with two **stable
+> light-mode accent sources** (`.dark` lightens the accent by mixing these
+> toward the white foreground; a self-referencing
+> `color-mix(… var(--color-accent) …)` inside `.dark` would be circular and
+> invalid at computed-value time), and an **unlayered `.dark`** selector that
+> toggles the whole app's token set at runtime. `ThemeToggler` in
+> `components/layout/ThemeToggler.tsx` flips `document.documentElement`
+> between no class (light) and `.dark`. Dark mode's card surface **is the
+> landing footer colour** (`--color-inverse` = `#2d2f33`) and the page shell
+> sits one step darker (`--color-inverse-sunken` = `#1c1e22`), so the dark
+> app reads as the footer's colour family.
+
+```css
+/* Stable light-mode sources. `.dark` lightens the accent by mixing these
+ * toward the white foreground; a self-referencing color-mix(… var(--color-accent) …)
+ * inside `.dark` would be circular and invalid at computed-value time. */
+:root {
+  --color-accent-source: #6e56cf;
+  --color-accent-dark-source: #5a45b8;
+}
+
+/*
+ * Dark mode — `.dark` is toggled on <html> by components/layout/ThemeToggler.
+ * Every override is derived from existing tokens, never a new literal: the
+ * card surface IS the landing footer background (--color-inverse) and the page
+ * shell sits one step darker (--color-inverse-sunken), so dark mode reads as
+ * the footer's colour family. Unlayered on purpose — it must beat the
+ * @layer theme defaults above (utilities are var() references, so overriding
+ * the custom properties at runtime recolours the whole app).
+ */
+.dark {
+  color-scheme: dark;
+
+  /* Surfaces — cards are the footer colour. */
+  --color-background: var(--color-inverse-sunken);
+  --color-surface: var(--color-inverse);
+  --color-surface-secondary: color-mix(in srgb, var(--color-inverse-foreground) 10%, var(--color-inverse));
+  --color-surface-tertiary: var(--color-inverse-deep);
+
+  --color-border: color-mix(in srgb, var(--color-inverse-foreground) 16%, var(--color-inverse-deep));
+  --color-border-light: color-mix(in srgb, var(--color-inverse-foreground) 9%, var(--color-inverse-deep));
+  --color-border-muted: color-mix(in srgb, var(--color-inverse-foreground) 26%, var(--color-inverse-deep));
+
+  --color-text-primary: var(--color-inverse-foreground);
+  --color-text-secondary: color-mix(in srgb, var(--color-inverse-foreground) 72%, var(--color-inverse-sunken));
+  --color-text-muted: color-mix(in srgb, var(--color-inverse-foreground) 56%, var(--color-inverse-sunken));
+  --color-text-strong: color-mix(in srgb, var(--color-inverse-foreground) 64%, var(--color-inverse-sunken));
+  --color-text-faint: color-mix(in srgb, var(--color-inverse-foreground) 36%, var(--color-inverse-sunken));
+  --color-text-dark: color-mix(in srgb, var(--color-inverse-foreground) 82%, var(--color-inverse-sunken));
+  --color-text-darkest: color-mix(in srgb, var(--color-inverse-foreground) 93%, var(--color-inverse-sunken));
+  --color-text-slate: color-mix(in srgb, var(--color-inverse-foreground) 93%, var(--color-inverse-sunken));
+  --color-text-slate-medium: color-mix(in srgb, var(--color-inverse-foreground) 72%, var(--color-inverse-sunken));
+  --color-chart-axis: color-mix(in srgb, var(--color-inverse-foreground) 56%, var(--color-inverse-sunken));
+
+  /* Accent lightens so purple text stays legible on dark surfaces; its light
+   * fills flip to dark lavenders so pills keep an accent-on-lavender pairing.
+   * --color-accent-foreground stays white — ink buttons and pills need it. */
+  --color-accent: color-mix(in srgb, var(--color-accent-source) 70%, var(--color-accent-foreground));
+  --color-accent-dark: color-mix(in srgb, var(--color-accent-dark-source) 70%, var(--color-accent-foreground));
+  --color-accent-light: color-mix(in srgb, var(--color-accent) 30%, var(--color-inverse));
+  --color-accent-muted: color-mix(in srgb, var(--color-accent) 20%, var(--color-inverse));
+
+  /* Pastel surfaces darken with their hue so white primary text stays readable.
+   * The hue share is deliberately between a washed-out tint and a full colour:
+   * enough to read as an actual colour in dark mode, not a standard swatch. */
+  --color-pastel-blue: color-mix(in srgb, var(--color-info) 38%, var(--color-inverse));
+  --color-pastel-mint: color-mix(in srgb, var(--color-success) 36%, var(--color-inverse));
+  --color-pastel-pink: color-mix(in srgb, var(--color-rose) 36%, var(--color-inverse));
+  --color-pastel-lilac: color-mix(in srgb, var(--color-accent) 40%, var(--color-inverse));
+  --color-pastel-cream: color-mix(in srgb, var(--color-amber) 30%, var(--color-inverse));
+  --color-pastel-aqua: color-mix(in srgb, var(--color-success-alt) 34%, var(--color-inverse));
+
+  /* Decorative fills (bento cards, hero gradients, skyline art) and the warm
+   * secondary shades darken with their hue; success/info light pills keep
+   * their dark text-on-light-fill pairing, which reads in both modes. */
+  --color-peach: color-mix(in srgb, var(--color-amber) 14%, var(--color-inverse));
+  --color-peach-soft: color-mix(in srgb, var(--color-amber) 10%, var(--color-inverse));
+  --color-peach-deep: color-mix(in srgb, var(--color-amber) 18%, var(--color-inverse));
+  --color-peach-line: color-mix(in srgb, var(--color-amber) 26%, var(--color-inverse));
+  --color-rose-soft: color-mix(in srgb, var(--color-rose) 16%, var(--color-inverse));
+  --color-violet-glow: color-mix(in srgb, var(--color-accent) 16%, var(--color-inverse));
+  --color-violet-border: color-mix(in srgb, var(--color-accent) 34%, var(--color-inverse));
+  --color-violet-panel: color-mix(in srgb, var(--color-accent) 20%, var(--color-inverse));
+  --color-lavender: color-mix(in srgb, var(--color-accent) 18%, var(--color-inverse));
+  --color-lavender-soft: color-mix(in srgb, var(--color-accent) 12%, var(--color-inverse));
+  --color-art-line: color-mix(in srgb, var(--color-inverse-foreground) 9%, var(--color-inverse-deep));
+  --color-art-fill: color-mix(in srgb, var(--color-inverse-foreground) 18%, var(--color-inverse-deep));
+  --color-art-fill-strong: color-mix(in srgb, var(--color-inverse-foreground) 30%, var(--color-inverse-deep));
+
+  /* shadcn/ui semantic aliases track the surfaces they stand for. */
+  --color-foreground: var(--color-text-primary);
+  --color-card: var(--color-inverse);
+  --color-card-foreground: var(--color-text-primary);
+  --color-popover: var(--color-inverse);
+  --color-popover-foreground: var(--color-text-primary);
+  --color-secondary: var(--color-surface-secondary);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-muted: var(--color-surface-secondary);
+}
+```
+
+**Dark-mode decisions worth remembering:**
+
+- The page shell is `--color-inverse-sunken` (`#1c1e22`), cards are the footer
+  `--color-inverse` (`#2d2f33`), and `--color-surface-secondary` is 10% white
+  over that footer colour. Borders/text tiers are white `color-mix` percentages
+  (borders 16/9/26%, text 72/56/64/36/82/93% against the sunken shell).
+- `--color-accent` lightens to 70% `--color-accent-source` + 30% white
+  (≈ `#9a88dd`) so purple text on dark surfaces stays **≥ 4.5:1**;
+  `--color-accent-foreground` stays white because ink buttons, pills and the
+  sidebar's active-nav badge depend on it.
+- `accent-light`/`accent-muted` flip to dark lavenders (30%/20% accent over the
+  footer colour) so `bg-accent-light text-accent` pill pairings stay readable.
+- Pastels darken **with their hue** in dark mode. The hue share is deliberately
+  set between a washed-out tint and a full swatch (pastel-blue 38%, mint 36%,
+  pink 36%, lilac 40%, cream 30%, aqua 34% over `--color-inverse`) so each reads
+  as an actual colour — noticeably more saturated than the light tint — without
+  becoming a standard/flat colour. These tokens are the **single source (DRY)**:
+  the shared `StatCard` (dashboard *and* Applications tracker) and the tracker's
+  stage cards all consume `bg-pastel-*`, so changing the token here recolours
+  every pastel surface at once. Never special-case one page (e.g. a per-page
+  "keep light" scope) — that breaks the shared contract.
+- Decorative fills (peach, lavender, rose-soft, violet-*, art-*) darken with
+  their hue; `--color-success-light` / `--color-info-light` and their
+  `-foreground` partners are deliberately **not** overridden — dark-text-on-
+  light-fill pills already read in both modes.
+
 Tailwind v4 generates utility classes automatically from every `--color-*` token above:
 
 - `bg-accent`, `text-accent`, `border-accent`
@@ -428,6 +558,7 @@ mark, as is the `ImageResponse` OG image in `app/opengraph-image.tsx`.
 - Font is Mona Sans — always import via next/font/google, never use a fallback system font
 - Never use raw Tailwind color classes like `bg-purple-500` or `text-gray-600` — use project tokens only
 - `--color-accent` (#6e56cf) is the only purple — never use Tailwind's built-in purple scale. It is reserved for AI/emphasis moments and active nav state; **primary buttons are near-black `bg-ink`, not purple.**
+- Dark mode is **not** a component layer — it is one unlayered `.dark { … }` block in `app/globals.css` that overrides the `--color-*` custom properties at runtime (utilities are `var()` references), toggled on `<html>` by `components/layout/ThemeToggler.tsx`. Every dark value derives from an existing token via `color-mix()`; the only new literals are the two `:root` accent sources above.
 - Match score bars always use color tokens based on score range — never hardcoded colors
 - LinkedIn badge always uses `--color-linkedin` (#0a66c2) / `bg-linkedin-light` — never a generic blue token
 - All borders default to `--color-border` (#e4e4e7) — never use `border-gray-*` / `border-zinc-*`

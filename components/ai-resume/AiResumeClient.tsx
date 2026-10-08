@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FileDown, Sparkles } from "lucide-react";
+import { FileDown, Loader2, Sparkles } from "lucide-react";
 
 import type { ExtractedProfile } from "@/actions/profile";
 import { ResumeSection } from "@/components/profile/ResumeSection";
@@ -10,9 +10,7 @@ import { ExtractedReviewDialog } from "@/components/dashboard/ExtractedReviewDia
 import { Button } from "@/components/ui/button";
 
 /**
- * /ai-resume: reuses the profile page's ResumeSection (upload -> Gemini
- * extract) and routes the extracted profile through the shared review dialog
- * so a user can apply it without leaving the page.
+ * /resumes surface: upload -> Gemini extract, plus instant PDF generation via Gemini + @react-pdf/renderer.
  */
 export function AiResumeClient({
   existingResumeUrl,
@@ -22,6 +20,25 @@ export function AiResumeClient({
   const router = useRouter();
   const [extracted, setExtracted] = useState<ExtractedProfile | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+
+  async function handleGeneratePdf() {
+    setIsGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/resume/generate", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to generate resume PDF");
+      }
+      router.refresh();
+    } catch (err: unknown) {
+      setGenError(err instanceof Error ? err.message : "Error generating resume PDF");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,22 +67,47 @@ export function AiResumeClient({
           </div>
           <div className="flex-1">
             <h2 className="text-base font-semibold leading-6 text-text-primary">
-              Tailor a resume for a role
+              Generate PDF Resume with Gemini
             </h2>
             <p className="mt-1 text-sm leading-6 text-text-secondary">
-              Select a saved job from your feed and Gemini rewrites your resume
-              to match it, then hands you a ready-to-apply PDF.
+              Gemini rewrites your achievements into impactful action bullet points and renders a clean, professional PDF resume ready for job applications.
             </p>
-            <Button asChild variant="outline" size="sm" className="mt-4">
-              <a href="/home" aria-label="Find a role to tailor a resume for">
-                <Sparkles className="h-4 w-4" />
-                Find a role
-              </a>
-            </Button>
+
+            {genError && (
+              <p className="mt-2 text-xs font-medium text-destructive">
+                {genError}
+              </p>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                onClick={handleGeneratePdf}
+                disabled={isGenerating}
+                size="sm"
+                className="rounded-full"
+              >
+                {isGenerating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {isGenerating ? "Generating PDF…" : "Generate AI Resume PDF"}
+              </Button>
+
+              {existingResumeUrl && (
+                <Button asChild variant="outline" size="sm" className="rounded-full">
+                  <a
+                    href={`/api/resume/download`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download Resume
+                  </a>
+                </Button>
+              )}
+            </div>
           </div>
-          <span className="rounded-full bg-surface-secondary px-3 py-1 text-xs font-medium text-text-muted">
-            Coming soon
-          </span>
         </div>
       </section>
 

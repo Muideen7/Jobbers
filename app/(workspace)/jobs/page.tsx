@@ -114,6 +114,66 @@ export default async function JobsPage({ searchParams }: Props) {
       .returns<Job[]>();
 
     jobs = (data as Job[] | null) ?? [];
+
+    // Fix for new users: if 0 jobs exist and user set target roles, trigger an instant search
+    if (jobs.length === 0 && hasTargetRoles && tab !== "saved") {
+      const targetTitle = profileResult.data?.job_titles_seeking?.[0];
+      if (targetTitle) {
+        try {
+          const { searchAll } = await import("@/lib/jobs/search-all");
+          const { keywordScoreBatch } = await import("@/lib/jobs/keyword-score");
+          const { buildJobRecord } = await import("@/lib/jobs/job-record");
+
+          const searchResult = await searchAll({
+            title: targetTitle,
+            location: "",
+            country: "us",
+          });
+
+          if (searchResult.jobs.length > 0) {
+            const profileContext = {
+              skills: null,
+              industries: null,
+              experience_level: null,
+              job_titles_seeking: profileResult.data?.job_titles_seeking ?? [],
+              years_experience: null,
+              work_experience: null,
+              remote_preference: null,
+              preferred_locations: null,
+              salary_expectation: null,
+              location: null,
+            };
+
+            const scores = keywordScoreBatch(searchResult.jobs, profileContext);
+            const jobRecords = searchResult.jobs.map((job, idx) =>
+              buildJobRecord({
+                job,
+                userId: user.id,
+                runId: null,
+                score: scores[idx] ?? {
+                  matchScore: 70,
+                  matchReason: `Matches target role "${targetTitle}"`,
+                  matchedSkills: [],
+                  missingSkills: [],
+                },
+                foundAt: new Date().toISOString(),
+              }),
+            );
+
+            const { data: inserted } = await insforge.database
+              .from("jobs")
+              .insert(jobRecords)
+              .select();
+
+            if (inserted && inserted.length > 0) {
+              jobs = inserted as Job[];
+            }
+          }
+        } catch (err) {
+          console.error("[jobs/page] auto-search error:", err);
+        }
+      }
+    }
   }
 
   return (
