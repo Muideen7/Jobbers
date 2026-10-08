@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 import { endOfToday, isToday } from "@/lib/workspace/application-rules";
 import { NEW_MATCH_SCORE_THRESHOLD } from "@/lib/workspace/constants";
@@ -122,7 +122,18 @@ function buildComingUp(
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    // Resolve the user directly instead of requireUser(): this is a JSON API,
+    // so a signed-out request must return 401 JSON, not a redirect() throw.
+    // Wrapping requireUser() inside this try/catch also swallowed its
+    // NEXT_REDIRECT as a 500 (the sidebar is fetched on focus/interval, so it
+    // can legitimately fire after the session has expired).
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const insforge = await createInsforgeServer();
 
     // Resolve the profile first so we can scope the "new matches" window.
