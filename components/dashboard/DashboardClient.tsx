@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -34,9 +34,11 @@ import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  getAppliedJobIds,
-  getRecentlyViewedIds,
+  getAppliedJobsSnapshot,
+  getRecentJobsServerSnapshot,
+  getRecentlyViewedSnapshot,
   recordJobView,
+  subscribeRecentJobs,
   toggleAppliedJob,
 } from "@/lib/recent-jobs";
 import { cn, formatDate, getInitials, getMatchBadgeVariant, getSurname } from "@/lib/utils";
@@ -72,14 +74,22 @@ export function DashboardClient({
   const totalJobsCount = totalCount ?? initialJobs.length;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("matches");
-  // Lazy initializers — getRecentlyViewedIds/getAppliedJobIds are SSR-safe
-  // (they return [] when window is undefined), so no effect is needed.
-  const [recentIds, setRecentIds] = useState<string[]>(() => getRecentlyViewedIds());
-  const [appliedIds, setAppliedIds] = useState<string[]>(() => getAppliedJobIds());
+  // localStorage is an external store: the server snapshot is empty, so the
+  // first client render matches the server HTML and the real ids stream in
+  // after hydration — no hydration mismatch, no suppressHydrationWarning.
+  const recentIds = useSyncExternalStore(
+    subscribeRecentJobs,
+    getRecentlyViewedSnapshot,
+    getRecentJobsServerSnapshot,
+  );
+  const appliedIds = useSyncExternalStore(
+    subscribeRecentJobs,
+    getAppliedJobsSnapshot,
+    getRecentJobsServerSnapshot,
+  );
 
   async function handleToggleApplied(jobId: string) {
     const isNowApplied = toggleAppliedJob(jobId);
-    setAppliedIds(getAppliedJobIds());
 
     // Sync to backend /api/applications so it persists and appears in Applications Tracker
     try {
@@ -97,7 +107,6 @@ export function DashboardClient({
 
   function handleViewJob(jobId: string) {
     recordJobView(jobId);
-    setRecentIds(getRecentlyViewedIds());
   }
 
   // At most 6 cards for each category
@@ -231,7 +240,7 @@ export function DashboardClient({
               <Eye className="h-3.5 w-3.5" />
               Recently Viewed
               {recentJobs.length > 0 && (
-                <span suppressHydrationWarning className={cn(
+                <span className={cn(
                   "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
                   activeTab === "recent" ? "bg-surface text-ink" : "bg-surface-secondary text-text-primary"
                 )}>
@@ -253,7 +262,7 @@ export function DashboardClient({
               <CheckCircle2 className="h-3.5 w-3.5" />
               Applied / Saved
               {appliedJobs.length > 0 && (
-                <span suppressHydrationWarning className={cn(
+                <span className={cn(
                   "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
                   activeTab === "applied" ? "bg-surface text-ink" : "bg-surface-secondary text-text-primary"
                 )}>
