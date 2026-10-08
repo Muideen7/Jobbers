@@ -309,7 +309,7 @@ async function collectBrowserResearch(
       projectId,
       browserbaseSessionID: session.id,
       model: {
-        modelName: `google/${getGeminiModel()}`,
+        modelName: geminiKey ? `google/${process.env.GEMINI_MODEL || "gemini-2.5-flash"}` : "google/gemini-2.5-flash",
         apiKey: geminiKey,
       },
       disablePino: true,

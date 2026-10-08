@@ -134,7 +134,7 @@ export async function generateJson<T extends z.ZodTypeAny>(
   let lastError: unknown;
   for (const p of providers) {
     try {
-      const model = p.model();
+      const model = p.model() as any;
       if (schema) {
         const result = await generateObject({
           model,
@@ -143,7 +143,7 @@ export async function generateJson<T extends z.ZodTypeAny>(
           prompt: input.prompt,
           temperature: input.temperature,
           maxOutputTokens: input.maxOutputTokens,
-        });
+        } as any);
         return result.object;
       } else {
         // Legacy path: generate text-like JSON? But we want structured; require schema going forward
