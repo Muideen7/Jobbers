@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 import { applicationStageRank } from "@/lib/workspace/application-rules";
 import { APPLICATION_STATUSES } from "@/lib/workspace/constants";
@@ -31,7 +31,13 @@ const createApplicationSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const insforge = await createInsforgeServer();
 
     const stageParam = req.nextUrl.searchParams.get("stage");
@@ -106,7 +112,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const insforge = await createInsforgeServer();
 
     const json = await req.json().catch(() => null);

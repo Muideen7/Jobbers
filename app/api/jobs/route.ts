@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 import { parseJobSearch } from "@/lib/search-query";
 import { MATCH_THRESHOLD } from "@/lib/utils";
@@ -10,7 +10,13 @@ const PAGE_SIZE = 20;
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const insforge = await createInsforgeServer();
 
     const { searchParams } = req.nextUrl;

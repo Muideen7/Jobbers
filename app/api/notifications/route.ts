@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createInsforgeServer } from "@/lib/insforge-server";
 
 /**
@@ -33,7 +33,13 @@ type ResearchedJobRow = {
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const insforge = await createInsforgeServer();
 
     const [runsResult, researchedResult] = await Promise.all([
