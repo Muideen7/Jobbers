@@ -28,7 +28,7 @@ export interface Resume {
   template: "classic" | "modern" | "minimal" | null;
   storage_path: string | null;
   file_size: number | null;
-  content: Record<string, any> | null;
+  content: Record<string, unknown> | null;
   is_primary: boolean;
   source_job_id: string | null;
   created_at: string;

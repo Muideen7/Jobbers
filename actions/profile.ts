@@ -239,7 +239,7 @@ export async function uploadResume(
     } else {
       // Has primary; keep it primary (or we can allow multiple; per rules primary exists). 
       // Still ensure this uploaded file is represented as a row if none matches storage_path
-      const hasMatching = existingResumes.some((r) => (r as any).storage_path === path);
+      const hasMatching = existingResumes.some((r) => (r as { storage_path?: string | null }).storage_path === path);
       if (!hasMatching) {
         await insforge.database.from("resumes").insert([
           {

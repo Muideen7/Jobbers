@@ -15,27 +15,27 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     if (!json || typeof json !== "object") {
       return NextResponse.json({ success: false, error: "Invalid body" }, { status: 400 });
     }
-    const { action, name, is_primary } = json as any;
+    const body = json as { action?: string; name?: string; is_primary?: boolean };
 
-    if (action === "set_primary" || is_primary === true) {
+    if (body.action === "set_primary" || body.is_primary) {
       const ok = await setPrimaryResume(id, user.id);
       return NextResponse.json({ success: ok });
     }
-    if (action === "rename" && typeof name === "string" && name.trim()) {
-      const resume = await updateResume(id, user.id, { name: name.trim() });
+    if (body.action === "rename" && typeof body.name === "string" && body.name.trim()) {
+      const resume = await updateResume(id, user.id, { name: body.name.trim() });
       return NextResponse.json({ success: !!resume });
     }
     // Generic update fallback
-    const updates: Record<string, any> = {};
-    if (typeof name === "string" && name.trim()) updates.name = name.trim();
-    if (is_primary === true) {
+    const updates: Record<string, unknown> = {};
+    if (typeof body.name === "string" && body.name.trim()) updates.name = body.name.trim();
+    if (body.is_primary) {
       updates.is_primary = true;
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ success: false, error: "No valid fields" }, { status: 400 });
     }
-    const resume = await updateResume(id, user.id, updates);
-    if (updates.is_primary && resume) {
+    const resume = await updateResume(id, user.id, updates as Partial<import("@/types").Resume>);
+    if ((updates.is_primary as boolean) && resume) {
       await setPrimaryResume(id, user.id);
     }
     return NextResponse.json({ success: !!resume });
@@ -78,7 +78,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
         .order("created_at", { ascending: false })
         .limit(1);
       if (latest && latest.length > 0) {
-        const r = latest[0] as any;
+        const r = latest[0] as { id: string };
         await setPrimaryResume(r.id, user.id);
       } else {
         await insforge.database.from("profiles").update({ resume_pdf_url: null }).eq("id", user.id);
