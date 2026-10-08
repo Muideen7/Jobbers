@@ -153,7 +153,6 @@ export async function uploadResume(
   formData: FormData,
 ): Promise<{ success: boolean; error?: string }> {
   // requireUser must be outside try/catch — redirect() throws NEXT_REDIRECT
-  // which would otherwise be caught and swallowed as a generic error.
   const user = await requireUser();
 
   try {
@@ -170,6 +169,7 @@ export async function uploadResume(
       return { success: false, error: "File must be under 2MB" };
     }
 
+    const fileSize = file.size;
     const path = `${user.id}/resume.pdf`;
 
     // SDK has no upsert option — remove existing file first, then upload fresh
@@ -185,7 +185,6 @@ export async function uploadResume(
     }
 
     // Store the storage path, not a public URL — bucket is private.
-    // Download happens via /api/resume/download which authenticates server-side.
     const { error: dbError } = await insforge.database
       .from("profiles")
       .update({ resume_pdf_url: path })
@@ -196,7 +195,67 @@ export async function uploadResume(
       return { success: false, error: "Failed to save resume URL" };
     }
 
+    // Ensure there's a primary resumes row for this user
+    const { data: existingResumes } = await insforge.database
+      .from("resumes")
+      .select("id, is_primary")
+      .eq("user_id", user.id);
+    if (!existingResumes || existingResumes.length === 0) {
+      await insforge.database.from("resumes").insert([
+        {
+          user_id: user.id,
+          name: "Uploaded resume",
+          kind: "uploaded",
+          storage_path: path,
+          file_size: fileSize,
+          is_primary: true,
+          template: null,
+          content: null,
+          target_role: null,
+          target_company: null,
+          source_job_id: null,
+        },
+      ]);
+    } else if (!existingResumes.some((r) => r.is_primary)) {
+      // Make the most recent? we just uploaded; set the one with this storage_path primary
+      await insforge.database.from("resumes").update({ is_primary: false }).eq("user_id", user.id);
+      await insforge.database
+        .from("resumes")
+        .update({ is_primary: true, storage_path: path, file_size: fileSize, name: "Uploaded resume", kind: "uploaded" })
+        .eq("user_id", user.id)
+        .eq("storage_path", path);
+      // If no exact match, just take the first? fallback
+      if ((await (async () => {
+        const { data } = await insforge.database
+          .from("resumes")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_primary", true)
+          .maybeSingle();
+        return !data;
+      })())) {
+        await insforge.database.from("resumes").update({ is_primary: true }).eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+      }
+    } else {
+      // Has primary; keep it primary (or we can allow multiple; per rules primary exists). 
+      // Still ensure this uploaded file is represented as a row if none matches storage_path
+      const hasMatching = existingResumes.some((r) => (r as any).storage_path === path);
+      if (!hasMatching) {
+        await insforge.database.from("resumes").insert([
+          {
+            user_id: user.id,
+            name: "Uploaded resume",
+            kind: "uploaded",
+            storage_path: path,
+            file_size: fileSize,
+            is_primary: false,
+          },
+        ]);
+      }
+    }
+
     revalidatePath("/profile");
+    revalidatePath("/resumes");
     return { success: true };
   } catch (error) {
     console.error("[actions/profile] uploadResume", error);
