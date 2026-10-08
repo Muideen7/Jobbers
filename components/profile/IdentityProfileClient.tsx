@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { parse } from "date-fns";
+
 import { saveProfile } from "@/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
@@ -49,18 +49,12 @@ export function IdentityProfileClient({ profile }: Props) {
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [countryCode] = useState("+234");
   const [gender, setGender] = useState("Prefer not to answer");
-  const [dob, setDob] = useState<Date | null>(() => {
-    try {
-      return parse("Jul 7, 2000", "MMM d, yyyy", new Date());
-    } catch {
-      return null;
-    }
-  });
-  const [country, setCountry] = useState("Nigeria");
-  const [state, setState] = useState("Lagos");
-  const [city, setCity] = useState("Lagos");
-  const [postalCode, setPostalCode] = useState("104101");
-  const [streetAddress, setStreetAddress] = useState(profile?.location ?? "24 Austin obasuke street ikorodu Lagos Nigeria");
+  const [dob, setDob] = useState<Date | null>(null);
+  const [country, setCountry] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [streetAddress, setStreetAddress] = useState(profile?.location ?? "");
   const [workLocationPref, setWorkLocationPref] = useState("Flexible / no preference");
   const [willingToRelocate, setWillingToRelocate] = useState("Yes");
 
@@ -75,18 +69,18 @@ export function IdentityProfileClient({ profile }: Props) {
   const [requiresSponsorship, setRequiresSponsorship] = useState("No");
 
   // EEO
-  const [ethnicity, setEthnicity] = useState("Black / African Descent");
+  const [ethnicity, setEthnicity] = useState("Prefer not to say");
   const [veteranStatus, setVeteranStatus] = useState("Not a veteran");
   const [disabilityStatus, setDisabilityStatus] = useState("No disability");
 
   // Application Defaults
-  const [currentTitle, setCurrentTitle] = useState(profile?.current_title ?? "Staff Frontend Engineer");
-  const [experienceLevel, setExperienceLevel] = useState(profile?.experience_level ?? "Senior");
-  const [yearsExperience, setYearsExperience] = useState(String(profile?.years_experience ?? 5));
-  const [jobTitlesSeeking, setJobTitlesSeeking] = useState((profile?.job_titles_seeking ?? ["Frontend Engineer", "React Specialist"]).join(", "));
-  const [remotePreference] = useState(profile?.remote_preference ?? "Any");
-  const [salaryExpectation, setSalaryExpectation] = useState(profile?.salary_expectation ?? "$120,000 / year");
-  const [preferredLocations] = useState((profile?.preferred_locations ?? ["Lagos, Nigeria", "Remote"]).join(", "));
+  const [currentTitle, setCurrentTitle] = useState(profile?.current_title ?? "");
+  const [experienceLevel, setExperienceLevel] = useState(profile?.experience_level ?? "");
+  const [yearsExperience, setYearsExperience] = useState(profile?.years_experience != null ? String(profile.years_experience) : "");
+  const [jobTitlesSeeking, setJobTitlesSeeking] = useState((profile?.job_titles_seeking ?? []).join(", "));
+  const [remotePreference] = useState(profile?.remote_preference ?? "");
+  const [salaryExpectation, setSalaryExpectation] = useState(profile?.salary_expectation ?? "");
+  const [preferredLocations] = useState((profile?.preferred_locations ?? []).join(", "));
 
   // 1. Restore local draft if saved and newer than mount. Deferred with a
   // microtask so the state updates aren't applied synchronously inside the
@@ -227,18 +221,18 @@ export function IdentityProfileClient({ profile }: Props) {
         currentTitle,
         experienceLevel,
         yearsExperience,
-        skills: profile?.skills ?? ["React", "TypeScript", "Next.js", "Node.js", "Tailwind CSS"],
-        industries: profile?.industries ?? ["Technology", "Software"],
+        skills: profile?.skills ?? [],
+        industries: profile?.industries ?? [],
         workEntries,
-        degree: profile?.education?.degree ?? "Bachelor's",
-        fieldOfStudy: profile?.education?.field ?? "Computer Science",
-        institution: profile?.education?.institution ?? "University of Lagos",
-        graduationYear: profile?.education?.graduation_year ?? "2022",
+        degree: profile?.education?.degree ?? "",
+        fieldOfStudy: profile?.education?.field ?? "",
+        institution: profile?.education?.institution ?? "",
+        graduationYear: profile?.education?.graduation_year ?? "",
         jobTitlesSeeking: jobTitlesSeeking.split(",").map((s) => s.trim()).filter(Boolean),
         remotePreference,
         salaryExpectation,
         preferredLocations: preferredLocations.split(",").map((s) => s.trim()).filter(Boolean),
-        coverLetterTone: profile?.cover_letter_tone ?? "Professional",
+        coverLetterTone: profile?.cover_letter_tone ?? "",
       });
 
       if (res.success) {
