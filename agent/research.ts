@@ -2,7 +2,7 @@ import { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
 
 import { getBrowserbase } from "@/lib/browserbase";
-import { generateJson, getGeminiModel } from "@/lib/llm";
+import { generateJson } from "@/lib/llm";
 import type {
   CompanyResearchDossier,
   Job,
