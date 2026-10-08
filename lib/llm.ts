@@ -18,14 +18,14 @@ export type GenerateJsonInput = {
 
 type ProviderAttempt = {
   id: "groq" | "openrouter";
-  model: () => any;
+  model: () => unknown;
 };
 
 let openRouterProvider: ReturnType<typeof createOpenRouter> | null = null;
 
 function getOpenRouterProvider() {
   if (openRouterProvider) return openRouterProvider;
-  const env: any = (globalThis as any).process?.env ?? {};
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
   const openrouterKey = env.OPENROUTER_API_KEY;
   if (!openrouterKey) {
     throw new Error("OPENROUTER_API_KEY is not set. Add it to .env.local.");
@@ -35,7 +35,7 @@ function getOpenRouterProvider() {
 }
 
 function getProviderOrder(): ProviderAttempt[] {
-  const env: any = (globalThis as any).process?.env ?? {};
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
   const order = typeof env.AI_PROVIDER_ORDER === "string" ? env.AI_PROVIDER_ORDER.trim().toLowerCase() : "";
   const groqModelEnv = env.GROQ_MODEL;
   const openrouterModelEnv = env.OPENROUTER_MODEL;
@@ -58,14 +58,14 @@ function getProviderOrder(): ProviderAttempt[] {
 
   return order
     .split(",")
-    .map((p: any) => String(p).trim())
+    .map((p: unknown) => String(p).trim())
     .filter(Boolean)
-    .map((p: any): ProviderAttempt | null => {
+    .map((p: string): ProviderAttempt | null => {
       if (p === "groq") {
         return {
           id: "groq",
           model: () => {
-            const env: any = (globalThis as any).process?.env ?? {};
+            const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
             const groqModelEnv = env.GROQ_MODEL;
             return groq((groqModelEnv ?? "").trim() || DEFAULT_GROQ_MODEL);
           },
@@ -75,7 +75,7 @@ function getProviderOrder(): ProviderAttempt[] {
         return {
           id: "openrouter",
           model: () => {
-            const env: any = (globalThis as any).process?.env ?? {};
+            const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
             const openrouterModelEnv = env.OPENROUTER_MODEL;
             return getOpenRouterProvider().chat(
               (openrouterModelEnv ?? "").trim() || DEFAULT_OPENROUTER_MODEL,
