@@ -36,7 +36,11 @@ Update this file after every completed feature. Any AI agent reading this should
   3. *Workplace Remote Expansion*: `isRemoteListing` now matches `worldwide`, `anywhere`, `wfh`, `virtual`, and `work from home` in addition to `remote`.
   4. *Search Input Sync*: Hero search inputs (`searchTitle`, `searchLocation`) are now bidirectionally bound to `filters.query` and `filters.location` for instant real-time filtering as the user types.
   5. *Active Filter Badges*: Updated `ResultsBar.tsx` to render removable badges for all active filters (salary floor, remote, AI focus, job types, levels, posted window, recently closed) with one-click removal.
-  All 168 tests pass, TypeScript clean, ESLint clean.
+- **Profile Form Persistence & Schema Additions**: Fixed profile form data loss on save where fields (`city`, `postal_code`, `date_of_birth`, `gender`, `email`, `middle_name`, `github_url`, `twitter_url`, etc.) were omitted from `saveProfile()` payload and unpopulated during state initialization.
+  1. Created additive database migration `migrations/20261016000000_add-extended-profile-fields.sql` adding nullable columns with fallback resilience.
+  2. Updated `Profile` TypeScript definitions in `types/index.ts` and `ProfileFormData` in `actions/profile.ts`.
+  3. Added dual-layer client persistence in `IdentityProfileClient.tsx`: binds all fields directly to server `profile` state, restores from localStorage draft/saved cache as fallback, and saves all fields through `saveProfile()`.
+- **Avatar Dropdown Signout Fix (`PostHogLogoutLink.tsx`)**: Replaced `<form method="POST">` with an async `button` handler using `keepalive: true` and `window.location.href = "/"`. This resolves the issue where closing the user avatar dropdown unmounted the form before the native POST submission completed.
 **Next:** Prompt 4 — Applications board (Kanban). The data layer, the
 `?tab=` vocabulary and the status vocabulary (`APPLICATION_STAGES`) it needs
 already exist; Prompt 5 (job detail, five tabs) follows, and note that

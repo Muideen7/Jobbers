@@ -29,6 +29,7 @@ const TABS: { key: TabKey; label: string; icon: typeof User }[] = [
 ];
 
 const PROFILE_DRAFT_STORAGE_KEY = "jobbers_profile_form_draft";
+const PROFILE_SAVED_EXTENDED_KEY = "jobbers_profile_saved_extended";
 
 export function IdentityProfileClient({ profile }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("personal");
@@ -43,46 +44,60 @@ export function IdentityProfileClient({ profile }: Props) {
   const names = (profile?.full_name ?? "").split(" ");
   const [firstName, setFirstName] = useState(names[0] ?? "");
   const [lastName, setLastName] = useState(names.slice(1).join(" ") ?? "");
-  const [middleName, setMiddleName] = useState("");
-  const [preferredName, setPreferredName] = useState(names[0] ?? "");
-  const [email, setEmail] = useState("");
+  const [middleName, setMiddleName] = useState(profile?.middle_name ?? "");
+  const [preferredName, setPreferredName] = useState(profile?.preferred_name ?? (names[0] ?? ""));
+  const [email, setEmail] = useState(profile?.email ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [countryCode] = useState("+234");
-  const [gender, setGender] = useState("Prefer not to answer");
-  const [dob, setDob] = useState<Date | null>(null);
-  const [country, setCountry] = useState("");
-  const [state, setState] = useState("");
-  const [city, setCity] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [streetAddress, setStreetAddress] = useState(profile?.location ?? "");
-  const [workLocationPref, setWorkLocationPref] = useState("Flexible / no preference");
-  const [willingToRelocate, setWillingToRelocate] = useState("Yes");
+  const [gender, setGender] = useState(profile?.gender ?? "Prefer not to answer");
+  const [dob, setDob] = useState<Date | null>(
+    profile?.date_of_birth ? new Date(profile.date_of_birth) : null
+  );
+  const [country, setCountry] = useState(profile?.country ?? "");
+  const [state, setState] = useState(profile?.state ?? "");
+  const [city, setCity] = useState(profile?.city ?? "");
+  const [postalCode, setPostalCode] = useState(profile?.postal_code ?? "");
+  const [streetAddress, setStreetAddress] = useState(
+    profile?.street_address ?? (profile?.location ?? "")
+  );
+  const [workLocationPref, setWorkLocationPref] = useState(
+    profile?.work_location_pref ?? "Flexible / no preference"
+  );
+  const [willingToRelocate, setWillingToRelocate] = useState(
+    profile?.willing_to_relocate ?? "Yes"
+  );
 
   // Links & Work Tab State
   const [linkedinUrl, setLinkedinUrl] = useState(profile?.linkedin_url ?? "");
   const [portfolioUrl, setPortfolioUrl] = useState(profile?.portfolio_url ?? "");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [twitterUrl, setTwitterUrl] = useState("");
+  const [githubUrl, setGithubUrl] = useState(profile?.github_url ?? "");
+  const [twitterUrl, setTwitterUrl] = useState(profile?.twitter_url ?? "");
 
   // Work Authorization
   const [workAuth, setWorkAuth] = useState(profile?.work_authorization ?? "Citizen");
-  const [requiresSponsorship, setRequiresSponsorship] = useState("No");
+  const [requiresSponsorship, setRequiresSponsorship] = useState(
+    profile?.requires_sponsorship ?? "No"
+  );
 
   // EEO
-  const [ethnicity, setEthnicity] = useState("Prefer not to say");
-  const [veteranStatus, setVeteranStatus] = useState("Not a veteran");
-  const [disabilityStatus, setDisabilityStatus] = useState("No disability");
+  const [ethnicity, setEthnicity] = useState(profile?.ethnicity ?? "Prefer not to say");
+  const [veteranStatus, setVeteranStatus] = useState(profile?.veteran_status ?? "Not a veteran");
+  const [disabilityStatus, setDisabilityStatus] = useState(profile?.disability_status ?? "No disability");
 
   // Application Defaults
   const [currentTitle, setCurrentTitle] = useState(profile?.current_title ?? "");
   const [experienceLevel, setExperienceLevel] = useState(profile?.experience_level ?? "");
-  const [yearsExperience, setYearsExperience] = useState(profile?.years_experience != null ? String(profile.years_experience) : "");
-  const [jobTitlesSeeking, setJobTitlesSeeking] = useState((profile?.job_titles_seeking ?? []).join(", "));
+  const [yearsExperience, setYearsExperience] = useState(
+    profile?.years_experience != null ? String(profile.years_experience) : ""
+  );
+  const [jobTitlesSeeking, setJobTitlesSeeking] = useState(
+    (profile?.job_titles_seeking ?? []).join(", ")
+  );
   const [remotePreference] = useState(profile?.remote_preference ?? "");
   const [salaryExpectation, setSalaryExpectation] = useState(profile?.salary_expectation ?? "");
   const [preferredLocations] = useState((profile?.preferred_locations ?? []).join(", "));
 
-  // 1. Restore local draft if saved and newer than mount. Deferred with a
+  // 1. Restore local saved cache or draft if saved. Deferred with a
   // microtask so the state updates aren't applied synchronously inside the
   // effect body (which trips react-hooks/set-state-in-effect); the restored
   // values, timing and hydration safety are unchanged — it still runs only on
@@ -90,6 +105,32 @@ export function IdentityProfileClient({ profile }: Props) {
   useEffect(() => {
     queueMicrotask(() => {
       try {
+        // First check locally saved extended values if the backend hasn't loaded them yet
+        const rawSaved = localStorage.getItem(PROFILE_SAVED_EXTENDED_KEY);
+        if (rawSaved) {
+          const saved = JSON.parse(rawSaved);
+          if (saved && typeof saved === "object") {
+            if (saved.middleName && !profile?.middle_name) setMiddleName(saved.middleName);
+            if (saved.preferredName && !profile?.preferred_name) setPreferredName(saved.preferredName);
+            if (saved.email && !profile?.email) setEmail(saved.email);
+            if (saved.gender && !profile?.gender) setGender(saved.gender);
+            if (saved.dob && !profile?.date_of_birth) setDob(new Date(saved.dob));
+            if (saved.country && !profile?.country) setCountry(saved.country);
+            if (saved.state && !profile?.state) setState(saved.state);
+            if (saved.city && !profile?.city) setCity(saved.city);
+            if (saved.postalCode && !profile?.postal_code) setPostalCode(saved.postalCode);
+            if (saved.streetAddress && !profile?.street_address) setStreetAddress(saved.streetAddress);
+            if (saved.workLocationPref && !profile?.work_location_pref) setWorkLocationPref(saved.workLocationPref);
+            if (saved.willingToRelocate && !profile?.willing_to_relocate) setWillingToRelocate(saved.willingToRelocate);
+            if (saved.githubUrl && !profile?.github_url) setGithubUrl(saved.githubUrl);
+            if (saved.twitterUrl && !profile?.twitter_url) setTwitterUrl(saved.twitterUrl);
+            if (saved.requiresSponsorship && !profile?.requires_sponsorship) setRequiresSponsorship(saved.requiresSponsorship);
+            if (saved.ethnicity && !profile?.ethnicity) setEthnicity(saved.ethnicity);
+            if (saved.veteranStatus && !profile?.veteran_status) setVeteranStatus(saved.veteranStatus);
+            if (saved.disabilityStatus && !profile?.disability_status) setDisabilityStatus(saved.disabilityStatus);
+          }
+        }
+
         const rawDraft = localStorage.getItem(PROFILE_DRAFT_STORAGE_KEY);
         if (!rawDraft) return;
         const draft = JSON.parse(rawDraft);
@@ -102,6 +143,7 @@ export function IdentityProfileClient({ profile }: Props) {
         if (draft.email !== undefined) setEmail(draft.email);
         if (draft.phone !== undefined) setPhone(draft.phone);
         if (draft.gender !== undefined) setGender(draft.gender);
+        if (draft.dob) setDob(new Date(draft.dob));
         if (draft.country !== undefined) setCountry(draft.country);
         if (draft.state !== undefined) setState(draft.state);
         if (draft.city !== undefined) setCity(draft.city);
@@ -127,7 +169,7 @@ export function IdentityProfileClient({ profile }: Props) {
         // Ignore parse/storage issues
       }
     });
-  }, []);
+  }, [profile]);
 
   // 2. Persist ongoing edits to localStorage so page refreshes or connection drops never lose inputs
   useEffect(() => {
@@ -140,6 +182,7 @@ export function IdentityProfileClient({ profile }: Props) {
         email,
         phone,
         gender,
+        dob: dob ? dob.toISOString() : null,
         country,
         state,
         city,
@@ -174,6 +217,7 @@ export function IdentityProfileClient({ profile }: Props) {
     email,
     phone,
     gender,
+    dob,
     country,
     state,
     city,
@@ -199,7 +243,7 @@ export function IdentityProfileClient({ profile }: Props) {
 
   function handleSave() {
     const fullName = `${firstName} ${lastName}`.trim();
-    const locationStr = streetAddress || `${city}, ${state}, ${country}`;
+    const locationStr = streetAddress || `${city}, ${state}, ${country}`.replace(/^[,\s]+|[,\s]+$/g, "");
 
     const workEntries = (profile?.work_experience ?? []).map((w) => ({
       company: w.company,
@@ -213,11 +257,31 @@ export function IdentityProfileClient({ profile }: Props) {
     startTransition(async () => {
       const res = await saveProfile({
         fullName,
+        firstName,
+        lastName,
+        middleName,
+        preferredName,
+        email,
         phone,
         location: locationStr,
+        gender,
+        dob: dob ? dob.toISOString().split("T")[0] : undefined,
+        country,
+        state,
+        city,
+        postalCode,
+        streetAddress,
+        workLocationPref,
+        willingToRelocate,
         linkedinUrl,
         portfolioUrl,
+        githubUrl,
+        twitterUrl,
         workAuth,
+        requiresSponsorship,
+        ethnicity,
+        veteranStatus,
+        disabilityStatus,
         currentTitle,
         experienceLevel,
         yearsExperience,
@@ -238,6 +302,29 @@ export function IdentityProfileClient({ profile }: Props) {
       if (res.success) {
         try {
           localStorage.removeItem(PROFILE_DRAFT_STORAGE_KEY);
+          localStorage.setItem(
+            PROFILE_SAVED_EXTENDED_KEY,
+            JSON.stringify({
+              middleName,
+              preferredName,
+              email,
+              gender,
+              dob: dob ? dob.toISOString() : null,
+              country,
+              state,
+              city,
+              postalCode,
+              streetAddress,
+              workLocationPref,
+              willingToRelocate,
+              githubUrl,
+              twitterUrl,
+              requiresSponsorship,
+              ethnicity,
+              veteranStatus,
+              disabilityStatus,
+            })
+          );
         } catch {
           // ignore
         }

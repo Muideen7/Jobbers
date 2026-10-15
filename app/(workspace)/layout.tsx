@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { Suspense, type ReactNode } from "react";
 
 import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";

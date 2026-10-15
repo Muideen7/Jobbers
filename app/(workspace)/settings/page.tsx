@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import { Settings2, User, Bell, Shield, LogOut } from "lucide-react";
 
