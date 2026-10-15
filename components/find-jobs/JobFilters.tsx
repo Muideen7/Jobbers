@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, ChevronDown } from "lucide-react";
+import { JobBoardSelect } from "./JobBoardSelect";
 
 export type MatchFilter = "all" | "high" | "low";
 export type SortOption = "score" | "newest" | "oldest";
@@ -12,6 +13,8 @@ type Props = {
   onMatchFilterChange: (value: MatchFilter) => void;
   sortOption: SortOption;
   onSortOptionChange: (value: SortOption) => void;
+  jobBoard?: string;
+  onJobBoardChange?: (value: string) => void;
 };
 
 const MATCH_FILTER_LABELS: Record<MatchFilter, string> = {
@@ -33,6 +36,8 @@ export function JobFilters({
   onMatchFilterChange,
   sortOption,
   onSortOptionChange,
+  jobBoard,
+  onJobBoardChange,
 }: Props) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -50,7 +55,13 @@ export function JobFilters({
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {onJobBoardChange && (
+          <JobBoardSelect
+            value={jobBoard ?? "all"}
+            onChange={onJobBoardChange}
+          />
+        )}
         <div className="relative">
           <select
             value={matchFilter}

@@ -84,9 +84,7 @@ const PASTEL_BACKGROUNDS = [
   "bg-pastel-blue",
   "bg-pastel-mint",
   "bg-pastel-pink",
-  "bg-pastel-lilac",
-  "bg-pastel-cream",
-  "bg-pastel-aqua",
+  "bg-pastel-yellow",
 ];
 
 function backgroundFor(index: number) {
@@ -529,7 +527,7 @@ export function LiveOpportunities() {
         </div>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {liveJobs.map((job, index) => (
+          {liveJobs.slice(0, 6).map((job, index) => (
             <article
               key={job.id}
               className={`${backgroundFor(index)} rounded-[28px] p-6 sm:p-7 flex flex-col justify-between border border-ink/[0.04] min-h-[300px] sm:min-h-[320px] transition-all duration-200`}
@@ -605,7 +603,7 @@ export function LiveOpportunities() {
 
         <div className="mt-12 text-center">
           <Link href="/jobs" className="btn btn-secondary cursor-pointer">
-            Browse all matched roles
+            Browse more
           </Link>
         </div>
       </div>

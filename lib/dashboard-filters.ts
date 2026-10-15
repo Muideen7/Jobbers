@@ -1,4 +1,5 @@
 import type { Job } from "@/types";
+import { matchesJobBoard } from "./job-boards.ts";
 
 /**
  * Pure filtering helpers for the workspace job feed. Kept free of React and
@@ -15,6 +16,7 @@ import type { Job } from "@/types";
  * - Posted within: window over `found_at`.
  * - Salary floor: first annual figure in the free-text salary string.
  * - Match score threshold + free-text query: unchanged.
+ * - Job board: source board filter from the multi-board registry.
  */
 
 export type JobTypeFilter =
@@ -42,6 +44,8 @@ export type PostedWithinFilter = "any" | "24h" | "3d" | "week";
 export type SalaryFloor = 0 | 60 | 100 | 150 | 200;
 
 export type DashboardFilters = {
+  /** Filter by specific job board/source registry id (or "all"). */
+  jobBoard: string;
   /** Instant title / skill / company search (top-bar + feed). */
   query: string;
   /** Workplace: only list remote roles. */
@@ -65,6 +69,7 @@ export type DashboardFilters = {
 };
 
 export const DEFAULT_DASHBOARD_FILTERS: DashboardFilters = {
+  jobBoard: "all",
   query: "",
   remoteOnly: false,
   aiFocus: false,
@@ -125,7 +130,7 @@ export function isRemoteListing(
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  return /\bremote\b/i.test(haystack);
+  return /\b(remote|anywhere|worldwide|wfh|virtual|work\s*from\s*home|telecommute|distributed)\b/i.test(haystack);
 }
 
 /** AI / ML focused listing heuristic over title, description and skills. */
@@ -156,16 +161,19 @@ const JOB_TYPE_PATTERNS: Record<JobTypeFilter, RegExp> = {
 };
 
 export function matchesJobType(
-  job: Pick<Job, "job_type">,
+  job: Pick<Job, "job_type"> & { title?: string | null },
   filter: JobTypeFilter,
 ): boolean {
-  return JOB_TYPE_PATTERNS[filter].test(job.job_type ?? "");
+  const pattern = JOB_TYPE_PATTERNS[filter];
+  if (pattern.test(job.job_type ?? "")) return true;
+  if (job.title && pattern.test(job.title)) return true;
+  return false;
 }
 
 const LEVEL_PATTERNS: Record<LevelFilter, RegExp> = {
   intern: /\bintern(ship)?\b/i,
-  junior: /\bjunior\b|\bjr\b/i,
-  mid: /\bmid([\s-]+level)?\b/i,
+  junior: /\b(junior|jr\.?|entry[\s-]?level|associate|graduate)\b/i,
+  mid: /\b(mid([\s-]+level)?|intermediate|middle)\b/i,
   senior: /\bsenior\b|\bsr\.?\b/i,
   staff: /\bstaff\b/i,
   principal: /\bprincipal\b/i,
@@ -206,13 +214,13 @@ export function matchesPostedWithin(
 }
 
 /**
- * Whether the role has been flagged as closed. The scraper pipeline does not
- * record closures yet, so today this narrows to an empty set — the sidebar
- * control is wired to the engine ahead of that data landing.
+ * Whether the role has been flagged as closed. Checks closed_at timestamp or closed status.
  */
 export function isRecentlyClosed(job: Job): boolean {
   const closedAt = (job as Job & { closed_at?: string | null }).closed_at;
-  return typeof closedAt === "string" && closedAt.length > 0;
+  if (typeof closedAt === "string" && closedAt.length > 0) return true;
+  const status = (job as Job & { status?: string | null }).status;
+  return status === "closed";
 }
 
 export function matchesQuery(job: Job, rawQuery: string): boolean {
@@ -250,6 +258,9 @@ export function filterDashboardJobs(
   return jobs.filter((job) => {
     const score = job.match_score ?? 0;
     if (score < filters.minScore) return false;
+    if (filters.jobBoard && filters.jobBoard !== "all") {
+      if (!matchesJobBoard(job, filters.jobBoard)) return false;
+    }
     if (filters.remoteOnly && !isRemoteListing(job)) return false;
     if (filters.aiFocus && !isAiFocusListing(job)) return false;
     if (filters.recentlyClosed && !isRecentlyClosed(job)) return false;
@@ -261,7 +272,15 @@ export function filterDashboardJobs(
     }
     if (filters.levels.length > 0) {
       const derived = deriveJobLevels(job.title);
-      if (!filters.levels.some((level) => derived.includes(level))) return false;
+      const matchesExplicit = filters.levels.some((level) => derived.includes(level));
+      // Standard professional titles without seniority modifiers (e.g. "Software Engineer", "Frontend Developer")
+      // are standard mid-level roles:
+      const matchesImplicitMid =
+        filters.levels.includes("mid") &&
+        derived.length === 0 &&
+        Boolean(job.title && job.title.trim().length > 0);
+
+      if (!matchesExplicit && !matchesImplicitMid) return false;
     }
     if (!matchesPostedWithin(job, filters.postedWithin)) return false;
     if (!passesSalaryFloor(job, filters.salaryFloor)) return false;

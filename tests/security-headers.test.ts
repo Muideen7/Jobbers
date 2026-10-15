@@ -161,6 +161,9 @@ test("the non-proxy source excludes every session-gated route", () => {
     "/applications",
     "/resumes",
     "/resumes/abc",
+    "/analytics",
+    "/company-research",
+    "/settings",
   ]) {
     const path = owned.slice(1);
     assert.ok(!pattern.test(path), `${owned} must not match the static-CSP source`);

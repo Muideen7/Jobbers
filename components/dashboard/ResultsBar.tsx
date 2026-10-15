@@ -2,6 +2,7 @@
 
 import { Columns2, LayoutGrid, SlidersHorizontal, X } from "lucide-react";
 
+import { JOB_BOARDS } from "@/lib/job-boards";
 import type { DashboardFilters } from "@/lib/dashboard-filters";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +87,19 @@ export function ResultsBar({
             </button>
           </span>
         )}
+        {filters.query && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            &ldquo;{filters.query}&rdquo;
+            <button
+              type="button"
+              onClick={() => onChange({ query: "" })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove search query"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
         {filters.location && (
           <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
             {filters.location}
@@ -94,6 +108,128 @@ export function ResultsBar({
               onClick={() => onChange({ location: "" })}
               className="hover:text-text-primary cursor-pointer"
               aria-label="Remove location filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.jobBoard && filters.jobBoard !== "all" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            {JOB_BOARDS.find((b) => b.id === filters.jobBoard)?.label ?? filters.jobBoard}
+            <button
+              type="button"
+              onClick={() => onChange({ jobBoard: "all" })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove job board filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.remoteOnly && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            Remote only
+            <button
+              type="button"
+              onClick={() => onChange({ remoteOnly: false })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove remote filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.aiFocus && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-accent-muted px-2 py-0.5 text-[11px] font-medium text-accent">
+            AI / ML
+            <button
+              type="button"
+              onClick={() => onChange({ aiFocus: false })}
+              className="hover:text-accent-dark cursor-pointer"
+              aria-label="Remove AI focus filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.salaryFloor > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            ≥ ${filters.salaryFloor}k+
+            <button
+              type="button"
+              onClick={() => onChange({ salaryFloor: 0 })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove salary floor filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.postedWithin !== "any" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            {filters.postedWithin === "24h"
+              ? "Past 24h"
+              : filters.postedWithin === "3d"
+                ? "Past 3 days"
+                : "This week"}
+            <button
+              type="button"
+              onClick={() => onChange({ postedWithin: "any" })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove posted within filter"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )}
+        {filters.jobTypes.map((type) => (
+          <span
+            key={type}
+            className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium capitalize text-text-secondary"
+          >
+            {type}
+            <button
+              type="button"
+              onClick={() =>
+                onChange({
+                  jobTypes: filters.jobTypes.filter((t) => t !== type),
+                })
+              }
+              className="hover:text-text-primary cursor-pointer"
+              aria-label={`Remove ${type} filter`}
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        ))}
+        {filters.levels.map((level) => (
+          <span
+            key={level}
+            className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium capitalize text-text-secondary"
+          >
+            {level}
+            <button
+              type="button"
+              onClick={() =>
+                onChange({
+                  levels: filters.levels.filter((l) => l !== level),
+                })
+              }
+              className="hover:text-text-primary cursor-pointer"
+              aria-label={`Remove ${level} filter`}
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        ))}
+        {filters.recentlyClosed && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            Recently closed
+            <button
+              type="button"
+              onClick={() => onChange({ recentlyClosed: false })}
+              className="hover:text-text-primary cursor-pointer"
+              aria-label="Remove recently closed filter"
             >
               <X className="h-2.5 w-2.5" />
             </button>

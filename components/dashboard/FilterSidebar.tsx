@@ -3,6 +3,7 @@
 import { MapPin, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 
 import { ResumeDropzone } from "@/components/dashboard/ResumeDropzone";
+import { JobBoardSelect } from "@/components/find-jobs/JobBoardSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -112,6 +113,7 @@ function toggleIn<T>(list: T[], value: T): T[] {
  */
 export function FilterSidebar({ filters, onChange, onAppliedResume, hideResumeCard = false }: Props) {
   const activeFilterCount =
+    (filters.jobBoard && filters.jobBoard !== "all" ? 1 : 0) +
     (filters.remoteOnly ? 1 : 0) +
     (filters.aiFocus ? 1 : 0) +
     (filters.location.trim().length > 0 ? 1 : 0) +
@@ -124,6 +126,7 @@ export function FilterSidebar({ filters, onChange, onAppliedResume, hideResumeCa
 
   function handleResetAll() {
     onChange({
+      jobBoard: "all",
       remoteOnly: false,
       aiFocus: false,
       location: "",
@@ -176,9 +179,20 @@ export function FilterSidebar({ filters, onChange, onAppliedResume, hideResumeCa
           )}
         </div>
 
-        {/* Workplace */}
+        {/* Job Board / Source */}
         <div className="pt-4">
-          <SectionLabel>Workplace</SectionLabel>
+          <SectionLabel>Job Board</SectionLabel>
+          <div className="mt-2">
+            <JobBoardSelect
+              value={filters.jobBoard ?? "all"}
+              onChange={(boardId) => onChange({ jobBoard: boardId })}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        {/* Workplace */}
+        <FilterSection label="Workplace">
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Pill
               active={filters.remoteOnly}
@@ -193,7 +207,7 @@ export function FilterSidebar({ filters, onChange, onAppliedResume, hideResumeCa
               AI / ML roles
             </Pill>
           </div>
-        </div>
+        </FilterSection>
 
         {/* Location */}
         <FilterSection label="Location">

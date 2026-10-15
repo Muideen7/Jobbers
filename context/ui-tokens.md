@@ -134,13 +134,14 @@ className="bg-purple-500 text-gray-600"
   --color-art-fill-strong: #cbd5e1;
   --color-brand-navy: #1e3a8a;
 
-  /* Pastel card backgrounds for live opportunity results. */
-  --color-pastel-blue: #eef4ff;
-  --color-pastel-mint: #eefbf3;
-  --color-pastel-pink: #fdf2f8;
-  --color-pastel-lilac: #f6f0ff;
-  --color-pastel-cream: #fff7ed;
-  --color-pastel-aqua: #f0fdfa;
+  /* Pastel card backgrounds matching 4-color palette (lilac #e3dbfa, pink #fbe2f4, mint #d4f6ed, yellow #fde68a) */
+  --color-pastel-blue: #e3dbfa;
+  --color-pastel-mint: #d4f6ed;
+  --color-pastel-pink: #fbe2f4;
+  --color-pastel-lilac: #e3dbfa;
+  --color-pastel-cream: #fde68a;
+  --color-pastel-yellow: #fde68a;
+  --color-pastel-aqua: #d4f6ed;
 
   --color-success: #10b981;
   --color-success-alt: #00bc7d;
@@ -247,6 +248,7 @@ className="bg-purple-500 text-gray-600"
   --color-pastel-pink: color-mix(in srgb, var(--color-rose) 36%, var(--color-inverse));
   --color-pastel-lilac: color-mix(in srgb, var(--color-accent) 40%, var(--color-inverse));
   --color-pastel-cream: color-mix(in srgb, var(--color-amber) 30%, var(--color-inverse));
+  --color-pastel-yellow: color-mix(in srgb, var(--color-amber) 30%, var(--color-inverse));
   --color-pastel-aqua: color-mix(in srgb, var(--color-success-alt) 34%, var(--color-inverse));
 
   /* Decorative fills (bento cards, hero gradients, skyline art) and the warm

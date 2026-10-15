@@ -115,6 +115,9 @@ export const config = {
     "/jobs/:path*",
     "/applications/:path*",
     "/resumes/:path*",
+    "/analytics/:path*",
+    "/company-research/:path*",
     "/profile/:path*",
+    "/settings/:path*",
   ],
 };
