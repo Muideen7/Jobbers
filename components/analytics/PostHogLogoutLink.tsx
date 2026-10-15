@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { resetPostHogUser } from "@/lib/posthog-client";
 
@@ -12,23 +12,47 @@ type Props = {
 };
 
 export function PostHogLogoutLink({ children, className, onClick }: Props) {
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleLogout(e: React.MouseEvent) {
+    e.preventDefault();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      resetPostHogUser();
+    } catch {
+      // ignore PostHog analytics reset errors
+    }
+
+    try {
+      onClick?.();
+    } catch {
+      // ignore transient chrome closing errors
+    }
+
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+      });
+    } catch (err) {
+      console.error("[logout] fetch error", err);
+    } finally {
+      window.location.href = "/";
+    }
+  }
+
   return (
-    // `contents` drops the form's own box so the button becomes the direct flex
-    // item of whatever contains it — callers pass classes that mix layout
-    // (`mt-auto`, `gap-2`) with visual styling, so they must stay on the button
-    // to keep the desktop row and the mobile drawer laid out as before.
-    <form action="/api/auth/logout" method="POST" className="contents">
-      <button
-        type="submit"
-        aria-label="Sign out"
-        className={className}
-        onClick={() => {
-          resetPostHogUser();
-          onClick?.();
-        }}
-      >
-        {children}
-      </button>
-    </form>
+    <button
+      type="button"
+      aria-label="Sign out"
+      className={className}
+      onClick={handleLogout}
+      disabled={isSigningOut}
+    >
+      {children}
+    </button>
   );
 }

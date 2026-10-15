@@ -42,7 +42,13 @@ async function fetchJson(
   fetchImpl: typeof fetch,
   label: string,
 ): Promise<unknown> {
-  const response = await fetchImpl(url, { cache: "no-store" });
+  const response = await fetchImpl(url, {
+    cache: "no-store",
+    headers: {
+      "User-Agent": "Jobbers/1.0 (Mozilla/5.0; https://jobbers.match)",
+      Accept: "application/json",
+    },
+  });
   if (!response.ok) {
     throw new Error(`${label} API error: HTTP ${response.status}`);
   }

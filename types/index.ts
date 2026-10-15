@@ -16,11 +16,47 @@ export type MissingField =
   | "WORK EXPERIENCE"
   | "EDUCATION";
 
+export type ResumeKind = "uploaded" | "generated";
+
+export interface Resume {
+  id: string;
+  user_id: string;
+  name: string;
+  kind: ResumeKind;
+  target_role: string | null;
+  target_company: string | null;
+  template: "classic" | "modern" | "minimal" | null;
+  storage_path: string | null;
+  file_size: number | null;
+  content: Record<string, unknown> | null;
+  is_primary: boolean;
+  source_job_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string | null;
+  middle_name?: string | null;
+  preferred_name?: string | null;
   email: string | null;
   phone: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  street_address?: string | null;
+  work_location_pref?: string | null;
+  willing_to_relocate?: string | null;
+  github_url?: string | null;
+  twitter_url?: string | null;
+  requires_sponsorship?: string | null;
+  ethnicity?: string | null;
+  veteran_status?: string | null;
+  disability_status?: string | null;
   location: string | null;
   current_title: string | null;
   experience_level: string | null;

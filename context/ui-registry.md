@@ -56,31 +56,26 @@ Visual hierarchy and stage differentiation in `/applications` map directly to th
 ### Login Card
 
 File: components/auth/LoginCard.tsx
-Last updated: 2026-10-05
+Last updated: 2026-10-15
 
 | Property         | Class                                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| Background       | `bg-surface` outer shell with `landing-hero-glow` on the left auth storytelling panel                    |
-| Border           | `border border-border`, `border-b border-border` on mobile split, `lg:border-r` on desktop split        |
-| Border radius    | `rounded-3xl` outer shell (24px token), `rounded-full` on the small OAuth security badge, `rounded-md` buttons |
-| Text — primary   | Hero `text-[clamp(2.35rem,5vw,4.25rem)] font-semibold leading-[0.96] tracking-[-0.04em] text-text-slate`, form title `text-3xl font-semibold leading-9 text-text-primary` |
-| Text — secondary | `text-base leading-7 text-text-secondary sm:text-lg` for supporting copy, `text-sm leading-6 text-text-secondary` for form guidance |
-| Spacing          | Outer `mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1440px] items-center justify-center px-4 py-12 sm:px-6 lg:px-8`, panels `p-8 sm:p-10`, actions `mt-8 grid gap-3` |
-| Hover state      | Provider form buttons use `hover:bg-surface-secondary`; focus uses `focus-visible:outline-accent`        |
-| Shadow           | `shadow-card` on the outer auth shell                                                                   |
-| Accent usage     | `text-accent` on the InsForge security badge icon only                                                     |
+| Background       | `bg-surface` outer shell; right showcase panel uses `bg-surface-secondary/50` with subtle ambient pastel glow |
+| Border           | `border border-border` on outer shell; `border-t lg:border-t-0 lg:border-l border-border/70` between panels |
+| Border radius    | `rounded-[32px]` outer shell, `rounded-full` on Google and GitHub OAuth pill buttons, `rounded-2xl` on preview card |
+| Text — primary   | Form title `text-2xl font-extrabold tracking-tight text-text-primary sm:text-3xl`, quote `text-sm sm:text-base font-semibold leading-relaxed text-text-primary` |
+| Text — secondary | `text-xs text-text-secondary sm:text-sm`, `text-[11px] text-text-secondary` for author role and preview |
+| Spacing          | Outer `mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1440px] items-center justify-center px-4 py-8 sm:px-6 lg:px-8`, panels `p-8 sm:p-12` |
+| Hover state      | Social OAuth pill buttons `hover:bg-surface-secondary hover:border-border-muted`; preview card `hover:-translate-y-0.5` |
+| Shadow           | `shadow-2xl` on outer container, `shadow-card` on floating match preview card, `shadow-xs` on buttons    |
+| Accent usage     | `bg-accent text-accent-foreground` on top brand icon squircle; `text-accent` on quote marks and active dots; `bg-accent-muted` on badge and quote circle |
 
 **Provider icons — use `CompanyLogo`, not lucide.** The Google and GitHub buttons render
 `<CompanyLogo type="google" />` and `<CompanyLogo type="github" />` from
-`components/homepage/Logos.tsx` at `h-5 w-5 shrink-0`. Do **not** substitute a lucide glyph
-(`Globe`, `GitBranch`) or hand-roll an inline path: those are generic symbols, not the brands, and
-Google's mark is genuinely four-colour so a monochrome path would be a different logo rather than a
-tint of the real one. Google carries its own brand hex fills and ignores `currentColor`; GitHub is
-`fill="currentColor"` and therefore inherits the button's `text-text-primary`, which is why neither
-button needs a colour utility on the icon itself.
+`components/homepage/Logos.tsx` at `h-4 w-4 shrink-0`.
 
 **Pattern notes:**
-Auth screens use a two-panel shell: a left explanatory panel with the established landing glow treatment and a right focused action panel. Provider actions are token-driven bordered form buttons with lucide icons and no hardcoded provider colors.
+Pure OAuth architecture (Google and GitHub, no legacy email/password fields). Left panel displays the centered Jobbers brand mark, "Start with Jobbers" title, rounded pill OAuth buttons, and value propositions. Right panel features the floating live match agent preview card with brand pastel mesh and real user testimonial with rating laurels, author avatar, and pagination dots. OAuth actions use plain `<a>` tags to maintain strict Chromium CSP compliance.strict CSP compliance.
 
 ### App Navbar
 
@@ -717,6 +712,7 @@ Last updated: 2026-10-07 (Prompt 3 revamp)
 | Attribution     | `SourceCredits` renders only when `resolveSourceCredits(...)` is non-empty (Saved can be all-manual and credit nothing) |
 
 **Pattern notes:**
+- **Auto-discovery initial feed.** Opening the page without an existing search or prior saved jobs automatically triggers server-side live discovery via `searchAll` across all providers, scored against the user profile with `keywordScoreBatch`. The feed immediately renders live roles with real salaries, company logos, and source attribution badges, eliminating the empty state.
 - **State split.** `?tab=` and `?researched=1` are resolved *server-side*;
   filters, sort, view mode, pagination and the search inputs are client state.
   Nothing mirrors a server prop into `useState`, so a tab switch can never
@@ -972,14 +968,44 @@ Nine landing sections compose in `app/page.tsx`; all are Server Components excep
 | Filter pills  | five local `FilterPill` dropdowns in spec order — **Job Categories** (options from `data.facets.categories`), **Countries** (static market list; scopes the search via the `country` param), **Salary Range** (`any`/`50k`/`100k`/`150k`), **Skills** (static terms, word-matched in title+description), **Employment Type** (`any`/`fulltime`/`parttime`/`contract`/`internship`) — plus the dark **Clear Filter** `.btn-primary` pinned far right (`ml-auto`, disabled while nothing is selected) |
 | Pill behaviour | resting label = spec text; a selection turns the pill `bg-ink text-accent-foreground` and shows `label: value`; the menu is a `role="listbox"` with a check-marked option, closes on select / outside click / Escape, and right-aligns when it would overflow the viewport edge (224 px guard) |
 | Result header | `h3` **"Available Positions (Search Result: {count})"** (`totalCount.toLocaleString()`) with the spinner "Searching live roles…" or the rose error on the right |
-| Grid size     | `PUBLIC_RESULTS_PER_PAGE` (`lib/public-jobs.ts`) = **9** cards per fetch → a clean 3×3 at `lg`; the rest of the matched set (48-result cap) is one click away behind "Browse all matched roles" → `/find-jobs`, which `proxy.ts` redirects to `/login?next=…` for anonymous visitors, so seeing more always means signing in first |
+| Grid size     | `PUBLIC_RESULTS_PER_PAGE` (`lib/public-jobs.ts`) = **6** cards per fetch → a clean 2×3 at `lg`; the rest of the matched set (48-result cap) is one click away behind "Browse more" → `/jobs`, which `proxy.ts` redirects to `/login?next=…` for anonymous visitors, so seeing more always means signing in first |
 | Endpoint      | `GET /api/public/jobs?q=&filter=&category=&country=&salary=&skills=&employment=` — public, no auth, 5 min in-memory cache (key includes every facet param), multi-source via `searchAll` (JSearch → feeds → Adzuna fallback); response adds `data.facets.categories` |
 | Legacy filter | `filter` = `all` / `remote` (JSearch `work_from_home` + remote flag/title/location post-filter) / `fulltime` (unknown type counts as full-time) / `salary150` (verified numeric min ≥ $150k, sorted by salary desc) still accepted server-side — the UI no longer sends it; the chips were replaced by the dropdowns |
 | Debounce      | 350 ms on the search input; dropdown changes and Clear Filter fire immediately |
 | Race guard    | monotonic `requestId` ref discards out-of-order responses            |
-| Card pastels  | `PASTEL_BACKGROUNDS` 6-colour array indexed by result position        |
+| Card pastels  | `PASTEL_BACKGROUNDS` 4-colour palette (`bg-pastel-blue` [#e3dbfa], `bg-pastel-mint` [#d4f6ed], `bg-pastel-pink` [#fbe2f4], `bg-pastel-yellow` [#fde68a]) indexed by result position |
 | Company mark  | `CompanyLogo` when known, else a 2-letter initials badge              |
 | Gating        | every "View" button targets `/login` so a role cannot be opened anonymously |
 
 **Pattern notes:**
 `proxy.ts` matches only `/dashboard`, `/profile`, `/find-jobs`, so the landing page and `/api/public/jobs` stay reachable while every detail view stays gated. The endpoint is intentionally separate from the auth-gated `/api/jobs`, which scopes to `user_id` and returns the signed-in user's saved matches. `PublicJob` lives in `types/index.ts` rather than the route file so client components can import it without pulling in route-module code. On mount the effect defers its fetch through `queueMicrotask` to satisfy `react-hooks/set-state-in-effect`; `fetchJobs` keeps a stable identity via a `filtersRef` so the seed effect never refires when a dropdown changes. Since plan A7 the response also carries `data.sources[]` (sources of the rendered cards) and the section renders a `SourceCredits` line under the grid; cards default-sort by `postedAt` desc to mix sources, `PublicJob.id` is `source:externalId`, and an all-sources-failed run — not a missing Adzuna key — is what returns 502. The five dropdowns post-filter server-side, so `totalCount` always matches what the grid could show; `data.facets.categories` is computed *before* the category filter so the Job Categories dropdown never collapses to its own selection, and `country` both scopes `searchAll` (JSearch embeds the location in its query, Adzuna gets its market country, feeds ignore it) and post-filters via `matchesPublicCountry` — remote/unresolvable locations pass, clear other-country locations drop. Skill/category param sanitisation lives in `lib/public-jobs.ts` (`sanitizePublic*`, 5 terms × 40 chars / 80 chars) so an unauthenticated param never flows raw into a filter or cache key.
+
+### JobBoardSelect
+
+File: components/find-jobs/JobBoardSelect.tsx
+Last updated: 2026-10-15
+
+| Property | Value |
+| --- | --- |
+| Container | `relative inline-block` |
+| Input | `appearance-none rounded-lg border border-border bg-surface py-2 pl-8.5 pr-8 text-xs font-medium text-text-primary` |
+| Focus | `focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent` |
+| Free tier metadata | Each option displays board title and free-tier/keyless badge (e.g. `Free public feed`, `Free Algolia API`, `Free keyless API`, `Free ATS Index`, `Free tier API`) |
+| Icon | Lucide `Globe` icon (`h-3.5 w-3.5 text-text-muted`) on left, `ChevronDown` on right |
+
+**Pattern notes:**
+Integrates directly into `FilterSidebar` and `JobFilters`. Drives `filters.jobBoard` in `DashboardFilters` without hardcoded colors or paid APIs.
+
+### Wall of Love Testimonials Carousel
+
+File: components/homepage/WallOfLove.tsx
+Last updated: 2026-10-15
+
+| Property | Value |
+| --- | --- |
+| Carousel size | 8 diverse testimonials across Africa, Asia, Europe, Middle East, and Americas with mixed genders and engineering/design/data roles |
+| Interaction | Auto-advances every 5s; pauses on hover; Left/Right navigation arrow buttons; keyboard `ArrowLeft` / `ArrowRight` accessible |
+| Indicators | Interactive indicator dots (`bg-ink` when active, `bg-ink/20` when inactive) |
+| Cards | `rounded-[28px] border border-border bg-surface p-6 shadow-card` with location badge (`bg-surface-secondary text-text-secondary`) and 5-star ratings |
+| Photos | High-resolution editorial portraits generated and saved to `public/landing/testimonial_{amara,priya,elena,zayd}.jpg` |
+

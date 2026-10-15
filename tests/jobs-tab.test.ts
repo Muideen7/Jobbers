@@ -51,8 +51,8 @@ test("every permanent redirect that lands on the /jobs list targets a real tab",
     .filter((destination) => destination.startsWith("/jobs?"));
 
   assert.ok(
-    listDestinations.length >= 4,
-    "expected /inventory, /matches, /dossiers and /company-research to land on /jobs",
+    listDestinations.length >= 3,
+    "expected /inventory, /matches, and /dossiers to land on /jobs",
   );
 
   for (const destination of listDestinations) {

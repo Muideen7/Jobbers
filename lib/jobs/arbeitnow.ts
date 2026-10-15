@@ -84,7 +84,13 @@ export async function searchArbeitnow(
   options: { fetchImpl?: typeof fetch } = {},
 ): Promise<NormalizedJob[]> {
   const { fetchImpl = fetch } = options;
-  const response = await fetchImpl(ARBEITNOW_ENDPOINT, { cache: "no-store" });
+  const response = await fetchImpl(ARBEITNOW_ENDPOINT, {
+    cache: "no-store",
+    headers: {
+      "User-Agent": "Jobbers/1.0 (Mozilla/5.0; https://jobbers.match)",
+      Accept: "application/json",
+    },
+  });
 
   if (!response.ok) {
     throw new Error(`Arbeitnow API error: HTTP ${response.status}`);

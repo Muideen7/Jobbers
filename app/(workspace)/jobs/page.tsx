@@ -10,8 +10,12 @@ import {
   normalizeResearched,
 } from "@/lib/workspace/jobs-tab";
 import { NEW_MATCH_SCORE_THRESHOLD } from "@/lib/workspace/constants";
+import { searchAll } from "@/lib/jobs/search-all";
+import { buildJobRecord } from "@/lib/jobs/job-record";
+import { keywordScoreBatch } from "@/lib/jobs/keyword-score";
+import { scoringId, type ProfileScoreContext } from "@/lib/jobs/scoring-prompt";
 import { privateMetadata } from "../../private-metadata";
-import type { Application, ApplicationRef, Job } from "@/types";
+import type { Application, ApplicationRef, Job, Profile } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Jobs",
@@ -65,9 +69,9 @@ export default async function JobsPage({ searchParams }: Props) {
       .eq("user_id", user.id),
     insforge.database
       .from("profiles")
-      .select("job_titles_seeking")
+      .select("*")
       .eq("id", user.id)
-      .maybeSingle<{ job_titles_seeking: string[] | null }>(),
+      .maybeSingle<Profile>(),
   ]);
 
   if (applicationResult.error) {
@@ -86,8 +90,9 @@ export default async function JobsPage({ searchParams }: Props) {
     ]),
   );
 
+  const profile = profileResult.data;
   const hasTargetRoles =
-    (profileResult.data?.job_titles_seeking?.length ?? 0) > 0;
+    (profile?.job_titles_seeking?.length ?? 0) > 0;
 
   let jobs: Job[] = [];
 
@@ -115,64 +120,122 @@ export default async function JobsPage({ searchParams }: Props) {
 
     jobs = (data as Job[] | null) ?? [];
 
-    // Fix for new users: if 0 jobs exist and user set target roles, trigger an instant search
-    if (jobs.length === 0 && hasTargetRoles && tab !== "saved") {
-      const targetTitle = profileResult.data?.job_titles_seeking?.[0];
-      if (targetTitle) {
-        try {
-          const { searchAll } = await import("@/lib/jobs/search-all");
-          const { keywordScoreBatch } = await import("@/lib/jobs/keyword-score");
-          const { buildJobRecord } = await import("@/lib/jobs/job-record");
+    // Resilient fallback for "for-you": if no job meets the >= 60 threshold
+    // (e.g. freshly scraped or unscored listings), fall back to available jobs
+    // ordered by match_score desc so the feed and sidebar filters aren't trapped in an empty state.
+    if (tab === "for-you" && jobs.length === 0) {
+      let fallbackQuery = insforge.database
+        .from("jobs")
+        .select("*")
+        .eq("user_id", user.id);
 
-          const searchResult = await searchAll({
-            title: targetTitle,
-            location: "",
-            country: "us",
-          });
+      if (researched) {
+        fallbackQuery = fallbackQuery.not("company_research", "is", null);
+      }
 
-          if (searchResult.jobs.length > 0) {
-            const profileContext = {
-              skills: null,
-              industries: null,
-              experience_level: null,
-              job_titles_seeking: profileResult.data?.job_titles_seeking ?? [],
-              years_experience: null,
-              work_experience: null,
-              remote_preference: null,
-              preferred_locations: null,
-              salary_expectation: null,
-              location: null,
-            };
+      const { data: fallbackData } = await fallbackQuery
+        .order("match_score", { ascending: false, nullsFirst: false })
+        .order("found_at", { ascending: false })
+        .range(0, DEFAULT_RANGE)
+        .returns<Job[]>();
 
-            const scores = keywordScoreBatch(searchResult.jobs, profileContext);
-            const jobRecords = searchResult.jobs.map((job, idx) =>
-              buildJobRecord({
-                job,
-                userId: user.id,
-                runId: null,
-                score: scores[idx] ?? {
-                  matchScore: 70,
-                  matchReason: `Matches target role "${targetTitle}"`,
-                  matchedSkills: [],
-                  missingSkills: [],
-                },
-                foundAt: new Date().toISOString(),
-              }),
-            );
+      if (fallbackData && fallbackData.length > 0) {
+        jobs = fallbackData;
+      }
+    }
+  }
 
-            const { data: inserted } = await insforge.database
-              .from("jobs")
-              .insert(jobRecords)
-              .select();
+  // Automatic live discovery: if the user has no saved/scraped jobs yet,
+  // automatically fan out to the multi-board providers (Arbeitnow, RemoteOK,
+  // Remotive, Jobicy, JSearch, Adzuna) so the Find Jobs page shows real roles
+  // immediately without requiring manual searching or filtering first.
+  if (jobs.length === 0 && tab !== "saved" && !researched) {
+    try {
+      const initialTitle =
+        q ||
+        profile?.job_titles_seeking?.[0] ||
+        profile?.current_title ||
+        "developer";
 
-            if (inserted && inserted.length > 0) {
-              jobs = inserted as Job[];
-            }
+      const searchResult = await searchAll(
+        {
+          title: initialTitle,
+          location: profile?.location || "",
+          country: "us",
+        },
+        { maxResults: 40 },
+      );
+
+      if (searchResult.jobs.length > 0) {
+        const profileContext: ProfileScoreContext = {
+          skills: profile?.skills ?? [],
+          industries: profile?.industries ?? [],
+          experience_level: profile?.experience_level ?? "mid",
+          job_titles_seeking: profile?.job_titles_seeking ?? [],
+          years_experience: profile?.years_experience ?? 0,
+          work_experience: profile?.work_experience ?? [],
+          remote_preference: profile?.remote_preference ?? "any",
+          preferred_locations:
+            profile?.preferred_locations ??
+            (profile?.location ? [profile.location] : []),
+          salary_expectation: profile?.salary_expectation ?? null,
+          location: profile?.location ?? null,
+        };
+
+        const scores = keywordScoreBatch(searchResult.jobs, profileContext);
+        const scoreMap = new Map(scores.map((s) => [s.jobId, s]));
+        const now = new Date().toISOString();
+
+        const records = searchResult.jobs.map((job) =>
+          buildJobRecord({
+            job,
+            userId: user.id,
+            runId: null,
+            score: scoreMap.get(scoringId(job)) ?? {
+              matchScore: 70,
+              matchReason: "Matches your target roles",
+              matchedSkills: [],
+              missingSkills: [],
+            },
+            foundAt: now,
+          }),
+        );
+
+        // Attempt database insert so detail pages, applications, and dossiers resolve seamlessly
+        const { data: inserted, error: insertError } = await insforge.database
+          .from("jobs")
+          .insert(records)
+          .select();
+
+        if (inserted && inserted.length > 0) {
+          jobs = inserted as Job[];
+        } else {
+          if (insertError) {
+            console.warn("[jobs] auto-seed insert warning:", insertError.message);
           }
-        } catch (err) {
-          console.error("[jobs/page] auto-search error:", err);
+          // In-memory fallback with IDs so the user is NEVER blocked from seeing jobs
+          jobs = records.map((record, idx) => ({
+            ...record,
+            id: `live_${record.source}_${idx}`,
+            created_at: now,
+            updated_at: now,
+            company_research: null,
+            cover_letter: null,
+            tailored_resume_url: null,
+            tailored_match_score: null,
+            is_tailored: false,
+            nice_to_have: [],
+            about_company: null,
+          })) as unknown as Job[];
+        }
+
+        // Rank by match score if on For You tab
+        if (tab === "for-you") {
+          jobs.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
         }
       }
+    } catch (err) {
+      console.error("[jobs] auto-discovery error:", err);
     }
   }
 

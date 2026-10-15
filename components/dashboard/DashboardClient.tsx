@@ -109,8 +109,8 @@ export function DashboardClient({
     recordJobView(jobId);
   }
 
-  // At most 6 cards for each category
-  const topJobs = initialJobs.slice(0, 6);
+  // Top 10 best matches based on profile & resume
+  const topJobs = initialJobs.slice(0, 10);
 
   const jobMap = new Map(initialJobs.map((j) => [j.id, j]));
   const recentJobs = recentIds

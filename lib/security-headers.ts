@@ -24,7 +24,10 @@ export const PROXY_OWNED_ROUTE_PREFIXES = [
   "/jobs",
   "/applications",
   "/resumes",
+  "/analytics",
+  "/company-research",
   "/profile",
+  "/settings",
 ] as const;
 
 /** Matches everything `PROXY_OWNED_ROUTE_PREFIXES` does not claim. */

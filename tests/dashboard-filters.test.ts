@@ -72,6 +72,9 @@ test("parseSalaryFloor rejects salary strings without figures", () => {
 
 test("isRemoteListing trusts location, job type and title", () => {
   assert.equal(isRemoteListing({ location: "Remote", job_type: null, title: "Engineer" }), true);
+  assert.equal(isRemoteListing({ location: "Worldwide", job_type: null, title: "Developer" }), true);
+  assert.equal(isRemoteListing({ location: "Anywhere", job_type: null, title: "Developer" }), true);
+  assert.equal(isRemoteListing({ location: "WFH", job_type: null, title: "Developer" }), true);
   assert.equal(isRemoteListing({ location: "US", job_type: "fulltime", title: "Remote Backend Engineer" }), true);
   assert.equal(isRemoteListing({ location: "New York, NY", job_type: "fulltime", title: "Frontend Engineer" }), false);
   assert.equal(isRemoteListing({ location: "London (Hybrid)", job_type: "fulltime", title: "Engineer" }), false);
@@ -225,6 +228,9 @@ test("filterDashboardJobs composes every rule with AND semantics", () => {
   const internLevel: DashboardFilters = { ...DEFAULT_DASHBOARD_FILTERS, levels: ["intern"] };
   assert.deepEqual(filterDashboardJobs(all, internLevel).map((j) => j.id), ["unscored"]);
 
+  const midLevel: DashboardFilters = { ...DEFAULT_DASHBOARD_FILTERS, levels: ["mid"] };
+  assert.deepEqual(filterDashboardJobs(all, midLevel).map((j) => j.id), ["mid", "ml"]);
+
   const london: DashboardFilters = { ...DEFAULT_DASHBOARD_FILTERS, location: "lon" };
   assert.deepEqual(filterDashboardJobs(all, london).map((j) => j.id), ["mid"]);
 
@@ -252,5 +258,50 @@ test("filterDashboardJobs treats a null match_score as zero for the threshold", 
   assert.deepEqual(
     filterDashboardJobs([unscored, lowScore], threshold).map((j) => j.id),
     ["low"],
+  );
+});
+
+test("filterDashboardJobs filters jobs by jobBoard identifier", () => {
+  const ghJob = job({
+    id: "gh",
+    title: "Software Engineer",
+    source_url: "https://boards.greenhouse.io/acme/jobs/123",
+  });
+  const remoteOkJob = job({
+    id: "ro",
+    title: "React Dev",
+    source: "remoteok",
+    source_url: "https://remoteok.com/remote-jobs/456",
+  });
+  const hnJob = job({
+    id: "hn",
+    title: "Backend Engineer",
+    source_url: "https://news.ycombinator.com/item?id=789",
+  });
+
+  const all = [ghJob, remoteOkJob, hnJob];
+
+  // "all" returns everything
+  assert.deepEqual(
+    filterDashboardJobs(all, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "all" }).map((j) => j.id),
+    ["gh", "ro", "hn"],
+  );
+
+  // "direct" matches greenhouse ATS
+  assert.deepEqual(
+    filterDashboardJobs(all, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "direct" }).map((j) => j.id),
+    ["gh"],
+  );
+
+  // "remoteok" matches source / domain
+  assert.deepEqual(
+    filterDashboardJobs(all, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "remoteok" }).map((j) => j.id),
+    ["ro"],
+  );
+
+  // "hackernews" matches HN domain
+  assert.deepEqual(
+    filterDashboardJobs(all, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "hackernews" }).map((j) => j.id),
+    ["hn"],
   );
 });

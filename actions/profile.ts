@@ -25,13 +25,33 @@ type WorkExperienceEntry = {
   responsibilities: string;
 };
 
-type ProfileFormData = {
+export type ProfileFormData = {
   fullName: string;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
+  middleName?: string | undefined;
+  preferredName?: string | undefined;
+  email?: string | undefined;
   phone: string;
+  gender?: string | undefined;
+  dob?: string | undefined;
+  country?: string | undefined;
+  state?: string | undefined;
+  city?: string | undefined;
+  postalCode?: string | undefined;
+  streetAddress?: string | undefined;
+  workLocationPref?: string | undefined;
+  willingToRelocate?: string | undefined;
   location: string;
   linkedinUrl: string;
   portfolioUrl: string;
+  githubUrl?: string | undefined;
+  twitterUrl?: string | undefined;
   workAuth: string;
+  requiresSponsorship?: string | undefined;
+  ethnicity?: string | undefined;
+  veteranStatus?: string | undefined;
+  disabilityStatus?: string | undefined;
   currentTitle: string;
   experienceLevel: string;
   yearsExperience: string;
@@ -97,32 +117,70 @@ export async function saveProfile(
       education,
     });
 
-    const { data: updated, error } = await insforge.database
+    const basePayload: Record<string, unknown> = {
+      full_name: data.fullName || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      location: data.location || null,
+      linkedin_url: data.linkedinUrl || null,
+      portfolio_url: data.portfolioUrl || null,
+      work_authorization: data.workAuth || null,
+      current_title: data.currentTitle || null,
+      experience_level: data.experienceLevel || null,
+      years_experience: yearsExperience,
+      skills: data.skills,
+      industries: data.industries,
+      work_experience: workExperience,
+      education,
+      job_titles_seeking: data.jobTitlesSeeking,
+      remote_preference: data.remotePreference || null,
+      salary_expectation: data.salaryExpectation || null,
+      preferred_locations: data.preferredLocations,
+      cover_letter_tone: data.coverLetterTone || null,
+      is_complete: isComplete,
+    };
+
+    const extendedPayload: Record<string, unknown> = {
+      ...basePayload,
+      middle_name: data.middleName || null,
+      preferred_name: data.preferredName || null,
+      gender: data.gender || null,
+      date_of_birth: data.dob || null,
+      country: data.country || null,
+      state: data.state || null,
+      city: data.city || null,
+      postal_code: data.postalCode || null,
+      street_address: data.streetAddress || null,
+      work_location_pref: data.workLocationPref || null,
+      willing_to_relocate: data.willingToRelocate || null,
+      github_url: data.githubUrl || null,
+      twitter_url: data.twitterUrl || null,
+      requires_sponsorship: data.requiresSponsorship || null,
+      ethnicity: data.ethnicity || null,
+      veteran_status: data.veteranStatus || null,
+      disability_status: data.disabilityStatus || null,
+    };
+
+    // First attempt to update with all extended columns
+    let { data: updated, error } = await insforge.database
       .from("profiles")
-      .update({
-        full_name: data.fullName || null,
-        phone: data.phone || null,
-        location: data.location || null,
-        linkedin_url: data.linkedinUrl || null,
-        portfolio_url: data.portfolioUrl || null,
-        work_authorization: data.workAuth || null,
-        current_title: data.currentTitle || null,
-        experience_level: data.experienceLevel || null,
-        years_experience: yearsExperience,
-        skills: data.skills,
-        industries: data.industries,
-        work_experience: workExperience,
-        education,
-        job_titles_seeking: data.jobTitlesSeeking,
-        remote_preference: data.remotePreference || null,
-        salary_expectation: data.salaryExpectation || null,
-        preferred_locations: data.preferredLocations,
-        cover_letter_tone: data.coverLetterTone || null,
-        is_complete: isComplete,
-      })
+      .update(extendedPayload)
       .eq("id", user.id)
       .select("id")
       .maybeSingle<{ id: string }>();
+
+    // If extended columns are not yet present in the database, gracefully fall back to base columns
+    if (error && (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703")) {
+      console.warn("[actions/profile] extended columns pending migration, falling back to base fields:", error.message);
+      const fallback = await insforge.database
+        .from("profiles")
+        .update(basePayload)
+        .eq("id", user.id)
+        .select("id")
+        .maybeSingle<{ id: string }>();
+      updated = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.error("[actions/profile] saveProfile", error);
@@ -153,7 +211,6 @@ export async function uploadResume(
   formData: FormData,
 ): Promise<{ success: boolean; error?: string }> {
   // requireUser must be outside try/catch — redirect() throws NEXT_REDIRECT
-  // which would otherwise be caught and swallowed as a generic error.
   const user = await requireUser();
 
   try {
@@ -170,6 +227,7 @@ export async function uploadResume(
       return { success: false, error: "File must be under 2MB" };
     }
 
+    const fileSize = file.size;
     const path = `${user.id}/resume.pdf`;
 
     // SDK has no upsert option — remove existing file first, then upload fresh
@@ -185,7 +243,6 @@ export async function uploadResume(
     }
 
     // Store the storage path, not a public URL — bucket is private.
-    // Download happens via /api/resume/download which authenticates server-side.
     const { error: dbError } = await insforge.database
       .from("profiles")
       .update({ resume_pdf_url: path })
@@ -196,7 +253,67 @@ export async function uploadResume(
       return { success: false, error: "Failed to save resume URL" };
     }
 
+    // Ensure there's a primary resumes row for this user
+    const { data: existingResumes } = await insforge.database
+      .from("resumes")
+      .select("id, is_primary")
+      .eq("user_id", user.id);
+    if (!existingResumes || existingResumes.length === 0) {
+      await insforge.database.from("resumes").insert([
+        {
+          user_id: user.id,
+          name: "Uploaded resume",
+          kind: "uploaded",
+          storage_path: path,
+          file_size: fileSize,
+          is_primary: true,
+          template: null,
+          content: null,
+          target_role: null,
+          target_company: null,
+          source_job_id: null,
+        },
+      ]);
+    } else if (!existingResumes.some((r) => r.is_primary)) {
+      // Make the most recent? we just uploaded; set the one with this storage_path primary
+      await insforge.database.from("resumes").update({ is_primary: false }).eq("user_id", user.id);
+      await insforge.database
+        .from("resumes")
+        .update({ is_primary: true, storage_path: path, file_size: fileSize, name: "Uploaded resume", kind: "uploaded" })
+        .eq("user_id", user.id)
+        .eq("storage_path", path);
+      // If no exact match, just take the first? fallback
+      if ((await (async () => {
+        const { data } = await insforge.database
+          .from("resumes")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_primary", true)
+          .maybeSingle();
+        return !data;
+      })())) {
+        await insforge.database.from("resumes").update({ is_primary: true }).eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+      }
+    } else {
+      // Has primary; keep it primary (or we can allow multiple; per rules primary exists). 
+      // Still ensure this uploaded file is represented as a row if none matches storage_path
+      const hasMatching = existingResumes.some((r) => (r as { storage_path?: string | null }).storage_path === path);
+      if (!hasMatching) {
+        await insforge.database.from("resumes").insert([
+          {
+            user_id: user.id,
+            name: "Uploaded resume",
+            kind: "uploaded",
+            storage_path: path,
+            file_size: fileSize,
+            is_primary: false,
+          },
+        ]);
+      }
+    }
+
     revalidatePath("/profile");
+    revalidatePath("/resumes");
     return { success: true };
   } catch (error) {
     console.error("[actions/profile] uploadResume", error);

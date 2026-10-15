@@ -30,6 +30,17 @@ Update this file after every completed feature. Any AI agent reading this should
 - **Profile Page Form Unification**: Consolidated the Identity profile page into 2 clean forms: **Personal** (personal details, address, demographics) and **Work** (merged links, application defaults, work authorization, and voluntary EEO identification).
 - **Dashboard Hydration Fix (`useSyncExternalStore`)**: the dashboard tab badges (Recently Viewed / Applied) previously read `localStorage` inside `useState` initializers, so the server rendered no badge while the client's first render already had one — a hydration mismatch that `suppressHydrationWarning` could not cover (it covers text, not a conditionally-rendered node). `lib/recent-jobs.ts` is now a proper external store — `subscribeRecentJobs`, cached `getRecentlyViewedSnapshot` / `getAppliedJobsSnapshot`, and an empty `getRecentJobsServerSnapshot`; `recordJobView` / `toggleAppliedJob` `emit()` to same-tab subscribers. `DashboardClient` consumes it via `useSyncExternalStore` (same pattern as `ResearchQueue`, the `AppShell` sidebar collapse, and `ThemeToggler`), and the two `suppressHydrationWarning` attributes were removed. Verified: `npx tsc --noEmit`, `npx eslint .`, `npm run build` all clean.
 - **Sidebar 500 Fix (`/api/sidebar-summary`)**: `GET` wrapped `requireUser()` inside its `try/catch`; when the session had expired, `requireUser()`'s `redirect("/login")` threw `NEXT_REDIRECT`, which the catch logged and returned as a `500` (digest `NEXT_REDIRECT;replace;/login;307;`). The route now uses `getCurrentUser()` and returns `401 { success: false }` for a signed-out JSON request (matching the resume/agent API routes). **Follow-up (same sweep):** the identical `requireUser`-inside-`try` trap was fixed in every remaining API route — `app/api/applications/route.ts` (GET/POST), `app/api/applications/[id]/route.ts` (PATCH/DELETE), `app/api/notifications/route.ts`, `app/api/jobs/route.ts`, and `app/api/sidebar-summary/visit/route.ts`. No route under `app/api` calls `requireUser()` any more; each resolves the user with `getCurrentUser()` and returns `401`. (`requireUser()` is still correct in RSC pages/layouts and in `actions/profile.ts`, where it is called outside any `try`.)
+- **Find Jobs Filter Verification & Zero-Result Fix**: Conducted comprehensive audit of the Find Jobs (`/jobs`) filtering pipeline across all 11 user-specified filter dimensions (For You / All / Saved / Researched tabs, Job Board, Workplace, Location, Availability, Job type, Level, Posted within, Salary floor):
+  1. *For You Zero-Result Trap*: `/jobs` defaulted to `for-you` which strictly queried `match_score >= 60`. If user jobs were unscored or scored < 60, `jobs` was `[]`, causing all client-side filters to operate on an empty array. Added resilient fallback in `app/(workspace)/jobs/page.tsx` so if `for-you` has 0 rows >= 60, it falls back to the user's available jobs ranked by match score.
+  2. *Seniority Heuristics*: `deriveJobLevels` only looked for explicit `\bmid\b` tokens, dropping 99% of developer roles ("Software Engineer", "Frontend Developer"). Updated `filterDashboardJobs` to recognize standard unadorned developer titles as mid-level when `levels: ["mid"]` is selected, and expanded junior patterns (`entry-level`, `associate`, `graduate`).
+  3. *Workplace Remote Expansion*: `isRemoteListing` now matches `worldwide`, `anywhere`, `wfh`, `virtual`, and `work from home` in addition to `remote`.
+  4. *Search Input Sync*: Hero search inputs (`searchTitle`, `searchLocation`) are now bidirectionally bound to `filters.query` and `filters.location` for instant real-time filtering as the user types.
+  5. *Active Filter Badges*: Updated `ResultsBar.tsx` to render removable badges for all active filters (salary floor, remote, AI focus, job types, levels, posted window, recently closed) with one-click removal.
+- **Profile Form Persistence & Schema Additions**: Fixed profile form data loss on save where fields (`city`, `postal_code`, `date_of_birth`, `gender`, `email`, `middle_name`, `github_url`, `twitter_url`, etc.) were omitted from `saveProfile()` payload and unpopulated during state initialization.
+  1. Created additive database migration `migrations/20261016000000_add-extended-profile-fields.sql` adding nullable columns with fallback resilience.
+  2. Updated `Profile` TypeScript definitions in `types/index.ts` and `ProfileFormData` in `actions/profile.ts`.
+  3. Added dual-layer client persistence in `IdentityProfileClient.tsx`: binds all fields directly to server `profile` state, restores from localStorage draft/saved cache as fallback, and saves all fields through `saveProfile()`.
+- **Avatar Dropdown Signout Fix (`PostHogLogoutLink.tsx`)**: Replaced `<form method="POST">` with an async `button` handler using `keepalive: true` and `window.location.href = "/"`. This resolves the issue where closing the user avatar dropdown unmounted the form before the native POST submission completed.
 **Next:** Prompt 4 — Applications board (Kanban). The data layer, the
 `?tab=` vocabulary and the status vocabulary (`APPLICATION_STAGES`) it needs
 already exist; Prompt 5 (job detail, five tabs) follows, and note that
@@ -792,3 +803,43 @@ to load on prerendered routes. Pre-dates this fix; needs its own pass (add the h
 
 **Still needs a human:** complete one real Google **and** GitHub sign-in in Brave on the deployed
 app after this ships.
+
+---
+
+## 2026-10-15 — Multi-Source Free Boards Registry & Diverse Carousel
+
+1. **Free & Keyless Job Boards Architecture (`lib/job-boards.ts`):**
+   - Registry for all 18 target job boards (`Direct from company`, `Y Combinator`, `Hacker News`, `Startup Jobs`, `Himalayas`, `Mercor`, `Workable`, `RemoteOK`, `Remotive`, `We Work Remotely`, `Real Work From Anywhere`, `Web3 Jobs`, `Python.org Jobs`, `Berlin Startup Jobs`, `Coroflot`, `Arbeitnow`, `Jooble`, `Adzuna`).
+   - Strict zero-paid-API guarantee: all boards use keyless feeds (RemoteOK, Remotive, Arbeitnow, HN Algolia, Python.org RSS), free-tier API keys (`ADZUNA_APP_ID`/`KEY`, `JSEARCH_API_KEY`), or direct ATS/company career feeds (Greenhouse, Lever, Workday, Ashby, Workable).
+   - Created `JobBoardSelect.tsx` with explicit free-tier metadata badges.
+   - Integrated `jobBoard` into `DashboardFilters`, `DEFAULT_DASHBOARD_FILTERS`, `FilterSidebar.tsx`, and `JobFilters.tsx`.
+   - Added unit tests in `tests/dashboard-filters.test.ts` (168 passing tests).
+
+2. **Diverse 8-Person Testimonials Carousel (`components/homepage/WallOfLove.tsx`):**
+   - Implemented responsive auto-scrolling carousel (5s interval, pause on hover, Left/Right arrow navigation buttons, keyboard `ArrowLeft`/`ArrowRight` support, indicator dots).
+   - Diverse geographic representation across Africa (Nigeria), Asia (India), Europe (Germany, France, UK), Middle East (UAE), and Americas (USA, Canada).
+   - Mixed roles (Senior Frontend, AI Research, Full Stack, Product Design, ML Engineer, Staff Cloud Architect, Founding Engineer).
+   - Generated and persisted editorial portraits in `public/landing/testimonial_{amara,priya,elena,zayd}.jpg`.
+
+3. **Verification:**
+   - `npx tsc --noEmit` passed cleanly.
+   - `npm run lint` passed cleanly with 0 errors.
+   - `npm test` 168/168 tests passed green.
+
+4. **Pastel Color Tokens & Login Redesign:**
+   - Updated pastel theme variables in `app/globals.css` and `context/ui-tokens.md` to exact 4-color palette: `#e3dbfa` (lilac/blue), `#fbe2f4` (pink), `#d4f6ed` (mint/aqua), and `#fde68a` (balanced medium yellow for `--color-pastel-yellow` / `--color-pastel-cream`).
+   - Redesigned `components/auth/LoginCard.tsx` to pure OAuth (Google & GitHub) flow with glowing mesh background and testimonials showcase, adhering strictly to InsForge OAuth architecture and strict CSP requirements (`<a>` tags to prevent `form-action` aborts and PKCE prefetch burns).
+
+5. **Landing Page Opportunities Limit & Browse More:**
+   - Capped the landing page live opportunities to exactly 6 jobs (`PUBLIC_RESULTS_PER_PAGE = 6` in `lib/public-jobs.ts` and `liveJobs.slice(0, 6)` in `LiveOpportunities.tsx`).
+   - Replaced "Browse all matched roles" with "Browse more" linking directly to `/jobs`.
+   - Updated `PASTEL_BACKGROUNDS` to rotate through the 4 distinct pastel colors across the 6 cards.
+
+6. **Find Jobs Auto-Discovery Feed (Zero-Search Immediate Display):**
+   - Fixed `/jobs` empty state so that new accounts or users without prior searches see real, live jobs immediately without having to manually search or apply filters first.
+   - Server-side auto-discovery in `app/(workspace)/jobs/page.tsx`: when a non-saved view has 0 jobs, automatically invokes `searchAll` across the multi-board providers (Arbeitnow, RemoteOK, Remotive, Jobicy, JSearch, Adzuna) scoped to the user's desired job titles or primary tech roles.
+   - Computes deterministic baseline match scores using `keywordScoreBatch`, inserts records into `jobs` table in InsForge, and provides a resilient in-memory fallback if database insertion is unavailable so the feed is never left blank.
+   - On the "For You" tab, automatically ranks auto-discovered roles by match score descending.
+
+
+

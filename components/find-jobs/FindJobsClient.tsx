@@ -234,12 +234,16 @@ export function FindJobsClient({
   // Any filter change starts the feed from the top.
   function applyFilters(patch: Partial<DashboardFilters>) {
     setPage(1);
+    if (patch.query !== undefined) setSearchTitle(patch.query);
+    if (patch.location !== undefined) setSearchLocation(patch.location);
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
   function handleClearFilters() {
     setPage(1);
-    setFilters((prev) => ({ ...DEFAULT_DASHBOARD_FILTERS, query: prev.query }));
+    setSearchTitle("");
+    setSearchLocation("");
+    setFilters(DEFAULT_DASHBOARD_FILTERS);
   }
 
   // Live multi-source scraping via agent. The server component owns the feed,
@@ -459,7 +463,12 @@ export function FindJobsClient({
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
                 value={searchTitle}
-                onChange={(e) => setSearchTitle(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchTitle(val);
+                  setPage(1);
+                  setFilters((prev) => ({ ...prev, query: val }));
+                }}
                 placeholder="Role or skill (e.g. React Engineer)"
                 aria-label="Job title or skill"
                 className="w-full rounded-full border border-border bg-surface py-2 pl-9 pr-3 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
@@ -470,7 +479,12 @@ export function FindJobsClient({
               <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
                 value={searchLocation}
-                onChange={(e) => setSearchLocation(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchLocation(val);
+                  setPage(1);
+                  setFilters((prev) => ({ ...prev, location: val }));
+                }}
                 placeholder="Location (e.g. Remote, Lagos, US)"
                 aria-label="Job location"
                 className="w-full rounded-full border border-border bg-surface py-2 pl-9 pr-3 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"

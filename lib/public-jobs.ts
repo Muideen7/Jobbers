@@ -29,13 +29,11 @@ export const PUBLIC_FILTERS: readonly string[] = [
 const SALARY_FILTER_MIN = 150_000;
 
 /**
- * Cards the landing grid renders per fetch — a clean 3×3 at the `lg`
- * breakpoint. The rest of the matched set (the route's 48-result cap) stays
- * one click away behind "Browse all matched roles" → `/jobs`, which the
- * proxy redirects to `/login?next=…` for anonymous visitors, so seeing more
- * always means signing in first.
+ * Cards the landing grid renders per fetch — a clean 2×3 at the `lg`
+ * breakpoint (6 jobs). The rest of the matched set (the route's 48-result cap)
+ * stays one click away behind "Browse more" → `/jobs`.
  */
-export const PUBLIC_RESULTS_PER_PAGE = 9;
+export const PUBLIC_RESULTS_PER_PAGE = 6;
 
 export function isPublicFilter(value: string): value is PublicFilter {
   return (PUBLIC_FILTERS as readonly string[]).includes(value);

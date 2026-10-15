@@ -1,4 +1,7 @@
+import "server-only";
+
 import { GoogleGenAI } from "@google/genai";
+import type { z } from "zod";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview";
 
@@ -40,13 +43,51 @@ export type GenerateJsonInput = {
  * rather than being repeated per call site. Callers own their own error
  * handling and fallbacks because each one degrades differently.
  *
- * Thinking is disabled because Gemini 3 spends the reasoning tokens out of
- * `maxOutputTokens`. At an 800-token cap a 6-job scoring prompt used 590
- * tokens on thinking and truncated mid-JSON, so the parse failed. These
- * tasks are extract-then-format work where reasoning adds nothing; callers
- * that genuinely need deliberation should pass an explicit thinkingBudget.
+ * Supports both:
+ * - generateJson(input) -> returns parsed JSON object
+ * - generateJson(schema, input) or generateJson(input, schema) -> validates against Zod schema
  */
-export async function generateJson(input: GenerateJsonInput): Promise<unknown> {
+export async function generateJson<T extends z.ZodTypeAny>(
+  schema: T,
+  input: GenerateJsonInput,
+): Promise<z.infer<T>>;
+export async function generateJson<T extends z.ZodTypeAny>(
+  input: GenerateJsonInput,
+  schema?: T,
+): Promise<unknown>;
+export async function generateJson<T extends z.ZodTypeAny>(
+  arg1: T | GenerateJsonInput,
+  arg2?: T | GenerateJsonInput,
+): Promise<unknown> {
+  let schema: T | undefined;
+  let input: GenerateJsonInput;
+
+  if (arg2 === undefined) {
+    const maybeInput = arg1 as GenerateJsonInput;
+    if (
+      maybeInput &&
+      typeof maybeInput === "object" &&
+      "system" in maybeInput &&
+      "prompt" in maybeInput
+    ) {
+      input = maybeInput;
+      schema = undefined;
+    } else {
+      throw new Error("Invalid generateJson call: missing input");
+    }
+  } else if (
+    arg1 &&
+    typeof arg1 === "object" &&
+    "parse" in arg1 &&
+    typeof (arg1 as z.ZodTypeAny).parse === "function"
+  ) {
+    schema = arg1 as T;
+    input = arg2 as GenerateJsonInput;
+  } else {
+    input = arg1 as GenerateJsonInput;
+    schema = arg2 as T | undefined;
+  }
+
   const response = await getGemini().models.generateContent({
     model: getGeminiModel(),
     contents: input.prompt,
@@ -73,5 +114,11 @@ export async function generateJson(input: GenerateJsonInput): Promise<unknown> {
     );
   }
 
-  return JSON.parse(raw);
+  const parsed: unknown = JSON.parse(raw);
+
+  if (schema) {
+    return schema.parse(parsed);
+  }
+
+  return parsed;
 }
