@@ -67,9 +67,22 @@ function normalize(value: string): string {
  * block.
  */
 export function parseJobDescriptionHtml(html: string): JobDescriptionBlock[] {
-  const source = html
+  const cleaned = html
+    .trim()
+    .replace(/^\{+\s*/, "")
+    .replace(/\s*\}+$/, "")
+    .replace(/\}\s*<\/(?:p|div|section|article|html|body)>\s*$/i, (match) =>
+      match.replace("}", ""),
+    )
+    .trim();
+
+  const source = cleaned
     .replace(/<script\b[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "");
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(
+      /<(p|div)\b[^>]*>\s*<(strong|b)\b[^>]*>([^<]+)<\/\2>\s*<\/\1>/gi,
+      (_, _p, _b, text) => `<h3>${text}</h3>`,
+    );
 
   const blocks: JobDescriptionBlock[] = [];
   let buffer: string[] = [];
@@ -153,6 +166,12 @@ export function parseJobDescriptionHtml(html: string): JobDescriptionBlock[] {
       continue;
     }
     // Inline/unknown tag — its text was already captured above.
+  }
+
+  const trailing = source.slice(lastIndex);
+  if (trailing) {
+    if (listItems !== null) itemBuffer.push(trailing);
+    else buffer.push(trailing);
   }
 
   flushList();

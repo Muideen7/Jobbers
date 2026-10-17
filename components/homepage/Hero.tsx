@@ -23,7 +23,7 @@ export function Hero() {
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
             <Link
-              href="/login"
+              href="/login?mode=signup"
               className="btn btn-primary"
             >
               Get started

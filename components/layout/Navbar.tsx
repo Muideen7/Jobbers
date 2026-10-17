@@ -6,7 +6,7 @@ import { ArrowLeft, LogOut, Menu, UserCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Logo } from "@/components/layout/Logo";
-import { PostHogLogoutLink } from "@/components/analytics/PostHogLogoutLink";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 const navigationItems = [
   { href: "/home", label: "Dashboard" },
@@ -76,10 +76,10 @@ export function Navbar({ isAuthenticated = false }: Props) {
           {isAuthenticated ? (
             <div className="hidden items-center gap-6 md:flex">
               <UserCircle className="h-6 w-6 text-info-muted" />
-              <PostHogLogoutLink className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
+              <LogoutButton className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
                 <LogOut className="h-4 w-4" />
                 <span>Sign out</span>
-              </PostHogLogoutLink>
+              </LogoutButton>
             </div>
           ) : (
             <div className="hidden items-center gap-6 md:flex">
@@ -90,7 +90,7 @@ export function Navbar({ isAuthenticated = false }: Props) {
                 <ArrowLeft className="h-4 w-4" />
                 <span>Back to home</span>
               </Link>
-              <Link href="/login" className="btn btn-primary btn-sm">
+              <Link href="/login?mode=signup" className="btn btn-primary btn-sm">
                 Get started
               </Link>
             </div>
@@ -187,13 +187,13 @@ export function Navbar({ isAuthenticated = false }: Props) {
           </div>
 
           {isAuthenticated ? (
-            <PostHogLogoutLink className="mt-auto inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary">
+            <LogoutButton className="mt-auto inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary">
               <LogOut className="h-4 w-4" />
               <span>Sign out</span>
-            </PostHogLogoutLink>
+            </LogoutButton>
           ) : (
             <Link
-              href="/login"
+              href="/login?mode=signup"
               tabIndex={menuOpen ? 0 : -1}
               onClick={() => setMenuOpen(false)}
               className="btn btn-primary mt-auto"

@@ -1,7 +1,7 @@
-import { Stagehand } from "@browserbasehq/stagehand";
-import { z } from "zod";
 
-import { getBrowserbase } from "@/lib/browserbase";
+
+
+import { z } from "zod";
 import { generateJson } from "@/lib/llm";
 import type {
   CompanyResearchDossier,
@@ -65,8 +65,7 @@ type BrowserResearch = {
   sources: string[];
 };
 
-const MAX_REDIRECTS = 5;
-const MAX_SUB_PAGES = 3;
+// NOTE: MAX_REDIRECTS and MAX_SUB_PAGES were used for Browserbase redirect handling, which has been disabled.
 
 const jobBoardHosts = [
   "adzuna.com",
@@ -82,7 +81,7 @@ const jobBoardHosts = [
   "bamboohr.com",
 ];
 
-const homepageSchema = z.object({
+export const homepageSchema = z.object({
   oneLiner: z.string().optional().default(""),
   productSummary: z.string().optional().default(""),
   signals: z.array(z.string()).optional().default([]),
@@ -105,7 +104,7 @@ const homepageSchema = z.object({
     .default([]),
 });
 
-const subPageSchema = z.object({
+export const subPageSchema = z.object({
   keyPoints: z.array(z.string()).optional().default([]),
   technologies: z.array(z.string()).optional().default([]),
   valuesOrCulture: z.array(z.string()).optional().default([]),
@@ -162,12 +161,12 @@ function getRootDomain(hostname: string): string {
   return parts.slice(-2).join(".");
 }
 
-function isKnownJobBoard(hostname: string): boolean {
+export function isKnownJobBoard(hostname: string): boolean {
   const host = hostname.replace(/^www\./, "");
   return jobBoardHosts.some((jobBoardHost) => host.endsWith(jobBoardHost));
 }
 
-function getHeaderValue(
+export function getHeaderValue(
   headers: Record<string, string>,
   headerName: string,
 ): string | null {
@@ -196,56 +195,17 @@ async function log(
 
 async function resolveHomepageUrl(
   job: ResearchJob,
-  logger: ResearchLogger | undefined,
 ): Promise<string> {
   const candidateUrl = job.external_apply_url ?? job.source_url;
   const fallbackUrl = fallbackHomepageUrl(job.company);
-
-  if (!candidateUrl || !process.env.BROWSERBASE_API_KEY) {
+  if (!candidateUrl) {
     return fallbackUrl;
   }
-
-  let currentUrl = candidateUrl;
-
-  try {
-    for (let i = 0; i < MAX_REDIRECTS; i += 1) {
-      const response = await getBrowserbase().fetchAPI.create({
-        url: currentUrl,
-        allowRedirects: false,
-        proxies: false,
-      });
-
-      const location = getHeaderValue(response.headers, "location");
-      if (
-        response.statusCode >= 300 &&
-        response.statusCode < 400 &&
-        location
-      ) {
-        currentUrl = new URL(location, currentUrl).toString();
-        continue;
-      }
-
-      break;
-    }
-
-    const finalUrl = new URL(currentUrl);
-    if (isKnownJobBoard(finalUrl.hostname)) {
-      return fallbackUrl;
-    }
-
-    return `https://${getRootDomain(finalUrl.hostname)}`;
-  } catch (error) {
-    await log(
-      logger,
-      "Could not resolve the employer site from the job redirect. Falling back to the company name.",
-      "warning",
-    );
-    console.error("[agent/research] resolveHomepageUrl", error);
-    return fallbackUrl;
-  }
+  // Directly use the candidate URL without Browserbase redirects handling
+  return candidateUrl;
 }
 
-function normalizeInternalUrl(url: string, homepageUrl: string): string | null {
+export function normalizeInternalUrl(url: string, homepageUrl: string): string | null {
   try {
     const normalized = new URL(url, homepageUrl);
     const homepage = new URL(homepageUrl);
@@ -259,7 +219,7 @@ function normalizeInternalUrl(url: string, homepageUrl: string): string | null {
   }
 }
 
-function rankPageKind(kind: string): number {
+export function rankPageKind(kind: string): number {
   const priority = ["about", "blog", "engineering", "product", "team", "careers"];
   const index = priority.indexOf(kind);
   return index === -1 ? priority.length : index;
@@ -267,9 +227,8 @@ function rankPageKind(kind: string): number {
 
 async function collectBrowserResearch(
   job: ResearchJob,
-  logger: ResearchLogger | undefined,
 ): Promise<BrowserResearch> {
-  const homepageUrl = await resolveHomepageUrl(job, logger);
+  const homepageUrl = await resolveHomepageUrl(job);
   const emptyResearch: BrowserResearch = {
     homepageUrl,
     oneLiner: null,
@@ -278,159 +237,8 @@ async function collectBrowserResearch(
     pages: [],
     sources: [],
   };
-
-  const apiKey = process.env.BROWSERBASE_API_KEY;
-  const projectId = process.env.BROWSERBASE_PROJECT_ID;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey || !projectId || !geminiKey) {
-    await log(
-      logger,
-      "Browser research skipped because Browserbase or Gemini credentials are not configured.",
-      "warning",
-    );
-    return emptyResearch;
-  }
-
-  let stagehand: Stagehand | null = null;
-  let sessionId: string | null = null;
-
-  try {
-    const session = await getBrowserbase().sessions.create({
-      projectId,
-      api_timeout: 120,
-    });
-
-    sessionId = session.id;
-
-    stagehand = new Stagehand({
-      env: "BROWSERBASE",
-      apiKey,
-      projectId,
-      browserbaseSessionID: session.id,
-      model: {
-        modelName: geminiKey ? `google/${process.env.GEMINI_MODEL || "gemini-2.5-flash"}` : "google/gemini-2.5-flash",
-        apiKey: geminiKey,
-      },
-      disablePino: true,
-    });
-
-    await stagehand.init();
-    const page = stagehand.context.activePage();
-    if (!page) {
-      await log(logger, "Stagehand opened without an active page.", "warning");
-      return emptyResearch;
-    }
-
-    await page.goto(homepageUrl, {
-      waitUntil: "networkidle",
-      timeoutMs: 30000,
-    });
-    await page.waitForTimeout(2000);
-
-    const homepage = await stagehand.extract(
-      "This is a company's homepage. Capture what the company actually does, who it's for, and any concrete signals (funding, customers, scale, mission, recent launches). Then find the internal links most worth visiting to research them as an employer.",
-      homepageSchema,
-    );
-
-    if (!homepage.oneLiner && !homepage.productSummary) {
-      await log(
-        logger,
-        "Homepage extraction did not find meaningful company content. Using job and profile context only.",
-        "warning",
-      );
-      return emptyResearch;
-    }
-
-    const research: BrowserResearch = {
-      homepageUrl,
-      oneLiner: homepage.oneLiner || null,
-      productSummary: homepage.productSummary || null,
-      signals: homepage.signals,
-      pages: [],
-      sources: [homepageUrl],
-    };
-
-    const subPageUrls = homepage.pageLinks
-      .flatMap((pageLink) => {
-        const url = normalizeInternalUrl(pageLink.url, homepageUrl);
-        return url ? [{ kind: pageLink.kind, url }] : [];
-      })
-      .sort((a, b) => rankPageKind(a.kind) - rankPageKind(b.kind))
-      .filter(
-        (pageLink, index, allLinks) =>
-          allLinks.findIndex((candidate) => candidate.url === pageLink.url) ===
-          index,
-      )
-      .slice(0, MAX_SUB_PAGES);
-
-    for (const subPage of subPageUrls) {
-      try {
-        await page.goto(subPage.url, {
-          waitUntil: "networkidle",
-          timeoutMs: 30000,
-        });
-        await page.waitForTimeout(2000);
-
-        const pageResearch = await stagehand.extract(
-          "Extract substance that helps a candidate understand this company before applying: what they do, their values and how they work, the specific technologies and tools they use, notable projects or customers, and how the team operates. Ignore nav, footers, cookie banners, and generic marketing copy.",
-          subPageSchema,
-        );
-
-        const hasContent =
-          pageResearch.keyPoints.length > 0 ||
-          pageResearch.technologies.length > 0 ||
-          pageResearch.valuesOrCulture.length > 0 ||
-          pageResearch.notable.length > 0;
-
-        if (hasContent) {
-          research.pages.push({
-            url: subPage.url,
-            keyPoints: pageResearch.keyPoints,
-            technologies: pageResearch.technologies,
-            valuesOrCulture: pageResearch.valuesOrCulture,
-            notable: pageResearch.notable,
-          });
-          research.sources.push(subPage.url);
-        }
-      } catch (error) {
-        await log(
-          logger,
-          `Skipped a company sub-page that could not be extracted: ${subPage.url}`,
-          "warning",
-        );
-        console.error("[agent/research] subPage", error);
-      }
-    }
-
-    return research;
-  } catch (error) {
-    await log(
-      logger,
-      "Browser research failed. Falling back to job and profile synthesis.",
-      "warning",
-    );
-    console.error("[agent/research] collectBrowserResearch", error);
-    return emptyResearch;
-  } finally {
-    if (stagehand) {
-      try {
-        await stagehand.close();
-      } catch (error) {
-        console.error("[agent/research] close", error);
-      }
-    }
-
-    if (sessionId) {
-      try {
-        await getBrowserbase().sessions.update(sessionId, {
-          status: "REQUEST_RELEASE",
-        });
-      } catch (error) {
-        console.error("[agent/research] release session", error);
-      }
-    }
-  }
+  // Browserbase has been removed; return minimal research data.
+  return emptyResearch;
 }
 
 function getWorkHistory(workExperience: WorkExperience[] | null): string {
@@ -582,6 +390,15 @@ Work history: ${getWorkHistory(profile.work_experience)}`;
   }
 }
 
+/**
+ * Perform company research using Gemini and optional browser scraping.
+ *
+ * @param params - An object containing the job posting, candidate profile, and optional logger.
+ * @param params.job - The job details to research.
+ * @param params.profile - The candidate profile.
+ * @param params.log - Optional logger for progress messages.
+ * @returns A result object with either a successful `CompanyResearchDossier` or an error string.
+ */
 export async function researchCompany({
   job,
   profile,
@@ -595,7 +412,7 @@ export async function researchCompany({
       };
     }
 
-    const browserResearch = await collectBrowserResearch(job, logger);
+    const browserResearch = await collectBrowserResearch(job);
     const dossier = await synthesizeDossier(job, profile, browserResearch);
 
     await log(logger, "Company research dossier generated.", "success");

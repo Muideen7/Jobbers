@@ -122,9 +122,7 @@ export function TopCompanies() {
 
             <div className="relative z-10 pt-16 sm:pt-20">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight leading-tight">
-                Where people
-                <br />
-                are hiring now
+                Where people are hiring now
               </h2>
             </div>
           </div>

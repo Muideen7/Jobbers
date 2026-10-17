@@ -1,11 +1,12 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 import { researchCompany } from "@/agent/research";
 import { getCurrentUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
-import { trackPostHogEvent } from "@/lib/posthog-server";
-import type { AgentLog, CompanyResearchDossier, Job, Profile } from "@/types";
+import { getCollection } from "@/lib/mongodb";
+import { getUserProfile } from "@/lib/profile";
+import type { AgentLog, Job, Profile } from "@/types";
 
 type RequestBody = {
   jobId?: unknown;
@@ -35,12 +36,6 @@ type ResearchProfileRow = Pick<
   | "work_experience"
 >;
 
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const user = await getCurrentUser();
@@ -63,51 +58,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const jobId = typeof body.jobId === "string" ? body.jobId.trim() : "";
-    if (!jobId || !isUuid(jobId)) {
+    if (!jobId) {
       return NextResponse.json(
         { success: false, error: "jobId is required" },
         { status: 400 },
       );
     }
 
-    const insforge = await createInsforgeServer();
+    const jobsCollection = await getCollection<Job>("jobs");
+    const logsCollection = await getCollection<AgentLog>("agent_logs");
 
     async function logAgentMessage(input: {
       message: string;
       level: AgentLog["level"];
     }): Promise<void> {
-      const { error } = await insforge.database.from("agent_logs").insert([
-        {
+      try {
+        await logsCollection.insertOne({
+          id: randomUUID(),
           run_id: null,
           user_id: userId,
           job_id: jobId,
           message: input.message,
           level: input.level,
           created_at: new Date().toISOString(),
-        },
-      ]);
-
-      if (error) {
-        console.error("[api/agent/research] logAgentMessage", error);
+        });
+      } catch (logErr) {
+        console.error("[api/agent/research] logAgentMessage", logErr);
       }
     }
 
-    const { data: job, error: jobError } = await insforge.database
-      .from("jobs")
-      .select(
-        "id,user_id,title,company,source_url,external_apply_url,about_role,matched_skills,missing_skills,company_research",
-      )
-      .eq("id", jobId)
-      .eq("user_id", userId)
-      .maybeSingle<ResearchJobRow>();
-
-    if (jobError) {
-      console.error("[api/agent/research] fetch job", jobError);
-      return NextResponse.json(
-        { success: false, error: "Failed to load job" },
-        { status: 500 },
-      );
-    }
+    const job = await jobsCollection.findOne({
+      id: jobId,
+      user_id: userId,
+    });
 
     if (!job) {
       return NextResponse.json(
@@ -123,28 +106,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     }
 
-    const { data: profile, error: profileError } = await insforge.database
-      .from("profiles")
-      .select(
-        "id,current_title,experience_level,years_experience,skills,work_experience",
-      )
-      .eq("id", userId)
-      .maybeSingle<ResearchProfileRow>();
-
-    if (profileError) {
-      console.error("[api/agent/research] fetch profile", profileError);
-      return NextResponse.json(
-        { success: false, error: "Failed to load profile" },
-        { status: 500 },
-      );
-    }
-
-    if (!profile) {
+    const rawProfile = await getUserProfile(userId);
+    if (!rawProfile) {
       return NextResponse.json(
         { success: false, error: "Profile not found" },
         { status: 404 },
       );
     }
+
+    const profile: ResearchProfileRow = {
+      id: rawProfile.id,
+      current_title: rawProfile.current_title,
+      experience_level: rawProfile.experience_level,
+      years_experience: rawProfile.years_experience,
+      skills: rawProfile.skills,
+      work_experience: rawProfile.work_experience,
+    };
 
     await logAgentMessage({
       message: `Starting company research for ${job.company ?? "this company"}.`,
@@ -152,7 +129,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
 
     const result = await researchCompany({
-      job,
+      job: job as ResearchJobRow,
       profile,
       log: logAgentMessage,
     });
@@ -164,36 +141,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { data: updatedJob, error: updateError } = await insforge.database
-      .from("jobs")
-      .update({ company_research: result.dossier })
-      .eq("id", jobId)
-      .eq("user_id", userId)
-      .select("company_research")
-      .maybeSingle<{ company_research: CompanyResearchDossier | null }>();
-
-    if (updateError || !updatedJob?.company_research) {
-      console.error("[api/agent/research] update job", updateError);
-      return NextResponse.json(
-        { success: false, error: "Failed to save company research" },
-        { status: 500 },
-      );
-    }
-
-    await trackPostHogEvent({
-      event: "company_researched",
-      properties: {
-        userId,
-        jobId,
-        company: job.company ?? "Unknown company",
-      },
-    });
+    await jobsCollection.updateOne(
+      { id: jobId, user_id: userId },
+      { $set: { company_research: result.dossier } },
+    );
 
     revalidatePath(`/jobs/${jobId}`);
 
     return NextResponse.json({
       success: true,
-      data: { dossier: updatedJob.company_research },
+      data: { dossier: result.dossier },
     });
   } catch (error) {
     console.error("[api/agent/research]", error);

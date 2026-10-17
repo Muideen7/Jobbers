@@ -2,7 +2,7 @@
 
 ## Core Principle
 
-Jobbers follows a clean 9-feature scope with zero "coming soon" placeholders, strict design token adherence (`@theme` in `app/globals.css`), and authentic real data integration through InsForge, Gemini LLM, and PostHog analytics.
+Jobbers follows a clean 9-feature scope with zero "coming soon" placeholders, strict design token adherence (`@theme` in `app/globals.css`), and authentic real data integration through MongoDB Atlas, Better Auth, and Gemini AI.
 
 ---
 
@@ -48,5 +48,5 @@ Account
 
 - **Zero TypeScript Errors**: Every edit must pass `npx tsc --noEmit`.
 - **No Hardcoded Hex Values**: All UI styling must consume `@theme` design tokens.
-- **Additive Database Changes**: Use InsForge CLI for DB operations.
+- **Additive Database Changes**: Keep MongoDB collection schemas non-destructive.
 - **No Dead End Routes**: Every route in the sidebar points to a working, content-rich page.

@@ -2,8 +2,8 @@ import type { Job } from "@/types";
 import { matchesJobBoard } from "./job-boards.ts";
 
 /**
- * Pure filtering helpers for the workspace job feed. Kept free of React and
- * InsForge so every rule is unit-testable (tests/dashboard-filters.test.ts).
+ * Pure filtering helpers for the workspace job feed. Kept free of React
+ * so every rule is unit-testable (tests/dashboard-filters.test.ts).
  *
  * Filter dimensions mirror the Find Jobs sidebar spec:
  * - Workplace: remote-only + AI / ML focused listings.

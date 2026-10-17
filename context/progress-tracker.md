@@ -21,6 +21,58 @@ Update this file after every completed feature. Any AI agent reading this should
 9. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
 
 ### Summary of Revamp Work Done:
+- **Profile Skills & Education Inputs (`/profile`)**:
+  1. *Interactive Skills Input*: In `components/profile/IdentityProfileClient.tsx`, added full interactive Skills management allowing users to type skills (with Enter/comma multi-skill parsing), pick from popular suggestions, view active skill chips, and remove skills with an `X` button.
+  2. *Education & Credentials Input*: Added comprehensive Education inputs for Degree / Level (dropdown), Field of Study, Institution / University, and Graduation Year.
+  3. *AI Matching Integration*: Wired skills and education directly into form submission (`saveProfile`), MongoDB persistence, draft caching, and profile completion tracking, directly enabling Gemini AI to score jobs, calculate match percentages, and display matched vs. gap skills.
+- **Enhanced Scraped Job Description Formatting (`lib/job-description.ts`, `JobDescription.tsx`)**:
+  1. *Promote Strong Paragraphs to Headings*: Updated `parseJobDescriptionHtml` to detect `<p><strong>Heading</strong></p>` and `<p><b>Heading</b></p>` markup (common in Arbeitnow, Adzuna, and other job boards), transforming them into semantic `<h3>` headings.
+  2. *Outer Brace & Trailing Text Cleaning*: Stripped any surrounding curly braces (`{<p>...</p>}`) and captured unclosed trailing text.
+  3. *Polished Heading Styling*: Enhanced heading typography with bold weights and generous top margin in `RichDescription` to cleanly separate sections (Overview, Responsibilities and Duties, Qualifications and Skills, Benefits, About Company).
+- **Server Component Array Safeguards (`JobDescription`, `SkillMatchCard`, `CompanyResearch`)**:
+  1. *Undefined Array Handling*: In `components/job-details/JobDescription.tsx`, updated `Props` to treat `responsibilities`, `requirements`, `niceToHave`, and `benefits` as optional arrays. Replaced raw `.length` access on `section.items` with fallback `?? []` and `Array.isArray(section.items) && section.items.length > 0`, resolving the recoverable server rendering error (`Cannot read properties of undefined (reading 'length')`).
+  2. *Defensive Fallbacks*: Applied equivalent array safeguards in `components/job-details/MatchScore.tsx` (`SkillMatchCard` for `matchedSkills` and `missingSkills`) and `components/job-details/CompanyResearch.tsx` (`BulletList`, `techStack`, `sources`).
+- **Dynamic 404 Back Navigation (`app/not-found.tsx`)**:
+  1. *History & Referrer Aware Navigation*: Updated `app/not-found.tsx` to dynamically navigate the user back to the exact page they were on before hitting the 404 (`window.history.back()` / `router.back()`), whether from `/home`, `/jobs`, `/dossiers`, `/profile`, or any other workspace route.
+  2. *Workspace-Safe Fallbacks*: Replaced landing page links with direct navigation to `/home` ("Dashboard") and `/jobs` ("Browse live jobs"), ensuring signed-in users never get unexpectedly redirected to the marketing landing page.
+- **Profile Completeness & AI Match Gating (`/home` & `/jobs`)**:
+  1. *Rigorous Filled Profile Requirement*: In `lib/profile-utils.ts`, enhanced `isProfileComplete(profile)` to verify that candidate data is genuinely filled (skills, target roles/current title, work experience or education, and completion threshold $\ge 50\%$). Empty profiles with lingering `is_complete: true` flags or only an OAuth name are strictly rejected.
+  2. *Top AI Matches Empty State*: In `components/dashboard/DashboardClient.tsx`, guarded `topJobs` so it never yields matches unless `profileComplete === true`. The "Top AI Matches" tab renders a dedicated CTA ("Complete your profile to get tailored AI matches") guiding users to `/profile`. Stats bar metrics (Roles Found, Avg Match Score, Highest Match, Researched Companies) are zeroed/dashed until the profile is filled.
+- **Researched Companies Dossier Count Fix (`/home`)**:
+  1. *`undefined !== null` Bug Resolution*: Resolved a critical JavaScript evaluation flaw where unresearched jobs (which lack the `company_research` property and evaluate to `undefined`) satisfied `job.company_research !== null` (since `undefined !== null` is true), falsely reporting 50 researched companies. Switched all checks across the codebase (`DashboardClient.tsx`, `JobCard.tsx`, `jobs/[id]/page.tsx`, `AnalyticsPage.tsx`, `InventoryClient.tsx`) to `Boolean(job.company_research)`.
+  2. *Direct DB Count Synchronization*: Updated `app/(workspace)/home/page.tsx` to execute `jobsCollection.countDocuments({ user_id: user.id, company_research: { $exists: true, $ne: null } })` concurrently with job fetching, passing the true researched count to `DashboardClient.tsx`. If the profile is incomplete or no jobs have been researched, the count accurately displays `0`.
+- **Removed Payment & Pro Upgrade Cards**:
+  1. *Clean Shell*: In `components/layout/AppShell.tsx`, completely removed the "Unlock Jobbers Pro" upgrade payment card, the `PricingModal` component, and its state. No claims of paid plans or "it's free" are shown, keeping the UI focused and unobtrusive.
+- **Build & Profile Utilities Fix**:
+  1. *`calculateCompletion` Export*: Restored `calculateCompletion` in `lib/profile-utils.ts` and re-exported it from `lib/profile.ts` so dashboard and profile completion metrics are always aligned.
+  2. *Dashboard Profile Score & Tailored Recommendations*: In `app/(workspace)/home/page.tsx`, switched from raw `.findOne({ id: user.id })` to `getUserProfile(user.id)` (matching `id`, `userId`, or `_id`). If the user's profile is incomplete, tailored AI matches are withheld and replaced by a clear CTA directing them to `/profile`.
+- **Job Details Page & ID Normalization (`/jobs/[id]`)**:
+  1. *Reliable Lookup*: Updated `app/(workspace)/jobs/[id]/page.tsx` to query by both string `id` and MongoDB `_id` (`new ObjectId(id)`), with a fallback query for globally discovered/seeded jobs.
+  2. *Job Record ID Normalization*: Ensured `buildJobRecord` and all query mappers normalize `id: doc.id || doc._id?.toString()` to prevent broken `/jobs/undefined` links.
+- **Resume CV Upload & AI Extraction**:
+  1. *Automated Extraction*: In `actions/profile.ts` (`uploadResume`), uploaded PDF resumes are parsed via `pdf-parse` and structured into JSON via Gemini AI (`generateJson`).
+  2. *No Fallback Data*: If extraction fails or text is unreadable, no mock data is inserted; `ResumeSection.tsx` prompts the user to fill the fields manually.
+- **Forgot Password & Welcome Email**:
+  1. *Forgot Password Flow*: Added "Forgot password" mode to `LoginCard.tsx` calling `authClient.requestPasswordReset`. Created `/reset-password` route with token validation, password strength criteria, and `authClient.resetPassword`.
+  2. *Transactional Emails via Resend*: Configured `sendResetPassword` and `databaseHooks.user.create.after` in `lib/betterAuth.ts`, plus `/api/email/welcome` triggered upon signup.
+- **Find Jobs Profile Completion & Feed Ranking Updates (`/jobs`)**:
+  1. *For You Empty State on Incomplete Profile*: In `app/(workspace)/jobs/page.tsx` and `components/find-jobs/FindJobsClient.tsx`, if a user has not completed their profile (`isProfileComplete(profile) === false`), the "For You" tab returns zero jobs and renders a dedicated prompt ("Complete your profile to get tailored jobs") with a direct CTA to `/profile`. Auto-discovery and fallback queries do not trigger on "For You" when the profile is incomplete.
+  2. *All Tab Ranking by Most Recent*: When on the "All" tab without a search query, returns all jobs from all boards ranked strictly by most recent (`found_at` descending). When a user enters a search query, results in "All" are filtered by that query and ranked by most recent.
+  3. *For You Tab Match & Recency Ranking*: When the profile is complete, jobs on "For You" are ranked by best matched according to profile (`match_score` descending) and most recent (`found_at` descending).
+  4. *Job Boards & Filters Functional*: All 14 job board filters (`JOB_BOARDS`) match seamlessly by both `sourceIds` and URL domains. All sidebar filters (Workplace remote/AI, location, job type, level, posted window, salary floor) are fully verified and tested.
+  5. *MongoDB Migration for Jobs & Agent Find*: Fully migrated `app/api/agent/find/route.ts` and `app/api/jobs/route.ts` to MongoDB Atlas (`jobs`, `agent_runs`, `agent_logs`).
+- **MongoDB & Better Auth Profile Migration**:
+  1. *Profile Service (`lib/profile.ts`)*: Created dedicated MongoDB profile service (`getUserProfile`, `upsertUserProfile`) backed by MongoDB Atlas `profiles` collection.
+  2. *Profile Page (`app/(workspace)/profile/page.tsx`)*: Removed all InsForge dependency; loads profile directly from MongoDB and initializes new user profiles cleanly.
+  3. *Profile Server Actions (`actions/profile.ts`)*: Migrated `saveProfile`, `uploadResume`, `applyExtractedProfile`, and `extractProfile` to MongoDB collections (`profiles`, `resumes`).
+  4. *Settings Page (`app/(workspace)/settings/page.tsx`)*: Migrated profile fetch from InsForge to MongoDB `getUserProfile`.
+  5. *Complete InsForge Removal*: Removed all instances of `@insforge/sdk`, `lib/insforge-server.ts`, and `lib/auth-cookies.ts`; migrated all routes (`applications`, `resumes`, `sidebar-summary`, `notifications`, `analytics`, `dossiers`, `company-research`, `inventory`) to native MongoDB Atlas collections (`profiles`, `resumes`, `jobs`, `applications`, `application_events`, `agent_runs`, `agent_logs`).
+- **UI & UX Polish (Page Transitions, Loading, 404, Strong Password, Headings)**:
+  1. *Page Transitions*: Added `@keyframes pageEnter` in `app/globals.css` and `app/template.tsx` for smooth, performant page enter animations on route transitions.
+  2. *Loading State*: Added `app/loading.tsx` with Jobbers branding, spinning brand mark, and breathing glow.
+  3. *404 Not Found*: Added `app/not-found.tsx` with on-brand error badge, recovery CTAs ("Back to home" and "Browse live jobs").
+  4. *Strong Password & Auth Encoding*: In `components/auth/LoginCard.tsx`, added $\ge 8$ characters, uppercase, lowercase, number/symbol validation with live visual criteria checklist, and lowercased email encoding.
+  5. *Desktop Section Headings*: Streamlined landing section headings (`TopCompanies`, `Faq`, `WallOfLove`, `HowItWorks`) to render on 1 line (or max 2 lines) without awkward line wrapping.
 - **Navigation Shell**: Updated `AppShell.tsx` to streamline the sidebar — moved **Settings** (`/settings`) directly into the dedicated bottom action slot below the Pro card (replacing "Take the tour"), giving it prominent, permanent placement.
 - **Shared UI & DRY Architecture**: Extracted reusable `StatCard` component (`components/shared/StatCard.tsx`) shared across Dashboard and Applications Tracker.
 - **Applications Page & Stage Color Themes**: Color-coded and harmonized each stage (Saved: Pastel Blue / Info, Applied: Pastel Mint / Success, Interviews: Pastel Pink / Rose, Offers: Pastel Lilac / Accent) across top stat cards, section headers, badges, and card border accents.

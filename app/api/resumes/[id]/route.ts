@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 
 import { getCurrentUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
+import { upsertUserProfile } from "@/lib/profile";
 import { setPrimaryResume, updateResume, deleteResume } from "@/lib/resumes";
+import type { Resume } from "@/types";
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -25,7 +28,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       const resume = await updateResume(id, user.id, { name: body.name.trim() });
       return NextResponse.json({ success: !!resume });
     }
-    // Generic update fallback
     const updates: Record<string, unknown> = {};
     if (typeof body.name === "string" && body.name.trim()) updates.name = body.name.trim();
     if (body.is_primary) {
@@ -34,7 +36,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ success: false, error: "No valid fields" }, { status: 400 });
     }
-    const resume = await updateResume(id, user.id, updates as Partial<import("@/types").Resume>);
+    const resume = await updateResume(id, user.id, updates as Partial<Resume>);
     if ((updates.is_primary as boolean) && resume) {
       await setPrimaryResume(id, user.id);
     }
@@ -52,38 +54,34 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await context.params;
-    const insforge = await createInsforgeServer();
-    const { data: resume } = await insforge.database
-      .from("resumes")
-      .select("storage_path, is_primary")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle<{ storage_path: string | null; is_primary: boolean }>();
+
+    const resumesColl = await getCollection<Resume & { _id?: unknown }>("resumes");
+    const resume = await resumesColl.findOne({
+      $or: [{ id }, { _id: id as unknown as ObjectId }],
+      user_id: user.id,
+    });
+
     const ok = await deleteResume(id, user.id);
     if (!ok) return NextResponse.json({ success: false, error: "Failed" }, { status: 500 });
-    // Optionally delete from storage if path matches
-    if (resume?.storage_path) {
-      try {
-        await insforge.storage.from("resumes").remove(resume.storage_path);
-      } catch (e) {
-        console.warn("[api/resumes/[id]] storage cleanup failed", e);
-      }
-    }
-    // If primary deleted, promote most recent remaining
+
     if (resume?.is_primary) {
-      const { data: latest } = await insforge.database
-        .from("resumes")
-        .select("id, storage_path")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (latest && latest.length > 0) {
-        const r = latest[0] as { id: string };
-        await setPrimaryResume(r.id, user.id);
+      const latest = await resumesColl
+        .find({ user_id: user.id })
+        .sort({ created_at: -1 })
+        .limit(1)
+        .toArray();
+
+      const nextCandidate = latest?.[0];
+      if (nextCandidate) {
+        const nextPrimaryId = nextCandidate.id || (nextCandidate._id ? String(nextCandidate._id) : undefined);
+        if (nextPrimaryId) {
+          await setPrimaryResume(nextPrimaryId, user.id);
+        }
       } else {
-        await insforge.database.from("profiles").update({ resume_pdf_url: null }).eq("id", user.id);
+        await upsertUserProfile(user.id, { resume_pdf_url: null });
       }
     }
+
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("[api/resumes/[id]] DELETE", e);

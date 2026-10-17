@@ -93,18 +93,18 @@ export function LandingNavbar() {
 
           <div className="hidden md:flex items-center gap-2">
             <Link
-              href="/login"
+              href="/login?mode=signin"
               className="cursor-pointer rounded-md px-4 py-2.5 text-sm font-medium text-text-strong transition-colors duration-200 hover:text-text-primary"
             >
               Sign in
             </Link>
-            <Link href="/login" className="btn btn-primary btn-sm cursor-pointer">
+            <Link href="/login?mode=signup" className="btn btn-primary btn-sm cursor-pointer">
               Get started
             </Link>
           </div>
 
           <div className="md:hidden flex items-center gap-2">
-            <Link href="/login" className="btn btn-primary btn-sm cursor-pointer">
+            <Link href="/login?mode=signup" className="btn btn-primary btn-sm cursor-pointer">
               Get started
             </Link>
             <button
@@ -189,7 +189,7 @@ export function LandingNavbar() {
 
           <div className="shrink-0 border-t border-border-light p-4 sm:p-6 space-y-2.5">
             <Link
-              href="/login"
+              href="/login?mode=signup"
               onClick={() => setMenuOpen(false)}
               tabIndex={menuOpen ? 0 : -1}
               className="btn btn-primary w-full cursor-pointer"
@@ -197,7 +197,7 @@ export function LandingNavbar() {
               Get started
             </Link>
             <Link
-              href="/login"
+              href="/login?mode=signin"
               onClick={() => setMenuOpen(false)}
               tabIndex={menuOpen ? 0 : -1}
               className="btn btn-secondary w-full cursor-pointer"

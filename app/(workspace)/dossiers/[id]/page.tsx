@@ -19,7 +19,7 @@ import {
 import { ResearchCompanyButton } from "@/components/job-details/ResearchCompanyButton";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import { getInitials, getMatchBadgeVariant } from "@/lib/utils";
 import { privateMetadata } from "../../../private-metadata";
 import type { Job } from "@/types";
@@ -36,20 +36,14 @@ type Props = {
 export default async function DossierPage({ params }: Props) {
   const user = await requireUser();
   const { id } = await params;
-  const insforge = await createInsforgeServer();
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const { data: job, error } = await insforge.database
-    .from("jobs")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle<Job>();
+  const job = await jobsCollection.findOne({
+    id,
+    user_id: user.id,
+  });
 
-  if (error) {
-    console.error("[dossiers/id]", error);
-  }
-
-  if (error || !job) {
+  if (!job) {
     notFound();
   }
 

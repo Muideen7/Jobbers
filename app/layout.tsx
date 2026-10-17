@@ -11,10 +11,17 @@ const monaSans = Mona_Sans({
 const DESCRIPTION =
   "Jobbers scores every open role against your profile, researches the company, and tailors your application — so you only read the ones worth your time.";
 
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000")
+).replace(/\/$/, "");
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Jobbers — AI Job Matching, Company Research & Tailored Resumes",
     template: "%s | Jobbers",

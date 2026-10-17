@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 
-import { createInsforgeServer } from "@/lib/insforge-server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCollection } from "@/lib/mongodb";
+import type { Resume } from "@/types";
+
+import type { Filter } from "mongodb";
+
+type ResumeDoc = Resume & {
+  _id?: ObjectId | string;
+  file_data?: string;
+};
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -10,38 +19,32 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await context.params;
-    const insforge = await createInsforgeServer();
 
-    const { data: resume, error } = await insforge.database
-      .from("resumes")
-      .select("storage_path")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle<{ storage_path: string | null }>();
-
-    if (error) {
-      console.error("[api/resume/download/[id]]", error);
-      return NextResponse.json({ error: "Failed to load resume" }, { status: 500 });
+    const idFilters: Filter<ResumeDoc>[] = [{ id } as Filter<ResumeDoc>];
+    if (ObjectId.isValid(id)) {
+      idFilters.push({ _id: new ObjectId(id) } as Filter<ResumeDoc>);
+    } else {
+      idFilters.push({ _id: id } as Filter<ResumeDoc>);
     }
-    if (!resume?.storage_path) {
+
+    const resumesColl = await getCollection<ResumeDoc>("resumes");
+    const resume = await resumesColl.findOne({
+      $or: idFilters,
+      user_id: user.id,
+    });
+
+    if (!resume || !resume.file_data) {
       return NextResponse.json({ error: "No resume on file" }, { status: 404 });
     }
 
-    const { data: blob, error: dlError } = await insforge.storage
-      .from("resumes")
-      .download(resume.storage_path);
+    const buffer = Buffer.from(resume.file_data, "base64");
+    const filename = resume.name ? `${resume.name.replace(/\.pdf$/i, "")}.pdf` : "resume.pdf";
 
-    if (dlError || !blob) {
-      console.error("[api/resume/download/[id]]", dlError);
-      return NextResponse.json({ error: "Failed to download resume" }, { status: 500 });
-    }
-
-    const buffer = await blob.arrayBuffer();
     return new NextResponse(buffer, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="resume.pdf"',
+        "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
   } catch (error) {

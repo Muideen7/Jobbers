@@ -2,15 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { Suspense, type ReactNode } from "react";
 
-import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
 import { AppShell } from "@/components/layout/AppShell";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import type { Profile } from "@/types";
 
 /**
  * Shared chrome for every authenticated workspace page — the collapsible
- * AppShell sidebar, top bar and PostHog identity. Pages below this layout only
+ * AppShell sidebar and top bar. Pages below this layout only
  * render their content; auth and the profile-driven nav identity live here.
  */
 export default async function WorkspaceLayout({
@@ -19,17 +18,10 @@ export default async function WorkspaceLayout({
   children: ReactNode;
 }) {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
-
-  const { data: profile } = await insforge.database
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle<Profile>();
+  const profile = await (await getCollection<Profile>('profiles')).findOne({ id: user.id });
 
   return (
     <>
-      <PostHogIdentify userId={user.id} />
       {/* Suspense keeps AppShell's useSearchParams safe on statically
           prerenderable descendants. */}
       <Suspense>

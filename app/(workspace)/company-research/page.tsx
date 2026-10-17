@@ -7,8 +7,9 @@ import {
   type QueueJob,
 } from "@/components/company-research/ResearchQueue";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection, serializeMongo } from "@/lib/mongodb";
 import { privateMetadata } from "../../private-metadata";
+import type { Job } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Research",
@@ -20,18 +21,27 @@ const QUEUE_LIMIT = 100;
 
 export default async function CompanyResearchPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const { data: jobRows } = await insforge.database
-    .from("jobs")
-    .select("id, title, company, location, found_at, match_score")
-    .eq("user_id", user.id)
-    .is("company_research", null)
-    .order("match_score", { ascending: false, nullsFirst: false })
+  const jobRows = await jobsCollection
+    .find(
+      { user_id: user.id, company_research: null },
+      {
+        projection: {
+          id: 1,
+          title: 1,
+          company: 1,
+          location: 1,
+          found_at: 1,
+          match_score: 1,
+        },
+      },
+    )
+    .sort({ match_score: -1, found_at: -1 })
     .limit(QUEUE_LIMIT)
-    .returns<QueueJob[]>();
+    .toArray();
 
-  const jobs = jobRows ?? [];
+  const jobs = (jobRows as unknown as QueueJob[]) ?? [];
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
@@ -53,7 +63,7 @@ export default async function CompanyResearchPage() {
             </h2>
           </div>
 
-          <ResearchQueue jobs={jobs} />
+          <ResearchQueue jobs={serializeMongo(jobs)} />
         </section>
       </div>
     </div>

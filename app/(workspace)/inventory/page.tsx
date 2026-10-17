@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { InventoryClient } from "@/components/inventory/InventoryClient";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection, serializeMongo } from "@/lib/mongodb";
 import { privateMetadata } from "../../private-metadata";
 import type { Job } from "@/types";
 
@@ -19,19 +19,17 @@ export const metadata: Metadata = privateMetadata(
  */
 export default async function InventoryPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const { data: jobRows } = await insforge.database
-    .from("jobs")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("found_at", { ascending: false })
-    .range(0, 499)
-    .returns<Job[]>();
+  const jobs = await jobsCollection
+    .find({ user_id: user.id })
+    .sort({ found_at: -1 })
+    .limit(500)
+    .toArray();
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-      <InventoryClient jobs={jobRows ?? []} />
+      <InventoryClient jobs={serializeMongo(jobs ?? [])} />
     </div>
   );
 }

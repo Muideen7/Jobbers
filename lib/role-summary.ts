@@ -12,7 +12,7 @@ import type { Job } from "@/types";
  *    starting at the first role heading ("The Role", "What You'll Work On", …).
  * 3. Always cap the result at `ROLE_SUMMARY_MAX_WORDS` words.
  *
- * Free of React and InsForge so `node --test` can cover it.
+ * Free of React so `node --test` can cover it.
  */
 
 export const ROLE_SUMMARY_MAX_WORDS = 90;

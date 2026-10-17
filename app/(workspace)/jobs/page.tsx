@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 
 import { FindJobsClient } from "@/components/find-jobs/FindJobsClient";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection, serializeMongo } from "@/lib/mongodb";
+import { getUserProfile, isProfileComplete } from "@/lib/profile";
 import {
   normalizeJobsTab,
   normalizeResearched,
@@ -14,8 +15,9 @@ import { searchAll } from "@/lib/jobs/search-all";
 import { buildJobRecord } from "@/lib/jobs/job-record";
 import { keywordScoreBatch } from "@/lib/jobs/keyword-score";
 import { scoringId, type ProfileScoreContext } from "@/lib/jobs/scoring-prompt";
+import type { Filter, Sort } from "mongodb";
 import { privateMetadata } from "../../private-metadata";
-import type { Application, ApplicationRef, Job, Profile } from "@/types";
+import type { Application, ApplicationRef, Job } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Jobs",
@@ -39,50 +41,27 @@ type Props = {
 };
 
 /**
- * The merged /jobs surface (Prompt 3).
+ * The merged /jobs surface.
  *
- * `?tab=` and `?researched=1` are resolved **server-side**, because each tab is
- * a different slice of the whole account — filtering the top 100 by score and
- * calling it "Saved" would silently hide a saved role that ranks low. Filters,
- * sort, view mode and pagination stay client-side in FindJobsClient.
- *
- * The job-fetching backend (Arbeitnow, RemoteOK, Remotive, Jobicy) is
- * untouched; this only narrows what is already in `jobs`.
+ * `?tab=` and `?researched=1` are resolved server-side.
+ * When tab === "for-you", if the user has not completed their profile,
+ * it returns an empty list so the dedicated profile completion CTA is shown.
+ * When tab === "all", jobs are ranked by most recent across all boards.
  */
 export default async function JobsPage({ searchParams }: Props) {
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
+  const q = typeof params.q === "string" ? params.q.trim() : "";
   const tab = normalizeJobsTab(params.tab);
   const researched = normalizeResearched(params.researched);
 
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
 
-  // Applications drive the Saved tab and the status chips on every other tab,
-  // so they are always fetched — one small, auth-scoped query. A failure reads
-  // as "nothing tracked yet" rather than 500ing the whole feed, exactly the way
-  // /api/sidebar-summary degrades when the migration has not run.
-  const [applicationResult, profileResult] = await Promise.all([
-    insforge.database
-      .from("applications")
-      .select("id, job_id, status")
-      .eq("user_id", user.id),
-    insforge.database
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle<Profile>(),
-  ]);
+  const applicationsCollection = await getCollection<Application>("applications");
+  const rawApplications = await applicationsCollection.find({ user_id: user.id }).toArray();
+  const profile = await getUserProfile(user.id);
+  const profileComplete = isProfileComplete(profile);
 
-  if (applicationResult.error) {
-    console.warn(
-      "[jobs] applications unavailable:",
-      applicationResult.error.message,
-    );
-  }
-
-  const applications =
-    (applicationResult.data as Pick<Application, "id" | "job_id" | "status">[] | null) ?? [];
+  const applications = rawApplications as Pick<Application, "id" | "job_id" | "status">[];
   const applicationByJobId = new Map<string, ApplicationRef>(
     applications.map((application) => [
       application.job_id,
@@ -90,77 +69,111 @@ export default async function JobsPage({ searchParams }: Props) {
     ]),
   );
 
-  const profile = profileResult.data;
-  const hasTargetRoles =
-    (profile?.job_titles_seeking?.length ?? 0) > 0;
-
+  const hasTargetRoles = (profile?.job_titles_seeking?.length ?? 0) > 0;
+  const jobsCollection = await getCollection<Job>("jobs");
   let jobs: Job[] = [];
 
-  // Saved is the one tab that cannot be expressed as "the top N by score".
-  if (tab !== "saved" || applicationByJobId.size > 0) {
-    let query = insforge.database
-      .from("jobs")
-      .select("*")
-      .eq("user_id", user.id);
-
+  // If on "for-you" and profile is not completed, we do NOT load any jobs
+  if (tab === "for-you" && !profileComplete) {
+    jobs = [];
+  } else if (tab !== "saved" || applicationByJobId.size > 0) {
+    const filters: Filter<Job> = { user_id: user.id };
     if (tab === "for-you") {
-      query = query.gte("match_score", NEW_MATCH_SCORE_THRESHOLD);
+      filters.match_score = { $gte: NEW_MATCH_SCORE_THRESHOLD } as unknown as number;
     } else if (tab === "saved") {
-      query = query.in("id", [...applicationByJobId.keys()]);
+      filters.id = { $in: [...applicationByJobId.keys()] } as unknown as string;
     }
 
     if (researched) {
-      query = query.not("company_research", "is", null);
+      filters.company_research = { $ne: null } as unknown as null;
     }
 
-    const { data } = await query
-      .order("match_score", { ascending: false, nullsFirst: false })
-      .range(0, tab === "saved" ? SAVED_RANGE : DEFAULT_RANGE)
-      .returns<Job[]>();
+    if (q) {
+      const queryRegex = { $regex: q, $options: "i" } as unknown as string;
+      filters.$or = [
+        { title: queryRegex },
+        { company: queryRegex },
+        { location: queryRegex },
+        { about_role: queryRegex },
+      ];
+    }
 
-    jobs = (data as Job[] | null) ?? [];
+    // For You: ranked by best matched (match_score desc) and most recent (found_at desc)
+    // All / Saved: ranked by most recent (found_at desc, created_at desc)
+    const sortOrder: Sort =
+      tab === "for-you"
+        ? { match_score: -1, found_at: -1 }
+        : { found_at: -1 };
 
-    // Resilient fallback for "for-you": if no job meets the >= 60 threshold
-    // (e.g. freshly scraped or unscored listings), fall back to available jobs
-    // ordered by match_score desc so the feed and sidebar filters aren't trapped in an empty state.
-    if (tab === "for-you" && jobs.length === 0) {
-      let fallbackQuery = insforge.database
-        .from("jobs")
-        .select("*")
-        .eq("user_id", user.id);
+    const limit = tab === "saved" ? SAVED_RANGE : DEFAULT_RANGE;
+    const jobsData = await jobsCollection.find(filters).sort(sortOrder).limit(limit).toArray();
+    jobs = serializeMongo(
+      (jobsData ?? []).map((job) => {
+        const { _id, ...rest } = job as unknown as { _id?: unknown } & Job;
+        return {
+          ...rest,
+          id: job.id || (_id ? String(_id) : ""),
+        };
+      }),
+    );
 
+    // Fallback for "for-you" when profile is complete but no job meets >= 60 threshold
+    if (tab === "for-you" && profileComplete && jobs.length === 0) {
+      const fallbackFilters: Filter<Job> = { user_id: user.id };
       if (researched) {
-        fallbackQuery = fallbackQuery.not("company_research", "is", null);
+        fallbackFilters.company_research = { $ne: null } as unknown as null;
       }
-
-      const { data: fallbackData } = await fallbackQuery
-        .order("match_score", { ascending: false, nullsFirst: false })
-        .order("found_at", { ascending: false })
-        .range(0, DEFAULT_RANGE)
-        .returns<Job[]>();
-
-      if (fallbackData && fallbackData.length > 0) {
-        jobs = fallbackData;
+      if (q) {
+        const queryRegex = { $regex: q, $options: "i" } as unknown as string;
+        fallbackFilters.$or = [
+          { title: queryRegex },
+          { company: queryRegex },
+          { location: queryRegex },
+          { about_role: queryRegex },
+        ];
+      }
+      const fallbackJobs = await jobsCollection
+        .find(fallbackFilters)
+        .sort({ match_score: -1, found_at: -1 })
+        .limit(DEFAULT_RANGE)
+        .toArray();
+      if (fallbackJobs && fallbackJobs.length > 0) {
+        jobs = serializeMongo(
+          fallbackJobs.map((job) => {
+            const { _id, ...rest } = job as unknown as { _id?: unknown } & Job;
+            return {
+              ...rest,
+              id: job.id || (_id ? String(_id) : ""),
+            };
+          }),
+        );
       }
     }
   }
 
-  // Automatic live discovery: if the user has no saved/scraped jobs yet,
-  // automatically fan out to the multi-board providers (Arbeitnow, RemoteOK,
-  // Remotive, Jobicy, JSearch, Adzuna) so the Find Jobs page shows real roles
-  // immediately without requiring manual searching or filtering first.
-  if (jobs.length === 0 && tab !== "saved" && !researched) {
+  // Automatic live discovery: if the user has no saved/scraped jobs yet
+  // (and if on for-you, only if their profile is complete)
+  const canAutoDiscover =
+    jobs.length === 0 &&
+    tab !== "saved" &&
+    !researched &&
+    (tab !== "for-you" || profileComplete);
+
+  if (canAutoDiscover) {
     try {
+      // If user enters a query, search for that query
+      // Otherwise, if tab === "for-you", use their target role
+      // If tab === "all", use a broad query across all boards
       const initialTitle =
         q ||
-        profile?.job_titles_seeking?.[0] ||
-        profile?.current_title ||
-        "developer";
+        (tab === "for-you"
+          ? profile?.job_titles_seeking?.[0] || profile?.current_title || "developer"
+          : "developer");
 
       const searchResult = await searchAll(
         {
           title: initialTitle,
-          location: profile?.location || "",
+          location: tab === "for-you" ? (profile?.location || "") : "",
           country: "us",
         },
         { maxResults: 40 },
@@ -193,7 +206,7 @@ export default async function JobsPage({ searchParams }: Props) {
             runId: null,
             score: scoreMap.get(scoringId(job)) ?? {
               matchScore: 70,
-              matchReason: "Matches your target roles",
+              matchReason: "Matches your search criteria",
               matchedSkills: [],
               missingSkills: [],
             },
@@ -201,19 +214,11 @@ export default async function JobsPage({ searchParams }: Props) {
           }),
         );
 
-        // Attempt database insert so detail pages, applications, and dossiers resolve seamlessly
-        const { data: inserted, error: insertError } = await insforge.database
-          .from("jobs")
-          .insert(records)
-          .select();
-
-        if (inserted && inserted.length > 0) {
-          jobs = inserted as Job[];
-        } else {
-          if (insertError) {
-            console.warn("[jobs] auto-seed insert warning:", insertError.message);
-          }
-          // In-memory fallback with IDs so the user is NEVER blocked from seeing jobs
+        try {
+          await jobsCollection.insertMany(records as unknown as Job[]);
+          jobs = records as unknown as Job[];
+        } catch (insertError) {
+          console.warn("[jobs] auto-seed insert warning:", (insertError as Error).message);
           jobs = records.map((record, idx) => ({
             ...record,
             id: `live_${record.source}_${idx}`,
@@ -229,9 +234,19 @@ export default async function JobsPage({ searchParams }: Props) {
           })) as unknown as Job[];
         }
 
-        // Rank by match score if on For You tab
+        // Rank by best matched and most recent for "for-you",
+        // or by most recent for "all"
         if (tab === "for-you") {
-          jobs.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+          jobs.sort((a, b) => {
+            const scoreDiff = (b.match_score ?? 0) - (a.match_score ?? 0);
+            if (scoreDiff !== 0) return scoreDiff;
+            return new Date(b.found_at ?? "").getTime() - new Date(a.found_at ?? "").getTime();
+          });
+        } else {
+          jobs.sort(
+            (a, b) =>
+              new Date(b.found_at ?? "").getTime() - new Date(a.found_at ?? "").getTime(),
+          );
         }
       }
     } catch (err) {
@@ -248,6 +263,7 @@ export default async function JobsPage({ searchParams }: Props) {
         researched={researched}
         applications={Object.fromEntries(applicationByJobId)}
         hasTargetRoles={hasTargetRoles}
+        isProfileComplete={profileComplete}
       />
     </div>
   );

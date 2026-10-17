@@ -2,20 +2,19 @@ import React from "react";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { randomUUID } from "node:crypto";
 
 import { getCurrentUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
+import { getUserProfile, upsertUserProfile } from "@/lib/profile";
 import { generateJson } from "@/lib/llm";
-import type { Profile } from "@/types";
+import type { Profile, Resume } from "@/types";
 import { ResumePDF, type GeneratedContent } from "./ResumePDF";
 
 function createResumeDocument(
   profile: Profile,
   generated: GeneratedContent,
 ): React.ReactElement<DocumentProps> {
-  // ResumePDF renders a @react-pdf <Document>. Its own props are not DocumentProps,
-  // but every DocumentProps member is optional and ReactElement is covariant in
-  // its props parameter, so the element is assignable with no assertion at all.
   return <ResumePDF profile={profile} generated={generated} />;
 }
 
@@ -29,22 +28,15 @@ export async function POST(): Promise<NextResponse> {
       );
     }
 
-    const insforge = await createInsforgeServer();
+    const profile = await getUserProfile(user.id);
 
-    const { data: profile, error: profileError } = await insforge.database
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle<Profile>();
-
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json(
         { success: false, error: "Profile not found" },
         { status: 404 },
       );
     }
 
-    // Generate polished resume content with Gemini
     const profileContext = JSON.stringify({
       full_name: profile.full_name,
       current_title: profile.current_title,
@@ -90,50 +82,36 @@ ${profileContext}`,
       );
     }
 
-    // Render PDF buffer server-side
     const buffer = await renderToBuffer(createResumeDocument(profile, generated));
+    const base64Data = Buffer.from(buffer).toString("base64");
+    const now = new Date().toISOString();
 
-    // Remove existing file then upload fresh (SDK has no upsert — matches actions/profile.ts pattern)
-    const path = `${user.id}/resume.pdf`;
-    await insforge.storage.from("resumes").remove(path);
+    const resumesColl = await getCollection<Resume>("resumes");
+    await resumesColl.updateMany({ user_id: user.id }, { $set: { is_primary: false } });
 
-    // InsForge storage upload expects a Blob — wrap the Node Buffer.
-    //
-    // renderToBuffer returns Buffer<ArrayBufferLike>, whose backing store is
-    // only *maybe* an ArrayBuffer (it could be a SharedArrayBuffer), so it is
-    // not assignable to BlobPart. Re-wrapping through Uint8Array narrows the
-    // backing store to ArrayBuffer for real, which is stronger than asserting
-    // the Buffer was always safe. The copy costs one pass over a PDF.
-    const blob = new Blob([new Uint8Array(buffer)], {
-      type: "application/pdf",
+    await resumesColl.insertOne({
+      id: randomUUID(),
+      user_id: user.id,
+      name: `${profile.full_name || "Professional"} Resume`,
+      kind: "generated",
+      target_role: null,
+      target_company: null,
+      template: null,
+      storage_path: null,
+      file_size: buffer.length,
+      content: null,
+      source_job_id: null,
+      file_path: null,
+      file_data: base64Data,
+      is_primary: true,
+      created_at: now,
+      updated_at: now,
     });
 
-    const { error: uploadError } = await insforge.storage
-      .from("resumes")
-      .upload(path, blob);
-
-    if (uploadError) {
-      console.error("[api/resume/generate] storage upload", uploadError);
-      return NextResponse.json(
-        { success: false, error: "Failed to upload resume" },
-        { status: 500 },
-      );
-    }
-
-    const { error: dbError } = await insforge.database
-      .from("profiles")
-      .update({ resume_pdf_url: path })
-      .eq("id", user.id);
-
-    if (dbError) {
-      console.error("[api/resume/generate] db update", dbError);
-      return NextResponse.json(
-        { success: false, error: "Failed to save resume URL" },
-        { status: 500 },
-      );
-    }
+    await upsertUserProfile(user.id, { resume_pdf_url: "generated" });
 
     revalidatePath("/profile");
+    revalidatePath("/resumes");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[api/resume/generate]", error);

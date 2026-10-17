@@ -54,6 +54,8 @@ type Props = {
   applications: Record<string, ApplicationRef>;
   /** Drives the For You empty state: are target roles on the profile yet? */
   hasTargetRoles: boolean;
+  /** Whether the user has completed their profile for tailored recommendations. */
+  isProfileComplete?: boolean;
 };
 
 type ViewMode = "split" | "grid";
@@ -112,6 +114,7 @@ export function FindJobsClient({
   researched,
   applications,
   hasTargetRoles,
+  isProfileComplete = true,
 }: Props) {
   const router = useRouter();
   const [isSearching, setIsSearching] = useState(false);
@@ -199,15 +202,24 @@ export function FindJobsClient({
     [jobs, filters],
   );
 
-  // For You arrives already ranked by match score; every other tab honours the
-  // newest/oldest pills.
+  // For You is ranked by best matched (match_score desc) and most recent (found_at desc);
+  // every other tab honours the newest/oldest pills (newest by default).
   const orderedJobs = useMemo(() => {
-    if (tab === "for-you") return filteredJobs;
     const copy = [...filteredJobs];
+    if (tab === "for-you") {
+      copy.sort((a, b) => {
+        const scoreDiff = (b.match_score ?? 0) - (a.match_score ?? 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        const at = new Date(a.found_at ?? "").getTime() || 0;
+        const bt = new Date(b.found_at ?? "").getTime() || 0;
+        return bt - at;
+      });
+      return copy;
+    }
     copy.sort((a, b) => {
       const at = new Date(a.found_at ?? "").getTime() || 0;
       const bt = new Date(b.found_at ?? "").getTime() || 0;
-      return sort === "newest" ? bt - at : at - bt;
+      return sort === "oldest" ? at - bt : bt - at;
     });
     return copy;
   }, [filteredJobs, sort, tab]);
@@ -406,6 +418,17 @@ export function FindJobsClient({
           action={
             <Button asChild variant="outline" size="sm" className="rounded-full">
               <Link href="/jobs?tab=all">Browse all jobs</Link>
+            </Button>
+          }
+        />
+      ) : tab === "for-you" && !isProfileComplete ? (
+        <FeedEmpty
+          icon={<Sparkles className="h-6 w-6 text-accent" />}
+          title="Complete your profile to get tailored jobs"
+          body="Add your target roles, skills, and experience to unlock AI-matched jobs scored specifically for you."
+          action={
+            <Button asChild size="sm" className="rounded-full">
+              <Link href="/profile">Complete your profile</Link>
             </Button>
           }
         />

@@ -3,11 +3,10 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { Settings2, User, Bell, Shield, LogOut } from "lucide-react";
 
-import { PostHogLogoutLink } from "@/components/analytics/PostHogLogoutLink";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getUserProfile } from "@/lib/profile";
 import { privateMetadata } from "../../private-metadata";
-import type { Profile } from "@/types";
 import Link from "next/link";
 
 export const metadata: Metadata = privateMetadata(
@@ -17,13 +16,7 @@ export const metadata: Metadata = privateMetadata(
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
-
-  const { data: profile } = await insforge.database
-    .from("profiles")
-    .select("full_name, phone, location")
-    .eq("id", user.id)
-    .maybeSingle<Pick<Profile, "full_name" | "phone" | "location">>();
+  const profile = await getUserProfile(user.id);
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 pb-12 pt-6 sm:px-6 lg:px-0">
@@ -114,10 +107,10 @@ export default async function SettingsPage() {
             <p className="text-sm text-text-secondary">
               Sign out of your Jobbers account on this device.
             </p>
-            <PostHogLogoutLink className="inline-flex items-center gap-2 rounded-lg border border-error/30 bg-error/5 px-4 py-2 text-sm font-medium text-error transition-colors hover:bg-error/10 hover:border-error/50">
+            <LogoutButton className="inline-flex items-center gap-2 rounded-lg border border-error/30 bg-error/5 px-4 py-2 text-sm font-medium text-error transition-colors hover:bg-error/10 hover:border-error/50">
               <LogOut className="h-4 w-4" />
               Sign out
-            </PostHogLogoutLink>
+            </LogoutButton>
           </div>
         </section>
       </div>

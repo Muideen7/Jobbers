@@ -4,9 +4,8 @@ import type { Metadata } from "next";
 
 import { IdentityProfileClient } from "@/components/profile/IdentityProfileClient";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getUserProfile } from "@/lib/profile";
 import { privateMetadata } from "../../private-metadata";
-import type { Profile } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Profile",
@@ -15,13 +14,39 @@ export const metadata: Metadata = privateMetadata(
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  let profile = await getUserProfile(user.id);
 
-  const { data: profile } = await insforge.database
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle<Profile>();
+  if (!profile) {
+    profile = {
+      id: user.id,
+      full_name: user.name || null,
+      email: user.email || null,
+      phone: null,
+      location: null,
+      current_title: null,
+      experience_level: null,
+      years_experience: null,
+      skills: [],
+      industries: [],
+      work_experience: [],
+      education: null,
+      job_titles_seeking: [],
+      remote_preference: null,
+      preferred_locations: [],
+      salary_expectation: null,
+      cover_letter_tone: null,
+      linkedin_url: null,
+      portfolio_url: null,
+      work_authorization: null,
+      resume_pdf_url: null,
+      linkedin_context_id: null,
+      linkedin_connected: false,
+      is_complete: false,
+      last_jobs_visit_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
 
-  return <IdentityProfileClient profile={profile ?? null} />;
+  return <IdentityProfileClient profile={profile} />;
 }

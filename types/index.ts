@@ -31,6 +31,8 @@ export interface Resume {
   content: Record<string, unknown> | null;
   is_primary: boolean;
   source_job_id: string | null;
+  file_data?: string | null;
+  file_path?: string | null;
   created_at: string;
   updated_at: string;
 }

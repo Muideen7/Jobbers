@@ -64,7 +64,7 @@ export function AiMatcher() {
 
             <div className="pt-2">
               <Link
-                href="/login"
+                href="/login?mode=signup"
                 className="btn btn-secondary"
               >
                 Start matching

@@ -74,8 +74,8 @@ function DossierCard({
   );
 }
 
-function BulletList({ items }: { items: string[] }) {
-  if (items.length === 0) {
+function BulletList({ items }: { items?: string[] | null }) {
+  if (!items || !Array.isArray(items) || items.length === 0) {
     return (
       <p className="text-sm leading-6 text-text-muted">
         Nothing recorded here yet.
@@ -177,7 +177,7 @@ export function CompanyResearch({
           </DossierCard>
 
           <DossierCard title="Tech Stack" icon={Code2}>
-            {research.techStack.length > 0 ? (
+            {Array.isArray(research.techStack) && research.techStack.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {research.techStack.map((tech) => (
                   <span
@@ -218,7 +218,7 @@ export function CompanyResearch({
             <Paragraph>{research.whyThisRole}</Paragraph>
           </DossierCard>
 
-          {research.sources.length > 0 && (
+          {Array.isArray(research.sources) && research.sources.length > 0 && (
             <DossierCard title="Sources" icon={Sparkles} className="sm:col-span-2">
               <div className="flex flex-wrap gap-2">
                 {research.sources.map((source) => (

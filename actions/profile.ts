@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 // Import from lib directly to avoid pdf-parse's index.js debug mode, which reads
 // a test file on every require() call and crashes when module.parent is null
 // (always the case under Next.js/Turbopack).
@@ -10,11 +11,11 @@ const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (
 ) => Promise<{ text: string }>;
 
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
-import { trackPostHogEvent } from "@/lib/posthog-server";
+import { getUserProfile, upsertUserProfile } from "@/lib/profile";
+import { getCollection } from "@/lib/mongodb";
 import { calculateCompletion } from "@/lib/profile-utils";
 import { generateJson } from "@/lib/llm";
-import type { Education, Profile, WorkExperience } from "@/types";
+import type { Education, Profile, Resume, WorkExperience } from "@/types";
 
 type WorkExperienceEntry = {
   company: string;
@@ -77,8 +78,6 @@ export async function saveProfile(
   const user = await requireUser();
 
   try {
-    const insforge = await createInsforgeServer();
-
     const education: Education = {
       degree: data.degree || null,
       field: data.fieldOfStudy || null,
@@ -98,12 +97,6 @@ export async function saveProfile(
       is_current: e.is_current,
       responsibilities: e.responsibilities,
     }));
-
-    const { data: existing } = await insforge.database
-      .from("profiles")
-      .select("is_complete")
-      .eq("id", user.id)
-      .maybeSingle<{ is_complete: boolean }>();
 
     const { isComplete } = calculateCompletion({
       full_name: data.fullName || null,
@@ -161,45 +154,11 @@ export async function saveProfile(
       disability_status: data.disabilityStatus || null,
     };
 
-    // First attempt to update with all extended columns
-    let { data: updated, error } = await insforge.database
-      .from("profiles")
-      .update(extendedPayload)
-      .eq("id", user.id)
-      .select("id")
-      .maybeSingle<{ id: string }>();
-
-    // If extended columns are not yet present in the database, gracefully fall back to base columns
-    if (error && (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703")) {
-      console.warn("[actions/profile] extended columns pending migration, falling back to base fields:", error.message);
-      const fallback = await insforge.database
-        .from("profiles")
-        .update(basePayload)
-        .eq("id", user.id)
-        .select("id")
-        .maybeSingle<{ id: string }>();
-      updated = fallback.data;
-      error = fallback.error;
-    }
-
-    if (error) {
-      console.error("[actions/profile] saveProfile", error);
-      return { success: false, error: "Failed to save profile" };
-    }
-
-    if (!updated) {
-      console.error("[actions/profile] saveProfile no row matched for user", user.id);
-      return { success: false, error: "Profile not found. Please sign out and sign in again." };
-    }
-
-    if (isComplete && !existing?.is_complete) {
-      await trackPostHogEvent({
-        event: "profile_completed",
-        properties: { userId: user.id },
-      });
-    }
+    await upsertUserProfile(user.id, extendedPayload as Partial<Profile>);
 
     revalidatePath("/profile");
+    revalidatePath("/home");
+    revalidatePath("/settings");
     return { success: true };
   } catch (error) {
     console.error("[actions/profile] saveProfile", error);
@@ -207,15 +166,20 @@ export async function saveProfile(
   }
 }
 
+export type UploadResumeResult = {
+  success: boolean;
+  error?: string;
+  extractedData?: ExtractedProfile | null;
+  extractionMessage?: string | null;
+};
+
 export async function uploadResume(
   formData: FormData,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<UploadResumeResult> {
   // requireUser must be outside try/catch — redirect() throws NEXT_REDIRECT
   const user = await requireUser();
 
   try {
-    const insforge = await createInsforgeServer();
-
     const file = formData.get("resume");
     if (!(file instanceof File)) {
       return { success: false, error: "No file provided" };
@@ -228,93 +192,84 @@ export async function uploadResume(
     }
 
     const fileSize = file.size;
-    const path = `${user.id}/resume.pdf`;
+    const arrayBuffer = await file.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
 
-    // SDK has no upsert option — remove existing file first, then upload fresh
-    await insforge.storage.from("resumes").remove(path);
+    const resumes = await getCollection<Resume>("resumes");
+    // Clear previous primaries for this user
+    await resumes.updateMany({ user_id: user.id }, { $set: { is_primary: false } });
 
-    const { error: uploadError } = await insforge.storage
-      .from("resumes")
-      .upload(path, file);
+    // Insert new primary resume document
+    const now = new Date().toISOString();
+    await resumes.insertOne({
+      id: randomUUID(),
+      user_id: user.id,
+      name: file.name || "Uploaded resume",
+      kind: "uploaded",
+      target_role: null,
+      target_company: null,
+      template: null,
+      storage_path: null,
+      file_size: fileSize,
+      content: null,
+      source_job_id: null,
+      file_path: null,
+      file_data: base64Data,
+      is_primary: true,
+      created_at: now,
+      updated_at: now,
+    });
 
-    if (uploadError) {
-      console.error("[actions/profile] uploadResume storage", uploadError);
-      return { success: false, error: "Failed to upload resume" };
-    }
+    await upsertUserProfile(user.id, { resume_pdf_url: "uploaded" });
 
-    // Store the storage path, not a public URL — bucket is private.
-    const { error: dbError } = await insforge.database
-      .from("profiles")
-      .update({ resume_pdf_url: path })
-      .eq("id", user.id);
+    let extractedData: ExtractedProfile | null = null;
+    let extractionMessage: string | null = null;
 
-    if (dbError) {
-      console.error("[actions/profile] uploadResume db", dbError);
-      return { success: false, error: "Failed to save resume URL" };
-    }
+    try {
+      const pdfData = await pdfParse(Buffer.from(arrayBuffer));
+      const extractedText = pdfData?.text;
+      if (extractedText && extractedText.trim().length >= 50) {
+        extractedData = (await generateJson({
+          system:
+            "You are a resume parser. Extract structured profile data from the resume text and return only valid JSON matching the exact schema provided. Use null for missing fields. Arrays must always be arrays (never null). experience_level must be one of: Junior, Mid-Level, Senior, Lead, Manager, Director, Executive — pick the closest match or null.",
+          prompt: `Extract profile data from this resume and return JSON with this exact shape:
+{
+  "full_name": string | null,
+  "phone": string | null,
+  "location": string | null,
+  "current_title": string | null,
+  "experience_level": "Junior"|"Mid-Level"|"Senior"|"Lead"|"Manager"|"Director"|"Executive"|null,
+  "years_experience": number | null,
+  "skills": string[],
+  "industries": string[],
+  "work_experience": [{ "company": string, "title": string, "start_date": string, "end_date": string|null, "is_current": boolean, "responsibilities": string }],
+  "education": { "degree": string|null, "field": string|null, "institution": string|null, "graduation_year": string|null },
+  "job_titles_seeking": string[],
+  "linkedin_url": string|null,
+  "portfolio_url": string|null
+}
 
-    // Ensure there's a primary resumes row for this user
-    const { data: existingResumes } = await insforge.database
-      .from("resumes")
-      .select("id, is_primary")
-      .eq("user_id", user.id);
-    if (!existingResumes || existingResumes.length === 0) {
-      await insforge.database.from("resumes").insert([
-        {
-          user_id: user.id,
-          name: "Uploaded resume",
-          kind: "uploaded",
-          storage_path: path,
-          file_size: fileSize,
-          is_primary: true,
-          template: null,
-          content: null,
-          target_role: null,
-          target_company: null,
-          source_job_id: null,
-        },
-      ]);
-    } else if (!existingResumes.some((r) => r.is_primary)) {
-      // Make the most recent? we just uploaded; set the one with this storage_path primary
-      await insforge.database.from("resumes").update({ is_primary: false }).eq("user_id", user.id);
-      await insforge.database
-        .from("resumes")
-        .update({ is_primary: true, storage_path: path, file_size: fileSize, name: "Uploaded resume", kind: "uploaded" })
-        .eq("user_id", user.id)
-        .eq("storage_path", path);
-      // If no exact match, just take the first? fallback
-      if ((await (async () => {
-        const { data } = await insforge.database
-          .from("resumes")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_primary", true)
-          .maybeSingle();
-        return !data;
-      })())) {
-        await insforge.database.from("resumes").update({ is_primary: true }).eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+Resume text:
+${extractedText.slice(0, 6000)}`,
+          temperature: 0.3,
+          maxOutputTokens: 800,
+        })) as ExtractedProfile;
+      } else {
+        extractionMessage =
+          "Could not extract text from this PDF. Please fill in your profile details manually below.";
       }
-    } else {
-      // Has primary; keep it primary (or we can allow multiple; per rules primary exists). 
-      // Still ensure this uploaded file is represented as a row if none matches storage_path
-      const hasMatching = existingResumes.some((r) => (r as { storage_path?: string | null }).storage_path === path);
-      if (!hasMatching) {
-        await insforge.database.from("resumes").insert([
-          {
-            user_id: user.id,
-            name: "Uploaded resume",
-            kind: "uploaded",
-            storage_path: path,
-            file_size: fileSize,
-            is_primary: false,
-          },
-        ]);
-      }
+    } catch {
+      extractionMessage =
+        "Automated extraction could not read this PDF. Please fill in your profile details manually below.";
     }
 
     revalidatePath("/profile");
     revalidatePath("/resumes");
-    return { success: true };
+    return {
+      success: true,
+      extractedData,
+      extractionMessage,
+    };
   } catch (error) {
     console.error("[actions/profile] uploadResume", error);
     return { success: false, error: "Failed to upload resume" };
@@ -339,12 +294,6 @@ export type ExtractedProfile = {
 
 /**
  * Applies an extracted (resume-parsed) profile over the user's saved one.
- *
- * Merging is non-destructive: an extracted value only wins when it is
- * non-empty, so re-parsing a resume never wipes fields the user filled in by
- * hand. The actual write is delegated to saveProfile — which handles its own
- * locking/errors — and, like saveProfile, this method keeps requireUser and
- * the final write outside its own try/catch so NEXT_REDIRECT can escape.
  */
 export async function applyExtractedProfile(
   extracted: ExtractedProfile,
@@ -353,15 +302,10 @@ export async function applyExtractedProfile(
   const user = await requireUser();
 
   const merged: ProfileFormData = await (async () => {
-    const insforge = await createInsforgeServer();
-    const { data: profile, error } = await insforge.database
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle<Profile>();
+    const profile = await getUserProfile(user.id);
 
-    if (error || !profile) {
-      console.error("[actions/profile] applyExtractedProfile fetch", error);
+    if (!profile) {
+      console.error("[actions/profile] applyExtractedProfile profile not found", user.id);
       throw new Error("Profile not found. Please sign out and sign in again.");
     }
 
@@ -440,7 +384,6 @@ export async function applyExtractedProfile(
     };
   })();
 
-  // Outside the try/catch above so saveProfile's own redirects can escape.
   return saveProfile(merged);
 }
 
@@ -452,21 +395,17 @@ export async function extractProfile(): Promise<{
   const user = await requireUser();
 
   try {
-    const insforge = await createInsforgeServer();
+    const resumes = await getCollection<Resume>("resumes");
+    const resume = await resumes.findOne({ user_id: user.id, is_primary: true });
 
-    const { data: fileData, error: downloadError } = await insforge.storage
-      .from("resumes")
-      .download(`${user.id}/resume.pdf`);
-
-    if (downloadError || !fileData) {
+    if (!resume || !resume.file_data) {
       return {
         success: false,
         error: "No resume found. Please upload your resume first.",
       };
     }
 
-    const arrayBuffer = await fileData.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = Buffer.from(resume.file_data, "base64");
     const pdfData = await pdfParse(buffer);
     const extractedText = pdfData.text;
 

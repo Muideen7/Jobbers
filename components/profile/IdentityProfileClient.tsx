@@ -9,6 +9,10 @@ import {
   Sliders,
   ChevronDown,
   Loader2,
+  GraduationCap,
+  Sparkles,
+  Plus,
+  X,
 } from "lucide-react";
 
 import { saveProfile } from "@/actions/profile";
@@ -25,7 +29,26 @@ type TabKey = "personal" | "work";
 
 const TABS: { key: TabKey; label: string; icon: typeof User }[] = [
   { key: "personal", label: "Personal", icon: User },
-  { key: "work", label: "Work", icon: Sliders },
+  { key: "work", label: "Skills & Career", icon: Sliders },
+];
+
+const SUGGESTED_SKILLS = [
+  "React",
+  "TypeScript",
+  "Node.js",
+  "Python",
+  "SQL",
+  "Next.js",
+  "Docker",
+  "AWS",
+  "Tailwind CSS",
+  "GraphQL",
+  "PostgreSQL",
+  "Git",
+  "REST APIs",
+  "CI/CD",
+  "Go",
+  "Vue.js",
 ];
 
 const PROFILE_DRAFT_STORAGE_KEY = "jobbers_profile_form_draft";
@@ -97,6 +120,41 @@ export function IdentityProfileClient({ profile }: Props) {
   const [salaryExpectation, setSalaryExpectation] = useState(profile?.salary_expectation ?? "");
   const [preferredLocations] = useState((profile?.preferred_locations ?? []).join(", "));
 
+  // Skills & Education State
+  const [skills, setSkills] = useState<string[]>(profile?.skills ?? []);
+  const [skillInput, setSkillInput] = useState("");
+  const [degree, setDegree] = useState(profile?.education?.degree ?? "");
+  const [fieldOfStudy, setFieldOfStudy] = useState(profile?.education?.field ?? "");
+  const [institution, setInstitution] = useState(profile?.education?.institution ?? "");
+  const [graduationYear, setGraduationYear] = useState(profile?.education?.graduation_year ?? "");
+
+  const handleAddSkill = (skillToAdd?: string) => {
+    const raw = skillToAdd ?? skillInput;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+
+    const parts = trimmed
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    setSkills((prev) => {
+      const set = new Set(prev);
+      for (const p of parts) {
+        set.add(p);
+      }
+      return Array.from(set);
+    });
+
+    if (!skillToAdd) {
+      setSkillInput("");
+    }
+  };
+
+  const handleRemoveSkill = (skillToRemove: string) => {
+    setSkills((prev) => prev.filter((s) => s !== skillToRemove));
+  };
+
   // 1. Restore local saved cache or draft if saved. Deferred with a
   // microtask so the state updates aren't applied synchronously inside the
   // effect body (which trips react-hooks/set-state-in-effect); the restored
@@ -128,6 +186,13 @@ export function IdentityProfileClient({ profile }: Props) {
             if (saved.ethnicity && !profile?.ethnicity) setEthnicity(saved.ethnicity);
             if (saved.veteranStatus && !profile?.veteran_status) setVeteranStatus(saved.veteranStatus);
             if (saved.disabilityStatus && !profile?.disability_status) setDisabilityStatus(saved.disabilityStatus);
+            if (Array.isArray(saved.skills) && (!profile?.skills || profile.skills.length === 0)) {
+              setSkills(saved.skills);
+            }
+            if (saved.degree && !profile?.education?.degree) setDegree(saved.degree);
+            if (saved.fieldOfStudy && !profile?.education?.field) setFieldOfStudy(saved.fieldOfStudy);
+            if (saved.institution && !profile?.education?.institution) setInstitution(saved.institution);
+            if (saved.graduationYear && !profile?.education?.graduation_year) setGraduationYear(saved.graduationYear);
           }
         }
 
@@ -165,6 +230,11 @@ export function IdentityProfileClient({ profile }: Props) {
         if (draft.yearsExperience !== undefined) setYearsExperience(draft.yearsExperience);
         if (draft.jobTitlesSeeking !== undefined) setJobTitlesSeeking(draft.jobTitlesSeeking);
         if (draft.salaryExpectation !== undefined) setSalaryExpectation(draft.salaryExpectation);
+        if (Array.isArray(draft.skills)) setSkills(draft.skills);
+        if (draft.degree !== undefined) setDegree(draft.degree);
+        if (draft.fieldOfStudy !== undefined) setFieldOfStudy(draft.fieldOfStudy);
+        if (draft.institution !== undefined) setInstitution(draft.institution);
+        if (draft.graduationYear !== undefined) setGraduationYear(draft.graduationYear);
       } catch {
         // Ignore parse/storage issues
       }
@@ -204,6 +274,11 @@ export function IdentityProfileClient({ profile }: Props) {
         yearsExperience,
         jobTitlesSeeking,
         salaryExpectation,
+        skills,
+        degree,
+        fieldOfStudy,
+        institution,
+        graduationYear,
       };
       localStorage.setItem(PROFILE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {
@@ -239,6 +314,11 @@ export function IdentityProfileClient({ profile }: Props) {
     yearsExperience,
     jobTitlesSeeking,
     salaryExpectation,
+    skills,
+    degree,
+    fieldOfStudy,
+    institution,
+    graduationYear,
   ]);
 
   function handleSave() {
@@ -285,13 +365,13 @@ export function IdentityProfileClient({ profile }: Props) {
         currentTitle,
         experienceLevel,
         yearsExperience,
-        skills: profile?.skills ?? [],
+        skills,
         industries: profile?.industries ?? [],
         workEntries,
-        degree: profile?.education?.degree ?? "",
-        fieldOfStudy: profile?.education?.field ?? "",
-        institution: profile?.education?.institution ?? "",
-        graduationYear: profile?.education?.graduation_year ?? "",
+        degree,
+        fieldOfStudy,
+        institution,
+        graduationYear,
         jobTitlesSeeking: jobTitlesSeeking.split(",").map((s) => s.trim()).filter(Boolean),
         remotePreference,
         salaryExpectation,
@@ -323,6 +403,11 @@ export function IdentityProfileClient({ profile }: Props) {
               ethnicity,
               veteranStatus,
               disabilityStatus,
+              skills,
+              degree,
+              fieldOfStudy,
+              institution,
+              graduationYear,
             })
           );
         } catch {
@@ -389,7 +474,7 @@ export function IdentityProfileClient({ profile }: Props) {
               </h2>
               <p className="mt-1 text-xs text-text-muted">
                 {activeTab === "personal" && "Inherited by all resume profiles unless overridden"}
-                {activeTab === "work" && "Links, career defaults, work authorization eligibility, and voluntary EEO self-identification"}
+                {activeTab === "work" && "Technical skills, education credentials, career defaults, online links, and work authorization"}
               </p>
             </div>
 
@@ -630,10 +715,185 @@ export function IdentityProfileClient({ profile }: Props) {
               </div>
             )}
 
-            {/* TAB 2: WORK (MERGED: LINKS, APPLICATION DEFAULTS, WORK AUTHORIZATION, EEO) */}
+            {/* TAB 2: WORK (SKILLS, EDUCATION, LINKS, APPLICATION DEFAULTS, WORK AUTHORIZATION, EEO) */}
             {activeTab === "work" && (
               <div className="space-y-8">
-                {/* 1. Links Section */}
+                {/* 1. Skills & Technical Proficiencies */}
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-accent" />
+                      <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
+                        Skills & Technical Proficiencies
+                      </h3>
+                    </div>
+                    <span className="rounded-md bg-accent-muted px-2.5 py-0.5 text-xs font-semibold text-accent">
+                      {skills.length} {skills.length === 1 ? "skill" : "skills"}
+                    </span>
+                  </div>
+                  <p className="mb-4 text-xs text-text-secondary leading-relaxed">
+                    The AI matching engine compares these skills directly against job descriptions to calculate match scores, rank roles, and pinpoint gap skills.
+                  </p>
+
+                  {/* Add skill input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={skillInput}
+                      onChange={(e) => setSkillInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          handleAddSkill();
+                        }
+                      }}
+                      placeholder="Add a skill (e.g. React, Node.js, Python, Docker) and press Enter"
+                      className="flex-1 rounded-2xl bg-surface-secondary/70 border-none px-4 py-3 text-sm font-medium text-text-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => handleAddSkill()}
+                      className="rounded-2xl px-5 bg-ink text-accent-foreground font-semibold hover:bg-ink-hover cursor-pointer shrink-0 inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add</span>
+                    </Button>
+                  </div>
+
+                  {/* Quick skill suggestions */}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] font-medium text-text-muted">Suggested:</span>
+                    {SUGGESTED_SKILLS.filter((s) => !skills.includes(s))
+                      .slice(0, 8)
+                      .map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => handleAddSkill(suggestion)}
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-text-secondary hover:border-accent hover:text-accent hover:bg-accent-muted/40 transition-colors cursor-pointer"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                          {suggestion}
+                        </button>
+                      ))}
+                  </div>
+
+                  {/* Active skills list */}
+                  <div className="mt-4 rounded-2xl border border-border bg-surface-secondary/40 p-4 min-h-[90px] flex items-center">
+                    {skills.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {skills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-accent-muted px-3 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent-muted/80"
+                          >
+                            <span>{skill}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSkill(skill)}
+                              className="rounded-full p-0.5 hover:bg-accent/20 text-accent transition-colors cursor-pointer"
+                              aria-label={`Remove ${skill}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-medium text-text-muted">
+                        No skills added yet. Add at least 3–5 key skills so the AI can score your job matches and identify skill gaps.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-border" />
+
+                {/* 2. Education & Credentials */}
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-accent" />
+                      <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
+                        Education & Credentials
+                      </h3>
+                    </div>
+                    <span className="rounded-md bg-surface-secondary px-2 py-0.5 text-[10px] font-medium text-text-muted">
+                      ATS matching
+                    </span>
+                  </div>
+                  <p className="mb-4 text-xs text-text-secondary leading-relaxed">
+                    Used for education qualification thresholds in AI role scoring and resume generation.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-text-primary">
+                        Degree / Qualification Level
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={degree}
+                          onChange={(e) => setDegree(e.target.value)}
+                          className="w-full appearance-none rounded-2xl bg-surface-secondary/70 border-none px-4 py-3 text-sm font-medium text-text-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent transition-all cursor-pointer"
+                        >
+                          <option value="">Select degree / level</option>
+                          <option value="Bachelor's Degree">Bachelor&apos;s Degree (B.S. / B.A. / B.Sc)</option>
+                          <option value="Master's Degree">Master&apos;s Degree (M.S. / M.A. / M.Sc)</option>
+                          <option value="Doctorate (Ph.D.)">Doctorate (Ph.D. / D.Phil)</option>
+                          <option value="Associate Degree">Associate Degree (A.S. / A.A.)</option>
+                          <option value="Bootcamp / Certificate">Bootcamp / Professional Certificate</option>
+                          <option value="High School / GED">High School / GED</option>
+                          <option value="Self-Taught / Other">Self-Taught / Other</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-text-primary">
+                        Field of Study / Major
+                      </label>
+                      <input
+                        type="text"
+                        value={fieldOfStudy}
+                        onChange={(e) => setFieldOfStudy(e.target.value)}
+                        placeholder="e.g. Computer Science, Software Engineering"
+                        className="w-full rounded-2xl bg-surface-secondary/70 border-none px-4 py-3 text-sm font-medium text-text-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-text-primary">
+                        School / Institution
+                      </label>
+                      <input
+                        type="text"
+                        value={institution}
+                        onChange={(e) => setInstitution(e.target.value)}
+                        placeholder="e.g. Stanford University, University of Lagos"
+                        className="w-full rounded-2xl bg-surface-secondary/70 border-none px-4 py-3 text-sm font-medium text-text-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-text-primary">
+                        Graduation Year
+                      </label>
+                      <input
+                        type="text"
+                        value={graduationYear}
+                        onChange={(e) => setGraduationYear(e.target.value)}
+                        placeholder="e.g. 2024"
+                        className="w-full rounded-2xl bg-surface-secondary/70 border-none px-4 py-3 text-sm font-medium text-text-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-border" />
+
+                {/* 3. Links Section */}
                 <div>
                   <div className="mb-4 flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-accent" />

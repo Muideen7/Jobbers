@@ -19,6 +19,15 @@ export const JOB_BOARDS: readonly JobBoardItem[] = [
   {
     id: "direct",
     label: "Direct from company",
+    sourceIds: [
+      "direct",
+      "greenhouse",
+      "lever",
+      "ashby",
+      "workday",
+      "smartrecruiters",
+      "bamboohr",
+    ],
     domainPatterns: [
       "greenhouse.io",
       "lever.co",
@@ -113,7 +122,10 @@ export function matchesJobBoard(job: Job, boardId: string): boolean {
   const board = JOB_BOARDS.find((b) => b.id === boardId);
   if (!board) return true;
 
-  const jobSource = (job.source ?? "").toLowerCase();
+  const jobSource = (job.source ?? "").toLowerCase().trim();
+  if (jobSource === board.id.toLowerCase()) {
+    return true;
+  }
   if (board.sourceIds && board.sourceIds.includes(jobSource)) {
     return true;
   }

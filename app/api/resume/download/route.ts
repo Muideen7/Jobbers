@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { createInsforgeServer } from "@/lib/insforge-server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCollection } from "@/lib/mongodb";
+import type { Resume } from "@/types";
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -10,37 +11,23 @@ export async function GET(): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const insforge = await createInsforgeServer();
+    const resumesColl = await getCollection<Resume & { file_data?: string }>("resumes");
+    const resume =
+      (await resumesColl.findOne({ user_id: user.id, is_primary: true })) ??
+      (await resumesColl.findOne({ user_id: user.id }, { sort: { created_at: -1 } }));
 
-    const { data: profile } = await insforge.database
-      .from("profiles")
-      .select("resume_pdf_url")
-      .eq("id", user.id)
-      .maybeSingle<{ resume_pdf_url: string | null }>();
-
-    if (!profile?.resume_pdf_url) {
+    if (!resume || !resume.file_data) {
       return NextResponse.json({ error: "No resume on file" }, { status: 404 });
     }
 
-    const { data: blob, error } = await insforge.storage
-      .from("resumes")
-      .download(profile.resume_pdf_url);
-
-    if (error || !blob) {
-      console.error("[api/resume/download]", error);
-      return NextResponse.json(
-        { error: "Failed to download resume" },
-        { status: 500 },
-      );
-    }
-
-    const buffer = await blob.arrayBuffer();
+    const buffer = Buffer.from(resume.file_data, "base64");
+    const filename = resume.name ? `${resume.name.replace(/\.pdf$/i, "")}.pdf` : "resume.pdf";
 
     return new NextResponse(buffer, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="resume.pdf"',
+        "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
   } catch (error) {

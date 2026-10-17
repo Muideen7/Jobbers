@@ -49,6 +49,7 @@ export function formatSalaryForDb(job: NormalizedJob): string | null {
 }
 
 export type JobDbRecord = {
+  id: string;
   user_id: string;
   run_id: string | null;
   // Provider id ("jsearch", "adzuna", …) so every saved row can be attributed
@@ -80,8 +81,10 @@ export function buildJobRecord(input: {
   foundAt: string;
 }): JobDbRecord {
   const { job, score } = input;
+  const id = job.externalId ? `${job.source}_${job.externalId}` : `${job.source}_${Math.random().toString(36).slice(2, 11)}`;
 
   return {
+    id,
     user_id: input.userId,
     run_id: input.runId,
     source: job.source,

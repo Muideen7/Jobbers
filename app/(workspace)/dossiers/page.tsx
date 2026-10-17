@@ -6,7 +6,7 @@ import { ArrowRight, Building2, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import { formatDate, getInitials, getMatchBadgeVariant } from "@/lib/utils";
 import { privateMetadata } from "../../private-metadata";
 import type { Job } from "@/types";
@@ -32,18 +32,28 @@ type ResearchJob = Pick<
 
 export default async function DossiersPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const { data: jobRows } = await insforge.database
-    .from("jobs")
-    .select("id, title, company, location, found_at, company_research, match_score")
-    .eq("user_id", user.id)
-    .not("company_research", "is", null)
-    .order("match_score", { ascending: false, nullsFirst: false })
+  const jobRows = await jobsCollection
+    .find(
+      { user_id: user.id, company_research: { $exists: true, $ne: null } },
+      {
+        projection: {
+          id: 1,
+          title: 1,
+          company: 1,
+          location: 1,
+          found_at: 1,
+          company_research: 1,
+          match_score: 1,
+        },
+      },
+    )
+    .sort({ match_score: -1, found_at: -1 })
     .limit(DOSSIER_LIMIT)
-    .returns<ResearchJob[]>();
+    .toArray();
 
-  const dossiers = jobRows ?? [];
+  const dossiers = (jobRows as unknown as ResearchJob[]) ?? [];
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">

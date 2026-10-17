@@ -40,7 +40,7 @@ The AI agent on this project operates as a senior engineer. This means:
   - useEffect
   - Browser APIs
   - Event listeners
-  - Third party client-only libraries (PostHog browser side)
+  - Third party client-only libraries
 - Never add `"use client"` to layout files unless absolutely required
 - Data fetching happens in Server Components — never fetch in Client Components directly
 - Route handlers live in `app/api/` — never put business logic directly in route handlers
@@ -54,7 +54,7 @@ The AI agent on this project operates as a senior engineer. This means:
 
 - Folders: kebab-case — `job-details`, `agent-controls`
 - Component files: PascalCase — `StatsBar.tsx`, `RecentActivity.tsx`
-- Utility files: camelCase — `browserbase.ts`, `posthog-client.ts`
+- Utility files: camelCase — `mongodb.ts`, `betterAuth.ts`, `profile.ts`
 - Type files: camelCase — `index.ts`
 - API route files: always `route.ts`
 - Server Action files: camelCase — `profile.ts`, `jobs.ts`
@@ -101,19 +101,21 @@ export function ComponentName({ jobId, matchScore }: Props) {
 ## API Route Handlers
 
 ```typescript
-// app/api/agent/find/route.ts
+// app/api/jobs/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCurrentUser } from "@/lib/auth";
+import { getCollection } from "@/lib/mongodb";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await req.json();
-    // validate body
-    // call agent function
-    return NextResponse.json({ success: true, data: result });
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    const collection = await getCollection("jobs");
+    const jobs = await collection.find({ user_id: user.id }).toArray();
+    return NextResponse.json({ success: true, data: { jobs } });
   } catch (error) {
-    console.error("[agent/find]", error);
+    console.error("[api/jobs]", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 },
@@ -138,13 +140,13 @@ export async function POST(req: NextRequest) {
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { requireUser } from "@/lib/auth";
+import { upsertUserProfile } from "@/lib/profile";
 
 export async function saveProfile(formData: ProfileFormData) {
+  const user = await requireUser();
   try {
-    const insforge = await createInsforgeServer();
-    // validate
-    // write to DB
+    await upsertUserProfile(user.id, formData);
     revalidatePath("/profile");
     return { success: true };
   } catch (error) {
@@ -190,21 +192,17 @@ export async function discoverJobs(
 
 ---
 
-## InsForge Client Usage
+## Database (MongoDB) Usage
 
 ```typescript
-// Browser context — Client Components only
-import { insforge } from "@/lib/insforge-client";
-
-// Server context — Server Components, Route Handlers, Server Actions, Agent
-import { createInsforgeServer } from "@/lib/insforge-server";
-const insforge = await createInsforgeServer();
+// Access MongoDB collections via getCollection
+import { getCollection } from "@/lib/mongodb";
+const collection = await getCollection<Job>("jobs");
 ```
 
-- Never use the browser client in server context
-- Never use the server client in browser context
-- Always await createInsforgeServer() — it reads cookies asynchronously
-- Always scope every query to the current user_id — never query without a user filter
+- Always access MongoDB via official driver singleton `getCollection<TSchema>("collection_name")`
+- Always scope every query and mutation to the current user ID (`user.id` / `user_id`)
+- Serialize `_id` to string (`_id.toString()`) before passing to Client Components
 
 ---
 
@@ -218,42 +216,28 @@ const insforge = await createInsforgeServer();
 
 ---
 
-## PostHog Events
-
-All PostHog events must use these exact event names. Never invent new event names without adding them here first.
-
-| Event                | When                                       | Key Properties             |
-| -------------------- | ------------------------------------------ | -------------------------- |
-| `job_search_started` | Find Jobs button clicked                   | userId, jobTitle, location |
-| `job_found`          | Each job discovered and saved              | userId, source, matchScore |
-| `profile_completed`  | User saves complete profile for first time | userId                     |
-| `company_researched` | Company research dossier generated         | userId, jobId, company     |
-
-These four events are the only events in this project. Do not add more without updating this list first.
-
-`job_found` powers the Jobs Found Over Time and Match Score Distribution dashboard charts.
-`company_researched` powers the Company Research Activity dashboard chart.
-Always fire these with correct properties.
-
----
-
 ## Environment Variables
 
 All environment variables defined in `.env.local` for development. Never hardcode any key, URL, or secret anywhere in the codebase.
 
 | Variable                        | Used In                |
 | ------------------------------- | ---------------------- |
-| `NEXT_PUBLIC_INSFORGE_URL`      | lib/insforge-client.ts |
-| `NEXT_PUBLIC_INSFORGE_ANON_KEY` | lib/insforge-client.ts |
-| `BROWSERBASE_API_KEY`           | lib/browserbase.ts     |
-| `BROWSERBASE_PROJECT_ID`        | lib/browserbase.ts     |
-| `GEMINI_API_KEY`                | agent/ functions       |
-| `GEMINI_MODEL`                  | agent/ functions       |
-| `ADZUNA_APP_ID`                 | lib/adzuna.ts          |
-| `ADZUNA_APP_KEY`                | lib/adzuna.ts          |
+| `NEXT_PUBLIC_SITE_URL`          | app/layout.tsx, sitemap|
+| `BETTER_AUTH_URL`               | lib/betterAuth.ts      |
+| `BETTER_AUTH_SECRET`            | lib/betterAuth.ts      |
+| `MONGODB_URI`                   | lib/mongodb.ts         |
+| `MONGODB_DB`                    | lib/mongodb.ts         |
+| `GITHUB_CLIENT_ID`              | lib/betterAuth.ts      |
+| `GITHUB_CLIENT_SECRET`          | lib/betterAuth.ts      |
+| `GOOGLE_CLIENT_ID`              | lib/betterAuth.ts      |
+| `GOOGLE_CLIENT_SECRET`          | lib/betterAuth.ts      |
+| `GEMINI_API_KEY`                | lib/llm.ts             |
+| `GEMINI_MODEL`                  | lib/llm.ts             |
+| `RESEND_API_KEY`                | lib/mail.ts            |
+| `EMAIL_FROM`                    | lib/mail.ts            |
+| `ADZUNA_APP_ID`                 | lib/jobs/adzuna.ts     |
+| `ADZUNA_APP_KEY`                | lib/jobs/adzuna.ts     |
 | `JSEARCH_API_KEY`               | lib/jobs/jsearch.ts    |
-| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`   | lib/posthog-client.ts  |
-| `NEXT_PUBLIC_POSTHOG_HOST`           | lib/posthog-client.ts  |
 
 `NEXT_PUBLIC_` prefix means the variable is exposed to the browser. Never add `NEXT_PUBLIC_` to secret keys.
 
@@ -279,7 +263,7 @@ Always use the `@/` alias — never use relative imports that go up more than on
 ```typescript
 // Correct
 import { Button } from "@/components/ui/button";
-import { insforge } from "@/lib/insforge-client";
+import { getCollection } from "@/lib/mongodb";
 import { MATCH_THRESHOLD } from "@/lib/utils";
 
 // Never
@@ -307,17 +291,15 @@ Never install a new package without a clear reason. Before installing anything c
 
 Approved dependencies for this project:
 
-- `@insforge/ssr` — InsForge client
-- `@browserbasehq/sdk` — Browserbase sessions
-- `@browserbasehq/stagehand` — AI browser control
-- `@google/genai` — Gemini API (see `lib/llm.ts`)
-- `posthog-js` — PostHog browser client
-- `posthog-node` — PostHog server client
+- `mongodb` — Official MongoDB Node.js driver
+- `better-auth` & `@better-auth/mongo-adapter` — Better Auth authentication & session management
+- `@google/genai` — Gemini AI API (see `lib/llm.ts`)
+- `resend` — Transactional email delivery (see `lib/mail.ts`)
 - `@react-pdf/renderer` — Resume PDF generation
 - `pdf-parse` — Extract text from uploaded PDF
 - `zod` — Schema validation
 - `lucide-react` — Icons
 - `tailwindcss` — Styling
-- `shadcn/ui` components — UI primitives
+- `@radix-ui/*` primitives — UI component primitives
 
 Do not install any other packages without updating this list first.

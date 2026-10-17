@@ -65,3 +65,21 @@ test("splits on <br> and ignores empty blocks", () => {
     { kind: "paragraph", text: "Line one Line two" },
   ]);
 });
+
+test("promotes paragraph strong/bold headers into headings and strips surrounding braces", () => {
+  const sample =
+    "{<p><strong>Overview</strong></p>" +
+    "<p>We are building the future.</p>" +
+    "<p><strong>Responsibilities and Duties</strong></p>" +
+    "<ul><li>Ship clean code</li><li>Maintain systems</li></ul>" +
+    "<p>Find Jobs in Switzerland on Arbeitnow}</p>";
+
+  const blocks = parseJobDescriptionHtml(sample);
+  assert.deepEqual(blocks, [
+    { kind: "heading", text: "Overview" },
+    { kind: "paragraph", text: "We are building the future." },
+    { kind: "heading", text: "Responsibilities and Duties" },
+    { kind: "list", items: ["Ship clean code", "Maintain systems"] },
+    { kind: "paragraph", text: "Find Jobs in Switzerland on Arbeitnow" },
+  ]);
+});

@@ -304,4 +304,23 @@ test("filterDashboardJobs filters jobs by jobBoard identifier", () => {
     filterDashboardJobs(all, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "hackernews" }).map((j) => j.id),
     ["hn"],
   );
+
+  // additional job boards matching
+  const remotiveJob = job({ id: "rm", title: "DevOps", source: "remotive" });
+  const arbeitJob = job({ id: "ab", title: "Go Dev", source: "arbeitnow" });
+  const directLever = job({ id: "lv", title: "QA", source_url: "https://jobs.lever.co/company/123" });
+  const extended = [...all, remotiveJob, arbeitJob, directLever];
+
+  assert.deepEqual(
+    filterDashboardJobs(extended, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "remotive" }).map((j) => j.id),
+    ["rm"],
+  );
+  assert.deepEqual(
+    filterDashboardJobs(extended, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "arbeitnow" }).map((j) => j.id),
+    ["ab"],
+  );
+  assert.deepEqual(
+    filterDashboardJobs(extended, { ...DEFAULT_DASHBOARD_FILTERS, jobBoard: "direct" }).map((j) => j.id),
+    ["gh", "lv"],
+  );
 });

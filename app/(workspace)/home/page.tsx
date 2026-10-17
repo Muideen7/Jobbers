@@ -5,10 +5,10 @@ import type { Metadata } from "next";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 import { ProfileAttentionBanner } from "@/components/profile/ProfileAttentionBanner";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
-import { calculateCompletion } from "@/lib/profile-utils";
+import { getCollection, serializeMongo } from "@/lib/mongodb";
+import { getUserProfile, isProfileComplete, calculateCompletion } from "@/lib/profile";
 import { privateMetadata } from "../../private-metadata";
-import type { Job, Profile } from "@/types";
+import type { Job } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "Dashboard",
@@ -22,24 +22,36 @@ export const metadata: Metadata = privateMetadata(
  */
 export default async function DashboardPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  const profile = await getUserProfile(user.id);
+  const profileComplete = isProfileComplete(profile);
 
-  const [{ data: profile }, { data: jobRows, count: totalCount }] = await Promise.all([
-    insforge.database
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle<Profile>(),
-    insforge.database
-      .from("jobs")
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id)
-      .order("match_score", { ascending: false, nullsFirst: false })
-      .range(0, 99)
-      .returns<Job[]>(),
-  ]);
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const jobs = (jobRows ?? []).slice(0, 100);
+  const [rawJobs, researchedJobsCount] = profileComplete
+    ? await Promise.all([
+        jobsCollection
+          .find({ user_id: user.id })
+          .sort({ match_score: -1 })
+          .limit(100)
+          .toArray(),
+        jobsCollection.countDocuments({
+          user_id: user.id,
+          company_research: { $exists: true, $ne: null },
+        }),
+      ])
+    : [[], 0];
+
+  const jobs: Job[] = serializeMongo(
+    rawJobs.map((job) => {
+      const { _id, ...rest } = job as unknown as { _id?: unknown } & Job;
+      return {
+        ...rest,
+        id: job.id || (_id ? String(_id) : ""),
+        company_research: job.company_research ?? null,
+      };
+    }),
+  );
+  const totalCount = jobs.length;
 
   const { completionPercent, missingFields } = calculateCompletion(
     profile ?? {
@@ -65,8 +77,10 @@ export default async function DashboardPage() {
       )}
       <DashboardClient
         initialJobs={jobs}
-        totalCount={totalCount ?? jobs.length}
+        totalCount={totalCount}
         profileName={profile?.full_name ?? null}
+        profileComplete={profileComplete}
+        researchedCount={researchedJobsCount}
       />
     </div>
   );

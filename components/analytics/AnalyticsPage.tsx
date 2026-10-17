@@ -113,7 +113,7 @@ export function AnalyticsPage({ jobs, now }: Props) {
       ? Math.round(scoredJobs.reduce((s, j) => s + (j.match_score ?? 0), 0) / scoredJobs.length)
       : null;
   const highMatches = jobs.filter((j) => (j.match_score ?? 0) >= 60).length;
-  const researched = jobs.filter((j) => j.company_research !== null).length;
+  const researched = jobs.filter((j) => Boolean(j.company_research)).length;
   const thisWeek = jobs.filter((j) => {
     if (!j.found_at) return false;
     return now - new Date(j.found_at).getTime() < 7 * 86_400_000;

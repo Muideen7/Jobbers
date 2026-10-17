@@ -4,16 +4,15 @@
 
 | Layer                          | Tool                     | Purpose                                          |
 | ------------------------------ | ------------------------ | ------------------------------------------------ |
-| Framework                      | Next.js 16 (App Router)  | Full stack framework                             |
-| Auth + DB + Storage + Realtime | InsForge                 | Entire backend                                   |
-| Cloud browser                  | Browserbase              | Company research — browsing company public pages |
-| AI browser control             | Stagehand                | Company page interaction and content extraction  |
-| Job Discovery                  | Adzuna API               | Job search and discovery                         |
-| AI model                       | Google Gemini            | Matching, research synthesis, extraction         |
-| Analytics                      | PostHog                  | Event tracking and dashboard charts              |
-| PDF generation                 | @react-pdf/renderer      | Resume PDF rendering                             |
-| Styling                        | Tailwind CSS + shadcn/ui | UI components and styling                        |
-| Language                       | TypeScript strict        | Throughout                                       |
+| Framework                      | Next.js 16 (App Router)  | Full stack framework (Turbopack, React 19)       |
+| Database                       | MongoDB Atlas            | Primary data store (collections: users, profiles, jobs, applications, resumes) |
+| Authentication                 | Better Auth              | Email/Password + OAuth (GitHub, Google)          |
+| Job Discovery                  | JSearch + Adzuna API     | Multi-source live job discovery                  |
+| AI model                       | Google Gemini            | Matching score, resume tailoring, extraction     |
+| Email service                  | Resend                   | Transactional and welcome notifications          |
+| PDF generation                 | @react-pdf/renderer      | Tailored ATS resume PDF rendering                |
+| Styling                        | Tailwind CSS v4          | Semantic design tokens in app/globals.css        |
+| Language                       | TypeScript strict        | Throughout the codebase                          |
 
 ---
 
@@ -94,13 +93,12 @@
 │       ├── CompanyResearch.tsx
 │       └── JobActions.tsx
 ├── lib/
-│   ├── insforge-client.ts                 → InsForge browser client instance
-│   ├── insforge-server.ts                 → InsForge server client
-│   ├── browserbase.ts                     → Browserbase session creation + management
-│   ├── stagehand.ts                       → Stagehand initialisation with Browserbase session
-│   ├── adzuna.ts                          → Adzuna API client
-│   ├── posthog-client.ts                  → PostHog browser client
-│   ├── posthog-server.ts                  → PostHog server client
+│   ├── mongodb.ts                         → MongoDB Atlas native connection singleton
+│   ├── betterAuth.ts                      → Better Auth configuration
+│   ├── profile.ts                         → Profile service for MongoDB
+│   ├── resumes.ts                         → Resumes service for MongoDB
+│   ├── auth.ts                            → User session helpers (getCurrentUser, requireUser)
+│   ├── llm.ts                             → Google Gemini AI integration
 │   └── utils.ts                           → Shared utility functions
 └── types/
     └── index.ts                           → Global TypeScript types
@@ -113,10 +111,10 @@
 | Folder        | Owns                                                                                                   |
 | ------------- | ------------------------------------------------------------------------------------------------------ |
 | `app/`        | Pages and API routes only. No business logic.                                                          |
-| `agent/`      | All agent logic. Adzuna discovery, company research, matching, extraction. Nothing here touches React. |
-| `actions/`    | Server Actions for UI-triggered mutations only. Profile save, profile update.                          |
-| `components/` | UI only. No data fetching logic. No direct DB calls.                                                   |
-| `lib/`        | Third party client initialisation and shared utilities only.                                           |
+| `agent/`      | All agent logic. Multi-source discovery, company research, matching. Nothing here touches React.      |
+| `actions/`    | Server Actions for UI-triggered mutations only. Profile save, resume upload.                           |
+| `components/` | UI only. No direct DB calls.                                                                           |
+| `lib/`        | MongoDB client, Better Auth, and shared utilities only.                                                |
 | `types/`      | TypeScript types shared across the project.                                                            |
 
 ---
@@ -130,7 +128,7 @@ User interaction in component
         ↓
 Server Action in actions/
         ↓
-InsForge DB write
+MongoDB Atlas write
         ↓
 Revalidate or redirect
 ```
@@ -138,17 +136,15 @@ Revalidate or redirect
 ### Agent Operations (API Routes)
 
 ```
-User clicks Find Jobs
+User clicks Find Jobs / Live Search
         ↓
 API route in app/api/agent/find
         ↓
-Calls agent/adzuna.ts
+Multi-source searchAll (Arbeitnow, RemoteOK, Remotive, Jobicy, JSearch, Adzuna)
         ↓
-Adzuna API returns job listings
+Google Gemini scores jobs against profile
         ↓
-Gemini scores each job against user profile
-        ↓
-Agent writes results to InsForge DB
+Agent writes records to MongoDB Atlas jobs collection
         ↓
 Page data revalidated
 ```
@@ -162,13 +158,9 @@ API route in app/api/agent/research
         ↓
 Calls agent/research.ts
         ↓
-Single Browserbase session opens with Stagehand
+Gemini synthesizes dossier from company web content
         ↓
-Navigates to company homepage + sub pages
-        ↓
-Gemini synthesizes dossier from extracted content
-        ↓
-Dossier saved to jobs.company_research
+Dossier saved to jobs.company_research in MongoDB
         ↓
 Page data revalidated
 ```
@@ -184,14 +176,14 @@ Gemini processes content
         ↓
 @react-pdf/renderer renders PDF buffer
         ↓
-New PDF uploaded to InsForge Storage
+PDF stored in MongoDB resumes collection
         ↓
-URL saved to profiles table
+Profile synced
 ```
 
 ---
 
-## InsForge Database Schema
+## MongoDB Collections Schema
 
 ### `profiles`
 
@@ -217,7 +209,7 @@ URL saved to profiles table
 | linkedin_url        | text        |                                              |
 | portfolio_url       | text        |                                              |
 | work_authorization  | text        | citizen / permanent_resident / visa_required |
-| resume_pdf_url      | text        | InsForge Storage URL of current resume       |
+| resume_pdf_url      | text        | URL or reference of current primary resume   |
 | is_complete         | boolean     | True when all required fields filled         |
 | created_at          | timestamptz |                                              |
 | updated_at          | timestamptz |                                              |
@@ -277,62 +269,34 @@ URL saved to profiles table
 
 ---
 
-## InsForge Storage
+## Resume Storage (MongoDB)
 
-| Bucket  | Path                         | Contents                  |
-| ------- | ---------------------------- | ------------------------- |
-| resumes | resumes/{user_id}/resume.pdf | Current active resume PDF |
+Resumes are stored directly in MongoDB's `resumes` collection. Binary PDF documents are stored as base64 in `file_data`, streamed inline via `/api/resume/download/[id]`.
 
-Access: authenticated users only, own files only.
+Access: authenticated users only, scoped by `user_id`.
 
 ---
 
 ## Authentication
 
-- Provider: InsForge Auth
-- Methods: Google OAuth, GitHub OAuth
-- Protected routes: /dashboard, /profile, /find-jobs, /find-jobs/[id]
-- Public routes: /, /login
-- Middleware in middleware.ts checks session on every protected route
-- On login → redirect to /dashboard
+- Provider: Better Auth (`better-auth` + `@better-auth/mongo-adapter`)
+- Methods: Email/Password, GitHub OAuth, Google OAuth
+- Protected routes: /home, /dashboard, /profile, /find-jobs, /resumes, /applications, /dossiers, /settings
+- Public routes: /, /login, /signup
+- Session handling: Server-side via `requireUser()` / `getCurrentUser()` from `lib/auth.ts`, client-side via `useSession()` from `lib/auth-client.ts`.
 
 ---
 
-## InsForge Client Pattern
+## MongoDB Driver Pattern
 
-Two separate InsForge instances — never mix them:
+Singleton connection via official MongoDB driver:
 
 ```typescript
-// lib/insforge-client.ts
-// Browser-side — used in client components for auth state
-import { createBrowserClient } from "@insforge/ssr";
-export const insforge = createBrowserClient(
-  process.env.NEXT_PUBLIC_INSFORGE_URL!,
-  process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-);
+// lib/mongodb.ts
+import { getCollection } from "@/lib/mongodb";
 
-// lib/insforge-server.ts
-// Server-side — used in API routes, Server Actions, agent code
-import { createServerClient } from "@insforge/ssr";
-import { cookies } from "next/headers";
-
-export const createInsforgeServer = async () => {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_INSFORGE_URL!,
-    process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-};
+const profilesColl = await getCollection<Profile>("profiles");
+const userProfile = await profilesColl.findOne({ id: user.id });
 ```
 
 ---
@@ -419,13 +383,12 @@ Rules the AI agent must never violate:
 
 - API routes contain no UI logic. Components contain no DB logic.
 - Agent code in `/agent` never imports from `/components` or `/actions`.
-- Server Actions never call agent functions. Agent functions are only called from API routes.
-- All InsForge server-side writes use `createInsforgeServer()` — never the browser client.
+- All database operations use `getCollection<T>()` from `lib/mongodb.ts` via the official MongoDB driver singleton.
 - No hardcoded hex values or raw Tailwind color classes in components — use CSS variables from ui-tokens.md.
 - Every Stagehand action is wrapped in try/catch. Failures are logged to agent_logs, never thrown to crash the run.
 - Company research always returns a dossier — even if browser research fails, Gemini synthesizes from company name and job description alone. Never return empty.
 - Browserbase sessions are always closed with stagehand.close() when done — never leave sessions open.
-- Always scope InsForge queries to the current user_id — never query without a user filter.
+- Always scope MongoDB queries and mutations to the authenticated user ID (`user.id` / `user_id`) — never query or write without a user filter.
 - Adzuna API always includes category=it-jobs — never search without this filter.
 - The search country comes from `detectCountry` (`lib/jobs/country.ts`, fallback chain search location → profile preferred/current location → "us") — never a hardcoded literal; Adzuna is skipped silently outside `ADZUNA_SUPPORTED_COUNTRIES` (its API 404s there).
 - A failing job source never fails the run: searchAll isolates it into an `outcomes` error, `sourceWarningLogRows` records it in `agent_logs` (level 'warning'), and `agent_runs.status` only becomes 'failed' for unexpected errors — never for one source's outage.

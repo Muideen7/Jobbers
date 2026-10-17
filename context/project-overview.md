@@ -2,7 +2,7 @@
 
 ## About the Project
 
-Jobbers is a full-stack, AI-powered job hunting assistant built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, and InsForge. Candidates set up their profile once, upload their resume, and the agent automatically discovers relevant jobs across multi-source networks (JSearch, Arbeitnow, RemoteOK, Remotive, Jobicy, Adzuna) — scoring each role against the user's profile using Google Gemini. 
+Jobbers is a full-stack, AI-powered job hunting assistant built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, MongoDB Atlas, and Better Auth. Candidates set up their profile once, upload their resume, and the agent automatically discovers relevant jobs across multi-source networks (JSearch, Arbeitnow, RemoteOK, Remotive, Jobicy, Adzuna) — scoring each role against the user's profile using Google Gemini. 
 
 Applications are managed across a 4-stage pipeline (Saved → Applied → Interview → Offer), while detailed company research dossiers prepare candidates for interviews.
 
@@ -49,7 +49,7 @@ Responsive left sidebar navigation with collapsible desktop state (`lg:w-[240px]
     └── Settings (/settings)
 
 [Unlock Jobbers Pro Card]
-[Take the Tour Button]
+[Settings Action Link]
 [Sign Out Button]
 ```
 
@@ -58,12 +58,12 @@ Responsive left sidebar navigation with collapsible desktop state (`lg:w-[240px]
 ## Core User Flows
 
 ### 1. New Candidate Onboarding & Auto-Search
-- User signs up / logs in via InsForge auth (Email/Password or OAuth).
+- User signs up / logs in via Better Auth (Email/Password or GitHub/Google OAuth).
 - Navigates to `/jobs` or finishes setting target roles in `/profile`.
 - If a candidate has 0 saved jobs, `/jobs` automatically triggers a server-side initial search using their primary target role — presenting live scored opportunities on first render.
 
 ### 2. Interactive Tour Guide
-- Clicking **Take the tour** in the sidebar opens `TourModal` (a 2/4 screen footprint modal using exact `@theme` design tokens).
+- Clicking **Take the tour** in the sidebar opens `TourModal` (using exact `@theme` design tokens).
 - Guides candidates step-by-step through Job Discovery, Applications Pipeline, AI Resumes, and Company Research.
 
 ### 3. Application Pipeline & Stage Transitions
@@ -81,7 +81,8 @@ Responsive left sidebar navigation with collapsible desktop state (`lg:w-[240px]
 
 - **Framework**: Next.js 16 (App Router, Turbopack), React 19, TypeScript
 - **Styling**: Tailwind CSS v4 (`@theme` variables in `app/globals.css`), lucide-react
-- **Backend & Auth**: InsForge (Postgres database, RLS, Storage, Auth)
+- **Database**: MongoDB Atlas (`mongodb` driver)
+- **Authentication**: Better Auth with MongoDB adapter
 - **AI Gateway**: Google Gemini via `@google/genai` (centralized in `lib/llm.ts`)
-- **Analytics**: PostHog server & client tracking
+- **Email Service**: Resend
 - **PDF Rendering**: `@react-pdf/renderer`

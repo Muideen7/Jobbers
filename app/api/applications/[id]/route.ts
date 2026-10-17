@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import { computeFollowUpDate } from "@/lib/workspace/application-rules";
+import { sendJobbersEmail } from "@/lib/mail";
 import {
   APPLICATION_STATUSES,
   CLOSED_REASONS,
   DEFAULT_FOLLOW_UP_DAYS,
 } from "@/lib/workspace/constants";
-import type { Application } from "@/types";
+import type { Application, ApplicationEvent } from "@/types";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-/**
- * Single-application API.
- *
- * PATCH  /api/applications/[id]  → update status / dates / notes / position.
- * DELETE /api/applications/[id]  → untrack (delete) the application.
- *
- * Both verify the row belongs to the signed-in user before touching it, so a
- * second user gets a 404 rather than a cross-user read/write.
- */
 
 const updateApplicationSchema = z.object({
   status: z.enum(APPLICATION_STATUSES).optional(),
@@ -35,18 +27,9 @@ const updateApplicationSchema = z.object({
   closed_reason: z.enum(CLOSED_REASONS).nullable().optional(),
 });
 
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    if (!isUuid(id)) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-    }
 
     const user = await getCurrentUser();
     if (!user) {
@@ -55,7 +38,9 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         { status: 401 },
       );
     }
-    const insforge = await createInsforgeServer();
+
+    const applicationsCollection = await getCollection<Application>("applications");
+    const eventsCollection = await getCollection<ApplicationEvent>("application_events");
 
     const json = await req.json().catch(() => null);
     const parsed = updateApplicationSchema.safeParse(json);
@@ -66,20 +51,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const { data: existing, error: findError } = await insforge.database
-      .from("applications")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle<Application>();
+    const existing = await applicationsCollection.findOne({
+      id,
+      user_id: user.id,
+    });
 
-    if (findError) {
-      console.error("[api/applications/[id]] find", findError);
-      return NextResponse.json(
-        { success: false, error: "Failed to update application" },
-        { status: 500 },
-      );
-    }
     if (!existing) {
       return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
@@ -132,47 +108,57 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ success: true, data: { application: existing } });
     }
 
-    const { data: updated, error: updateError } = await insforge.database
-      .from("applications")
-      .update(patch)
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .select()
-      .single<Application>();
+    const now = new Date().toISOString();
+    patch.updated_at = now;
 
-    if (updateError || !updated) {
-      console.error("[api/applications/[id]] update", updateError);
-      return NextResponse.json(
-        { success: false, error: "Failed to update application" },
-        { status: 500 },
-      );
-    }
+    await applicationsCollection.updateOne(
+      { id, user_id: user.id },
+      { $set: patch },
+    );
 
-    const events: Record<string, unknown>[] = [];
-    if (statusChanged) {
+    const updated = await applicationsCollection.findOne({ id, user_id: user.id });
+
+    const events: ApplicationEvent[] = [];
+    if (statusChanged && updated) {
       events.push({
+        id: randomUUID(),
         application_id: id,
         user_id: user.id,
         type: "status_changed",
         from_status: previousStatus,
         to_status: updated.status,
+        created_at: now,
       });
     }
-    if ("next_follow_up_at" in patch && patch.next_follow_up_at) {
+    if ("next_follow_up_at" in patch && patch.next_follow_up_at && updated) {
       events.push({
+        id: randomUUID(),
         application_id: id,
         user_id: user.id,
         type: "follow_up_set",
+        from_status: null,
         to_status: updated.status,
+        created_at: now,
       });
     }
     if (events.length > 0) {
-      const { error: eventError } = await insforge.database
-        .from("application_events")
-        .insert(events);
-      if (eventError) {
-        console.error("[api/applications/[id]] events", eventError);
-      }
+      await eventsCollection.insertMany(events);
+    }
+
+    if (
+      statusChanged &&
+      updated &&
+      (updated.status === "interview" || updated.status === "offer") &&
+      user.email
+    ) {
+      sendJobbersEmail({
+        to: user.email,
+        subject: `Application Update: You moved to ${updated.status.toUpperCase()}!`,
+        heading: "Great news on your application!",
+        bodyText: `Your application status has advanced to "${updated.status}". Check your dashboard for next steps.`,
+        ctaLabel: "View Applications",
+        ctaUrl: `${process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/applications`,
+      }).catch((err) => console.error("[mail] status email trigger error", err));
     }
 
     return NextResponse.json({ success: true, data: { application: updated } });
@@ -188,9 +174,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 export async function DELETE(_req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    if (!isUuid(id)) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-    }
 
     const user = await getCurrentUser();
     if (!user) {
@@ -199,39 +182,18 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
         { status: 401 },
       );
     }
-    const insforge = await createInsforgeServer();
 
-    const { data: existing, error: findError } = await insforge.database
-      .from("applications")
-      .select("id")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle<{ id: string }>();
+    const applicationsCollection = await getCollection<Application>("applications");
+    const existing = await applicationsCollection.findOne({
+      id,
+      user_id: user.id,
+    });
 
-    if (findError) {
-      console.error("[api/applications/[id]] find", findError);
-      return NextResponse.json(
-        { success: false, error: "Failed to delete application" },
-        { status: 500 },
-      );
-    }
     if (!existing) {
       return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
 
-    const { error: deleteError } = await insforge.database
-      .from("applications")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (deleteError) {
-      console.error("[api/applications/[id]] delete", deleteError);
-      return NextResponse.json(
-        { success: false, error: "Failed to delete application" },
-        { status: 500 },
-      );
-    }
+    await applicationsCollection.deleteOne({ id, user_id: user.id });
 
     return NextResponse.json({ success: true, data: { id } });
   } catch (error) {

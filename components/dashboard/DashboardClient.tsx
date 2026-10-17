@@ -48,6 +48,8 @@ type Props = {
   initialJobs: Job[];
   totalCount?: number;
   profileName?: string | null;
+  profileComplete?: boolean;
+  researchedCount?: number;
 };
 
 type ActiveTab = "matches" | "recent" | "applied";
@@ -70,8 +72,10 @@ export function DashboardClient({
   initialJobs,
   totalCount,
   profileName,
+  profileComplete = false,
+  researchedCount: serverResearchedCount,
 }: Props) {
-  const totalJobsCount = totalCount ?? initialJobs.length;
+  const totalJobsCount = profileComplete ? (totalCount ?? initialJobs.length) : 0;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("matches");
   // localStorage is an external store: the server snapshot is empty, so the
@@ -109,8 +113,9 @@ export function DashboardClient({
     recordJobView(jobId);
   }
 
-  // Top 10 best matches based on profile & resume
-  const topJobs = initialJobs.slice(0, 10);
+  // Top 10 best matches based on profile & resume.
+  // CRITICAL: NEVER show top AI matches unless the user's profile is filled.
+  const topJobs = profileComplete ? initialJobs.slice(0, 10) : [];
 
   const jobMap = new Map(initialJobs.map((j) => [j.id, j]));
   const recentJobs = recentIds
@@ -130,8 +135,10 @@ export function DashboardClient({
         ? appliedJobs
         : topJobs;
 
-  // Compute key stats
-  const scoredJobs = initialJobs.filter((j) => j.match_score !== null);
+  // Compute key stats (only available if profile is filled)
+  const scoredJobs = profileComplete
+    ? initialJobs.filter((j) => j.match_score !== null)
+    : [];
   const avgMatchRate =
     scoredJobs.length > 0
       ? Math.round(
@@ -145,9 +152,10 @@ export function DashboardClient({
       ? Math.max(...scoredJobs.map((j) => j.match_score ?? 0))
       : 0;
 
-  const researchedCount = initialJobs.filter(
-    (j) => j.company_research !== null,
-  ).length;
+  const researchedCount = profileComplete
+    ? (serverResearchedCount ??
+        initialJobs.filter((j) => Boolean(j.company_research)).length)
+    : 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -276,7 +284,7 @@ export function DashboardClient({
             href="/jobs"
             className="inline-flex shrink-0 items-center gap-1.5 self-start text-xs font-semibold text-accent transition-colors hover:text-accent-dark hover:underline sm:self-auto"
           >
-            Explore all {totalJobsCount} roles
+            {profileComplete ? `Explore all ${totalJobsCount} roles` : "Browse all jobs"}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -288,6 +296,8 @@ export function DashboardClient({
                 <Clock className="h-6 w-6 text-text-muted" />
               ) : activeTab === "applied" ? (
                 <Briefcase className="h-6 w-6 text-text-muted" />
+              ) : !profileComplete ? (
+                <Sparkles className="h-6 w-6 text-accent" />
               ) : (
                 <Search className="h-6 w-6 text-text-muted" />
               )}
@@ -297,17 +307,23 @@ export function DashboardClient({
                 ? "No recently viewed roles yet"
                 : activeTab === "applied"
                   ? "No applied or saved roles yet"
-                  : "No matched roles found yet"}
+                  : !profileComplete
+                    ? "Complete your profile to get tailored AI matches"
+                    : "No matched roles found yet"}
             </p>
             <p className="mt-1.5 max-w-sm text-xs text-text-muted">
               {activeTab === "recent"
                 ? "Click 'View Details' on any position to track roles you've previewed."
                 : activeTab === "applied"
                   ? "Click 'Mark Applied' on any position card to track your pipeline."
-                  : "Discover open positions across live job sources scored by AI."}
+                  : !profileComplete
+                    ? "Your profile needs to be filled before AI can match you with relevant roles. Upload your CV or enter your experience, skills, and target roles to start getting accurate recommendations."
+                    : "Discover open positions across live job sources scored by AI."}
             </p>
             <Button asChild size="sm" className="mt-5 rounded-full font-semibold">
-              <Link href="/jobs">Browse Live Jobs</Link>
+              <Link href={!profileComplete && activeTab === "matches" ? "/profile" : "/jobs"}>
+                {!profileComplete && activeTab === "matches" ? "Complete Profile" : "Browse Live Jobs"}
+              </Link>
             </Button>
           </div>
         ) : (

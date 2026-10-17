@@ -118,9 +118,7 @@ export function WallOfLove() {
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">
-              Trusted by job seekers
-              <br />
-              across 6 continents
+              Trusted by job seekers across 6 continents
             </h2>
           </div>
 

@@ -8,12 +8,12 @@ import {
 } from "@/lib/job-description";
 
 type Props = {
-  aboutRole: string | null;
-  responsibilities: string[];
-  requirements: string[];
-  niceToHave: string[];
-  benefits: string[];
-  sourceUrl: string | null;
+  aboutRole?: string | null;
+  responsibilities?: string[] | null;
+  requirements?: string[] | null;
+  niceToHave?: string[] | null;
+  benefits?: string[] | null;
+  sourceUrl?: string | null;
 };
 
 type BulletSection = {
@@ -21,7 +21,7 @@ type BulletSection = {
   items: string[];
 };
 
-function isTruncatedPreview(description: string | null): boolean {
+function isTruncatedPreview(description: string | null | undefined): boolean {
   if (!description) return false;
 
   const trimmed = description.trim();
@@ -29,7 +29,7 @@ function isTruncatedPreview(description: string | null): boolean {
 }
 
 function BulletList({ section }: { section: BulletSection }) {
-  if (section.items.length === 0) return null;
+  if (!section.items || section.items.length === 0) return null;
 
   return (
     <div className="mt-6">
@@ -54,7 +54,7 @@ function RichDescription({ blocks }: { blocks: JobDescriptionBlock[] }) {
           return (
             <h3
               key={index}
-              className="mt-2 text-base font-semibold leading-6 text-text-primary first:mt-0"
+              className="mt-5 text-sm sm:text-base font-bold leading-6 text-text-primary first:mt-0 tracking-tight"
             >
               {block.text}
             </h3>
@@ -101,11 +101,11 @@ export function JobDescription({
     !hasHtml && isTruncatedPreview(aboutRole) && Boolean(sourceUrl);
 
   const sections: BulletSection[] = [
-    { title: "Responsibilities", items: responsibilities },
-    { title: "Requirements", items: requirements },
-    { title: "Nice to Have", items: niceToHave },
-    { title: "Benefits", items: benefits },
-  ].filter((section) => section.items.length > 0);
+    { title: "Responsibilities", items: responsibilities ?? [] },
+    { title: "Requirements", items: requirements ?? [] },
+    { title: "Nice to Have", items: niceToHave ?? [] },
+    { title: "Benefits", items: benefits ?? [] },
+  ].filter((section) => Array.isArray(section.items) && section.items.length > 0);
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-card">
@@ -122,7 +122,7 @@ export function JobDescription({
         {blocks.length > 0 ? (
           <RichDescription blocks={blocks} />
         ) : aboutRole ? (
-          <p className="text-sm font-medium leading-6 text-text-primary">
+          <p className="whitespace-pre-line text-sm font-medium leading-relaxed text-text-primary">
             {aboutRole}
           </p>
         ) : (

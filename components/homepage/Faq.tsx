@@ -15,9 +15,7 @@ export function Faq() {
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">
-              Common
-              <br />
-              questions
+              Common questions
             </h2>
 
             <p className="text-text-secondary text-sm leading-relaxed">
@@ -32,7 +30,7 @@ export function Faq() {
                 than we can.
               </p>
               <Link
-                href="/login"
+                href="/login?mode=signup"
                 className="btn btn-secondary btn-sm mt-2 cursor-pointer"
               >
                 Get started

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { AnalyticsPage } from "@/components/analytics/AnalyticsPage";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import { privateMetadata } from "../../private-metadata";
 import type { Job } from "@/types";
 
@@ -15,16 +15,23 @@ export const metadata: Metadata = privateMetadata(
 
 export default async function AnalyticsRoute() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
+  const jobsCollection = await getCollection<Job>("jobs");
 
-  const { data: jobRows } = await insforge.database
-    .from("jobs")
-    .select("id, match_score, found_at, company_research, source")
-    .eq("user_id", user.id)
-    .order("found_at", { ascending: false })
-    .returns<Job[]>();
-
-  const jobs = (jobRows as Job[] | null) ?? [];
+  const jobs = await jobsCollection
+    .find(
+      { user_id: user.id },
+      {
+        projection: {
+          id: 1,
+          match_score: 1,
+          found_at: 1,
+          company_research: 1,
+          source: 1,
+        },
+      },
+    )
+    .sort({ found_at: -1 })
+    .toArray();
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">

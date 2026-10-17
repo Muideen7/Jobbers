@@ -1,57 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ResponseCookies } from "next/dist/server/web/spec-extension/cookies";
-import type { RequestCookies } from "next/dist/server/web/spec-extension/cookies";
-import { updateSession } from "@insforge/sdk/ssr";
-import type { CookieOptions, CookieStore } from "@insforge/sdk/ssr";
 
-import { AUTH_COOKIE_SETTINGS } from "@/lib/auth-cookies";
-import {
-  buildContentSecurityPolicy,
-  createNonce,
-} from "@/lib/security-headers";
 
-function createCookieStoreAdapter(
-  cookies: RequestCookies | ResponseCookies,
-): CookieStore {
-  function setCookie(
-    name: string,
-    value: string,
-    options?: CookieOptions,
-  ): unknown;
-  function setCookie(
-    options: { name: string; value: string } & CookieOptions,
-  ): unknown;
-  function setCookie(
-    nameOrOptions: string | ({ name: string; value: string } & CookieOptions),
-    value?: string,
-    options?: CookieOptions,
-  ): unknown {
-    if (typeof nameOrOptions === "string") {
-      cookies.set({ name: nameOrOptions, value: value ?? "", ...options });
-      return;
-    }
+import { createNonce, buildContentSecurityPolicy } from "@/lib/security-headers";
 
-    cookies.set(nameOrOptions);
-    return undefined;
-  }
 
-  function deleteCookie(name: string): unknown;
-  function deleteCookie(options: { name: string } & CookieOptions): unknown;
-  function deleteCookie(
-    nameOrOptions: string | ({ name: string } & CookieOptions),
-  ): unknown {
-    cookies.delete(
-      typeof nameOrOptions === "string" ? nameOrOptions : nameOrOptions.name,
-    );
-    return undefined;
-  }
 
-  return {
-    get: (name: string) => cookies.get(name),
-    set: setCookie,
-    delete: deleteCookie,
-  };
-}
+
+
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Every route this proxy owns is dynamically rendered, so a per-request
@@ -75,33 +30,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // Redirect responses are not documents, but carrying the policy keeps the
   // header set uniform on every route this proxy touches.
-  const withSecurityHeaders = (redirect: NextResponse): NextResponse => {
-    redirect.headers.set("Content-Security-Policy", contentSecurityPolicy);
-    return redirect;
-  };
 
-  let session;
-  try {
-    session = await updateSession({
-      ...AUTH_COOKIE_SETTINGS,
-      requestCookies: createCookieStoreAdapter(request.cookies),
-      responseCookies: createCookieStoreAdapter(response.cookies),
-    });
-  } catch (error) {
-    // updateSession throws (rather than returning an error) when the InsForge
-    // env vars are missing. Fail closed to the login page with a real message
-    // instead of returning an unhandled 500 on every matched route.
-    console.error("[proxy] updateSession", error);
-    return withSecurityHeaders(
-      NextResponse.redirect(new URL("/login?error=server", request.url)),
-    );
-  }
 
-  if (!session.accessToken) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return withSecurityHeaders(NextResponse.redirect(loginUrl));
-  }
+
 
   return response;
 }

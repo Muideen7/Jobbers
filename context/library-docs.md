@@ -67,122 +67,69 @@ hand-written variants of the classic shadcn/ui components. Read
 
 ---
 
-## InsForge
+## MongoDB Atlas & Better Auth
 
-**Check first:** Check AGENTS.md for an installed InsForge skill. If an InsForge MCP server is configured — use it. The skill/MCP will have the latest API patterns.
+### Client & Connection (`lib/mongodb.ts`)
 
-### Client vs Server
-
-Two separate instances — never mix them:
+MongoDB is accessed via the official `mongodb` driver. A singleton `MongoClient` is cached on `globalThis._mongoClient` in development to prevent connection exhaustion during hot reloads:
 
 ```typescript
-// lib/insforge-client.ts — browser context only
-import { createBrowserClient } from "@insforge/ssr";
+// lib/mongodb.ts
+import { MongoClient, ServerApiVersion, type Document } from "mongodb";
 
-export const insforge = createBrowserClient(
-  process.env.NEXT_PUBLIC_INSFORGE_URL!,
-  process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-);
+const client: MongoClient = ...;
+export default client;
+
+export async function getCollection<TSchema extends Document>(collectionName: string) {
+  const connectedClient = await client.connect();
+  return connectedClient.db().collection<TSchema>(collectionName);
+}
 ```
 
-```typescript
-// lib/insforge-server.ts — server context only
-import { createServerClient } from "@insforge/ssr";
-import { cookies } from "next/headers";
+### Authentication (`lib/betterAuth.ts` & `lib/auth.ts`)
 
-export const createInsforgeServer = async () => {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_INSFORGE_URL!,
-    process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-};
+Better Auth handles sessions, email/password validation (enforcing $\ge 8$ chars), and OAuth providers (GitHub & Google) backed by `@better-auth/mongo-adapter`.
+
+```typescript
+// lib/auth.ts — Server session check
+import { auth } from "@/lib/betterAuth";
+import { headers } from "next/headers";
+
+export async function getCurrentUser() {
+  const headerList = await headers();
+  const session = await auth.api.getSession({ headers: headerList });
+  return session?.user ?? null;
+}
+
+export async function requireUser() {
+  const user = await getCurrentUser();
+  if (!user) {
+    const { redirect } = await import("next/navigation");
+    redirect("/login");
+  }
+  return user;
+}
 ```
 
-**Rules:**
-
-- Browser client — Client Components, browser-side auth state, realtime subscriptions
-- Server client — Server Components, API routes, Server Actions, agent functions
-- Never use browser client in server context
-- Never use server client in browser context
-
----
-
-### Auth
+### Database Operations (`lib/profile.ts`, `lib/dashboard.ts`, `lib/resumes.ts`)
 
 ```typescript
-// Get current user in server context
-const insforge = await createInsforgeServer();
-const {
-  data: { user },
-  error,
-} = await insforge.auth.getUser();
-if (!user) redirect("/login");
-```
+// Read profile
+import { getUserProfile, upsertUserProfile } from "@/lib/profile";
 
----
+const profile = await getUserProfile(user.id);
 
-### DB Queries
-
-```typescript
-// Read
-const { data, error } = await insforge
-  .from("jobs")
-  .select("*")
-  .eq("user_id", user.id)
-  .order("found_at", { ascending: false });
-
-// Insert
-const { data, error } = await insforge
-  .from("jobs")
-  .insert({ user_id: user.id, title, company, match_score })
-  .select()
-  .single();
-
-// Update
-const { error } = await insforge
-  .from("jobs")
-  .update({ company_research: dossier })
-  .eq("id", jobId)
-  .eq("user_id", user.id); // always scope to user
+// Upsert profile
+await upsertUserProfile(user.id, {
+  full_name: "Jane Doe",
+  skills: ["React", "TypeScript", "Node.js"],
+});
 ```
 
 **Rules:**
-
-- Always scope queries to `user_id` — never query without user filter
-- Always handle the `error` return — never assume success
-- Use `.single()` when expecting exactly one row
-
----
-
-### Storage
-
-```typescript
-// Upload file
-const { data, error } = await insforge.storage
-  .from("resumes")
-  .upload(`${userId}/resume.pdf`, fileBuffer, {
-    contentType: "application/pdf",
-    upsert: true, // overwrites existing file
-  });
-
-// Get public URL
-const { data } = insforge.storage
-  .from("resumes")
-  .getPublicUrl(`${userId}/resume.pdf`);
-
-const url = data.publicUrl;
-```
+- All queries must be scoped to `userId` or `user.id`.
+- Always serialize MongoDB `_id` to string (`_id.toString()`) and `Date` instances to ISO strings before passing to Client Components.
+- Use `getCollection<TSchema>("name")` for type-safe collection access.
 
 **Storage paths:**
 
@@ -433,7 +380,7 @@ A failing source must never fail the run. `lib/jobs/source-warnings.ts`:
 import { sourceWarningLogRows } from "@/lib/jobs/source-warnings";
 
 const rows = sourceWarningLogRows({ runId, userId: user.id, outcomes: result.outcomes });
-if (rows.length > 0) await insforge.database.from("agent_logs").insert(rows);
+if (rows.length > 0) await (await getCollection("agent_logs")).insertMany(rows);
 ```
 
 - One `agent_logs` row (level `"warning"`, message names source + error + "Run continued") per errored outcome — insert failures are `console.error`'d, never thrown
@@ -743,64 +690,40 @@ throws if the response text is empty, and returns the parsed object.
 
 ---
 
-## PostHog
+## Resend (Email Service)
 
-**Check first:** Check AGENTS.md for an installed PostHog skill. If a PostHog MCP server is configured — use it. The skill/MCP will have the latest client and server patterns.
+### Setup & Sending (`lib/mail.ts`)
 
-### Client Setup (Browser)
-
-```typescript
-// lib/posthog-client.ts
-import posthog from "posthog-js";
-
-export function initPostHog() {
-  if (typeof window !== "undefined") {
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST!,
-      capture_pageview: false, // manual pageview tracking
-    });
-  }
-}
-
-// Capture event client-side
-posthog.capture("job_found", {
-  userId,
-  source: "search",
-  matchScore: score,
-});
-```
-
-### Server Setup
+Resend delivers branded notifications and transactional emails (such as the new account welcome message):
 
 ```typescript
-// lib/posthog-server.ts
-import { PostHog } from "posthog-node";
+// lib/mail.ts
+import { Resend } from "resend";
 
-export const createPostHogServer = () =>
-  new PostHog(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
-    host: process.env.NEXT_PUBLIC_POSTHOG_HOST!,
-    flushAt: 1, // send immediately
-    flushInterval: 0, // no batching — Next.js functions are short-lived
+export async function sendJobbersEmail(options: {
+  to: string;
+  subject: string;
+  heading: string;
+  bodyText: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const resend = new Resend(apiKey);
+  return await resend.emails.send({
+    from: process.env.EMAIL_FROM || "Jobbers <onboarding@resend.dev>",
+    to: options.to,
+    subject: options.subject,
+    html: renderEmailHtml(options),
   });
-
-// Always use and shutdown in the same function
-const posthog = createPostHogServer();
-posthog.capture({
-  distinctId: userId,
-  event: "company_researched",
-  properties: { userId, jobId, company },
-});
-await posthog.shutdown(); // required — ensures event is sent
+}
 ```
 
 **Rules:**
-
-- Always call `await posthog.shutdown()` in server-side functions — events are lost without it
-- `flushAt: 1` and `flushInterval: 0` always set on server client
-- Event names must match exactly the list in `code-standards.md`
-- Always include `userId` as a property on every server-side event
-- Call `posthog.identify(userId)` after login on client side
-- Call `posthog.reset()` on logout on client side
+- Always provide a safe fallback if `RESEND_API_KEY` is not configured in local development.
+- Use responsive HTML email layouts with Jobbers brand styling.
+- Catch errors gracefully at call sites so email delivery never blocks user registration.
 
 ---
 
@@ -835,13 +758,14 @@ const ResumePDF = ({ profile }: { profile: Profile }) => (
 // Generate buffer
 const buffer = await renderToBuffer(<ResumePDF profile={profile} />)
 
-// Upload directly to InsForge Storage
-await insforge.storage
-  .from('resumes')
-  .upload(`${userId}/resume.pdf`, buffer, {
-    contentType: 'application/pdf',
-    upsert: true
-  })
+// Save base64 buffer directly to MongoDB resumes collection
+const base64Data = Buffer.from(buffer).toString("base64");
+await resumesCollection.insertOne({
+  id: randomUUID(),
+  user_id: userId,
+  file_data: base64Data,
+  is_primary: true,
+});
 ```
 
 **Supported CSS properties:**
@@ -853,8 +777,8 @@ Only use these — others are silently ignored:
 - Server-side only — never import in client components
 - Always use `renderToBuffer` — not `renderToStream` or `PDFDownloadLink`
 - PDF generation only in `app/api/resume/` routes
-- Generated buffer uploaded directly to InsForge Storage — never written to disk
-- Always save public URL to DB after upload
+- Generated buffer stored directly in MongoDB — never written to disk
+- Always sync profile `resume_pdf_url` after generation
 
 ---
 

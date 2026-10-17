@@ -75,6 +75,13 @@ export function ResumeSection({ existingResumeUrl, onExtracted }: Props) {
       const result = await uploadResume(formData);
       if (result.success) {
         setUploadSuccess(true);
+        if (result.extractedData) {
+          onExtracted?.(result.extractedData);
+          setExtractSuccess(true);
+          setExtractError(null);
+        } else if (result.extractionMessage) {
+          setExtractError(result.extractionMessage);
+        }
       } else {
         setUploadError(result.error ?? "Upload failed");
       }

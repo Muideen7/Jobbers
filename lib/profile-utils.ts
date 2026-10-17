@@ -1,4 +1,4 @@
-import type { MissingField } from "@/types";
+import type { MissingField, Profile } from "@/types";
 
 type CompletionInput = {
   full_name: string | null;
@@ -42,3 +42,42 @@ export function calculateCompletion(data: CompletionInput): CompletionResult {
     missingFields,
   };
 }
+
+/**
+ * Checks whether the user has filled their profile for tailored AI recommendations.
+ * Requires actual filled candidate profile data (skills, role/title, experience or education)
+ * and an adequate completion threshold so AI matching is accurate and meaningful.
+ */
+export function isProfileComplete(profile: Profile | null): boolean {
+  if (!profile) return false;
+
+  const { isComplete, completionPercent } = calculateCompletion({
+    full_name: profile.full_name,
+    phone: profile.phone,
+    location: profile.location,
+    current_title: profile.current_title,
+    experience_level: profile.experience_level,
+    years_experience: profile.years_experience,
+    skills: profile.skills ?? [],
+    work_experience: profile.work_experience,
+    education: profile.education,
+  });
+
+  if (isComplete) return true;
+  if (profile.is_complete === true && completionPercent >= 50) return true;
+
+  const hasName = Boolean(profile.full_name?.trim());
+  const hasRole = Boolean(
+    (profile.job_titles_seeking && profile.job_titles_seeking.length > 0) ||
+      profile.current_title?.trim(),
+  );
+  const hasSkills = Boolean(profile.skills && profile.skills.length > 0);
+  const hasExperienceOrEdu = Boolean(
+    (profile.work_experience && profile.work_experience.length > 0) ||
+      profile.education?.degree ||
+      profile.years_experience !== null,
+  );
+
+  return hasName && hasRole && hasSkills && hasExperienceOrEdu && completionPercent >= 50;
+}
+

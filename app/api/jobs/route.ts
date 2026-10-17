@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import { parseJobSearch } from "@/lib/search-query";
 import { MATCH_THRESHOLD } from "@/lib/utils";
+import type { Filter } from "mongodb";
 import type { Job } from "@/types";
 
 const PAGE_SIZE = 20;
@@ -17,7 +18,6 @@ export async function GET(req: NextRequest) {
         { status: 401 },
       );
     }
-    const insforge = await createInsforgeServer();
 
     const { searchParams } = req.nextUrl;
     const search = parseJobSearch(searchParams.get("search"));
@@ -25,57 +25,44 @@ export async function GET(req: NextRequest) {
     const sortOption = searchParams.get("sortOption") ?? "score";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
 
-    // The dashboard feed asks for a bigger first page so its client-side
-    // filters work over a representative set; cap it to keep the response sane.
     const limitParam = parseInt(searchParams.get("limit") ?? "", 10);
     const pageSize = Number.isFinite(limitParam)
       ? Math.min(Math.max(limitParam, 1), 100)
       : PAGE_SIZE;
 
-    let query = insforge.database
-      .from("jobs")
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id);
+    const query: Filter<Job> = { user_id: user.id };
 
     if (matchFilter === "high") {
-      query = query.gte("match_score", MATCH_THRESHOLD);
+      query.match_score = { $gte: MATCH_THRESHOLD } as unknown as number;
     } else if (matchFilter === "low") {
-      query = query.lt("match_score", MATCH_THRESHOLD);
+      query.match_score = { $lt: MATCH_THRESHOLD } as unknown as number;
     }
 
     if (search) {
-      query = query.or(
-        `title.ilike.%${search}%,company.ilike.%${search}%`,
-      );
+      const regex = { $regex: search, $options: "i" } as unknown as string;
+      query.$or = [{ title: regex }, { company: regex }];
     }
 
-    if (sortOption === "score") {
-      query = query.order("match_score", { ascending: false, nullsFirst: false });
-    } else if (sortOption === "newest") {
-      query = query.order("found_at", { ascending: false });
-    } else if (sortOption === "oldest") {
-      query = query.order("found_at", { ascending: true });
-    }
+    const sortOrder: Record<string, 1 | -1> =
+      sortOption === "score"
+        ? { match_score: -1, found_at: -1 }
+        : sortOption === "oldest"
+          ? { found_at: 1 }
+          : { found_at: -1 };
 
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    query = query.range(from, to);
+    const skip = (page - 1) * pageSize;
+    const jobsCollection = await getCollection<Job>("jobs");
 
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error("[api/jobs]", error);
-      return NextResponse.json(
-        { success: false, error: "Failed to fetch jobs" },
-        { status: 500 },
-      );
-    }
+    const [data, totalCount] = await Promise.all([
+      jobsCollection.find(query).sort(sortOrder).skip(skip).limit(pageSize).toArray(),
+      jobsCollection.countDocuments(query),
+    ]);
 
     return NextResponse.json({
       success: true,
       data: {
         jobs: (data as Job[] | null) ?? [],
-        totalCount: count ?? 0,
+        totalCount,
         page,
         pageSize,
       },

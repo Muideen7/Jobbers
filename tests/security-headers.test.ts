@@ -8,7 +8,6 @@ import {
   buildContentSecurityPolicy,
   buildStrictTransportSecurity,
   createNonce,
-  posthogAssetsHost,
 } from "../lib/security-headers.ts";
 
 function directive(policy: string, name: string): string {
@@ -31,45 +30,19 @@ test("static fallback policy is used only when no nonce is supplied", () => {
   const policy = buildContentSecurityPolicy();
 
   const scriptSrc = directive(policy, "script-src");
-  assert.ok(scriptSrc.startsWith("script-src 'self' 'unsafe-inline'"), scriptSrc);
-  // Without a nonce there is no 'strict-dynamic', so posthog's remote config
-  // has to be named explicitly or the browser blocks it.
-  assert.ok(scriptSrc.includes("us-assets.i.posthog.com"), scriptSrc);
+  assert.equal(scriptSrc, "script-src 'self' 'unsafe-inline'");
 });
 
-test("posthog's assets host is reachable from both directives", () => {
+test("connect-src is self-only in production", () => {
   for (const policy of [
     buildContentSecurityPolicy(),
     buildContentSecurityPolicy({ nonce: "abc123" }),
   ]) {
     const connect = directive(policy, "connect-src");
-    assert.ok(connect.includes("us.i.posthog.com"), connect);
-    assert.ok(connect.includes("us-assets.i.posthog.com"), connect);
+    assert.equal(connect, "connect-src 'self'");
   }
-
-  // The nonce policy must stay byte-identical: 'strict-dynamic' already
-  // covers scripts posthog injects, and host allowlists are ignored alongside
-  // it, so adding the origin there would be dead weight.
-  assert.equal(
-    directive(buildContentSecurityPolicy({ nonce: "abc123" }), "script-src"),
-    "script-src 'self' 'nonce-abc123' 'strict-dynamic'",
-  );
 });
 
-test("a custom posthog host maps to itself instead of inventing an assets host", () => {
-  assert.equal(
-    posthogAssetsHost("https://us.i.posthog.com"),
-    "https://us-assets.i.posthog.com",
-  );
-  assert.equal(
-    posthogAssetsHost("https://eu.i.posthog.com"),
-    "https://eu-assets.i.posthog.com",
-  );
-  assert.equal(
-    posthogAssetsHost("https://proxy.example.com"),
-    "https://proxy.example.com",
-  );
-});
 
 test("both policies agree on the directives that are not script-src", () => {
   const strict = buildContentSecurityPolicy({ nonce: "abc123" });
@@ -99,11 +72,10 @@ test("frame-ancestors and object-src stay locked down", () => {
   assert.equal(directive(policy, "form-action"), "form-action 'self'");
 });
 
-test("connect-src allowlists PostHog and nothing else", () => {
+test("connect-src allowlists self and nothing else", () => {
   const connect = directive(buildContentSecurityPolicy(), "connect-src");
 
-  assert.match(connect, /'self'/);
-  assert.match(connect, /posthog\.com/);
+  assert.equal(connect, "connect-src 'self'");
   // Adzuna and Browserbase are server-side only and must never be reachable
   // from the browser.
   assert.ok(!connect.includes("adzuna"), connect);

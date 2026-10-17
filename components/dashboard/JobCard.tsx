@@ -77,7 +77,7 @@ export function JobCard({
   const company = job.company ?? "Unknown company";
   const title = job.title ?? "Untitled role";
   const detailHref = `/jobs/${job.id}`;
-  const hasResearch = job.company_research !== null;
+  const hasResearch = Boolean(job.company_research);
   const isRemote = isRemoteListing(job);
   const topSkills = job.matched_skills.slice(0, 2);
   const isSaved = application !== null;
@@ -203,7 +203,14 @@ export function JobCard({
               href={job.external_apply_url}
               target="_blank"
               rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                fetch("/api/applications", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ jobId: job.id, status: "applied" }),
+                }).catch(() => {});
+              }}
               className="inline-flex items-center gap-0.5 text-[11px] font-medium text-text-muted hover:text-text-primary"
               title="Apply on external job board"
             >

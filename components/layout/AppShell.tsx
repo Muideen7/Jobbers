@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
   BarChart2,
   Bell,
   Building2,
@@ -22,12 +21,10 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 
-import { PostHogLogoutLink } from "@/components/analytics/PostHogLogoutLink";
-import { PricingModal } from "@/components/layout/PricingModal";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Logo } from "@/components/layout/Logo";
 import { ThemeToggler } from "@/components/layout/ThemeToggler";
 import { useSidebarSummary } from "@/components/layout/useSidebarSummary";
-import { Button } from "@/components/ui/button";
 import { formatDate, getInitials } from "@/lib/utils";
 import type { ApplicationStage } from "@/lib/workspace/constants";
 import type { SidebarSummary } from "@/lib/workspace/types";
@@ -173,7 +170,6 @@ export function AppShell({ user, children }: Props) {
     getCollapsedServerSnapshot,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [pricingOpen, setPricingOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<"notifications" | "account" | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
@@ -316,27 +312,6 @@ export function AppShell({ user, children }: Props) {
 
         {renderNav({ collapsed, onNavigate: closeTransientChrome })}
 
-        {/* Pro upgrade card — centered between Settings and Take the tour with balanced spacing */}
-        {!collapsed && (
-          <div className="mx-3 my-6 rounded-2xl border border-border bg-gradient-to-br from-accent-muted to-surface-secondary p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-accent">
-              <ArrowRight className="h-4 w-4" aria-hidden />
-              <p className="text-sm font-semibold text-text-primary">Unlock Jobbers Pro</p>
-            </div>
-            <p className="mt-1 text-xs leading-5 text-text-secondary">
-              Unlimited matches, research and tailored resumes.
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setPricingOpen(true)}
-              className="mt-3 w-full font-medium"
-            >
-              Upgrade
-            </Button>
-          </div>
-        )}
-
         {/* Settings button — in place of Take the tour */}
         <div className="px-3 pb-4">
           <Link
@@ -472,13 +447,13 @@ export function AppShell({ user, children }: Props) {
                   Preferences
                 </Link>
                 <div className="my-1 border-t border-border" />
-                <PostHogLogoutLink
+                <LogoutButton
                   onClick={closeTransientChrome}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-error cursor-pointer"
                 >
                   <LogOut className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
                   <span>Sign out</span>
-                </PostHogLogoutLink>
+                </LogoutButton>
               </div>
             </>
           )}
@@ -511,9 +486,6 @@ export function AppShell({ user, children }: Props) {
           </div>
         </div>
       )}
-
-      {/* Pricing Modal */}
-      <PricingModal open={pricingOpen} onOpenChange={setPricingOpen} />
     </div>
   );
 }

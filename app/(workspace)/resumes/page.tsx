@@ -5,9 +5,9 @@ import Link from "next/link";
 
 import { AiResumeClient } from "@/components/ai-resume/AiResumeClient";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getUserProfile } from "@/lib/profile";
+import { listUserResumes } from "@/lib/resumes";
 import { privateMetadata } from "../../private-metadata";
-import type { Profile } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
   "AI Resume",
@@ -16,14 +16,13 @@ export const metadata: Metadata = privateMetadata(
 
 export default async function AiResumePage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
 
-  const [{ data: profile }, { data: resumes }] = await Promise.all([
-    insforge.database.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>(),
-    insforge.database.from("resumes").select("*").eq("user_id", user.id),
+  const [profile, resumes] = await Promise.all([
+    getUserProfile(user.id),
+    listUserResumes(user.id),
   ]);
 
-  const hasResumes = (resumes ?? []).length > 0;
+  const hasResumes = resumes.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-[820px] px-4 pb-12 pt-6 sm:px-6 lg:px-0">

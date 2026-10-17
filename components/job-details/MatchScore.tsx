@@ -45,9 +45,12 @@ export function SkillMatchCard({
   matchedSkills,
   missingSkills,
 }: {
-  matchedSkills: string[];
-  missingSkills: string[];
+  matchedSkills?: string[] | null;
+  missingSkills?: string[] | null;
 }) {
+  const matched = Array.isArray(matchedSkills) ? matchedSkills : [];
+  const missing = Array.isArray(missingSkills) ? missingSkills : [];
+
   return (
     <section className="h-full rounded-2xl border border-border bg-surface p-6 shadow-card">
       <h2 className="text-xs font-semibold uppercase leading-4 tracking-wide text-text-secondary">
@@ -57,9 +60,9 @@ export function SkillMatchCard({
       <div className="mt-5 flex flex-col gap-4">
         <div>
           <p className="mb-2 text-xs font-medium leading-4 text-text-muted">You have</p>
-          {matchedSkills.length > 0 ? (
+          {matched.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {matchedSkills.map((skill) => (
+              {matched.map((skill) => (
                 <SkillBadge key={skill} skill={skill} type="matched" />
               ))}
             </div>
@@ -70,9 +73,9 @@ export function SkillMatchCard({
 
         <div>
           <p className="mb-2 text-xs font-medium leading-4 text-text-muted">Gap skills</p>
-          {missingSkills.length > 0 ? (
+          {missing.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {missingSkills.map((skill) => (
+              {missing.map((skill) => (
                 <SkillBadge key={skill} skill={skill} type="missing" />
               ))}
             </div>

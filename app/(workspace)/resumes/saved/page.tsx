@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { privateMetadata } from "../../../private-metadata";
 import { requireUser } from "@/lib/auth";
-import { createInsforgeServer } from "@/lib/insforge-server";
+import { getCollection } from "@/lib/mongodb";
 import type { Resume } from "@/types";
 
 export const metadata: Metadata = privateMetadata(
@@ -14,15 +14,10 @@ export const metadata: Metadata = privateMetadata(
 
 export default async function SavedResumesPage() {
   const user = await requireUser();
-  const insforge = await createInsforgeServer();
-  const { data: resumes } = await insforge.database
-    .from("resumes")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const resumes = await (await getCollection<Resume>('resumes')).find({ user_id: user.id }).sort({ created_at: -1 }).toArray();
 
   return (
-    <div className="mx-auto w-full max-w-[900px] px-4 pb-12 pt-6 sm:px-6 lg:px-0">
+    <div className="mx-auto w-full max-w-225 px-4 pb-12 pt-6 sm:px-6 lg:px-0">
       <h1 className="text-3xl font-bold text-text-primary">Saved Resumes</h1>
       <p className="mt-1 text-sm text-text-secondary">
         Uploaded and generated resumes live here.

@@ -234,8 +234,7 @@ export function HowItWorks() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[56px] font-bold tracking-tight text-inverse-foreground leading-[1.12]">
-            Keep your day job.
-            <br />
+            Keep your day job.{" "}
             <span className="text-inverse-foreground">Jobbers does the searching.</span>
           </h2>
         </div>

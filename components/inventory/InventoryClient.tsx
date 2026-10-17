@@ -31,7 +31,7 @@ export function InventoryClient({ jobs }: { jobs: Job[] }) {
   const filtered = useMemo(() => {
     return jobs.filter((job) => {
       if (!matchesQuery(job, query)) return false;
-      const hasResearch = job.company_research !== null;
+      const hasResearch = Boolean(job.company_research);
       switch (status) {
         case "researched":
           return hasResearch;
@@ -119,7 +119,7 @@ export function InventoryClient({ jobs }: { jobs: Job[] }) {
 function InventoryCard({ job }: { job: Job }) {
   const company = job.company ?? "Unknown company";
   const title = job.title ?? "Untitled role";
-  const hasResearch = job.company_research !== null;
+  const hasResearch = Boolean(job.company_research);
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5 shadow-card">

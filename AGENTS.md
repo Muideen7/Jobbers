@@ -50,8 +50,7 @@ Read in this exact order before any implementation:
 
 Stack: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4
 (design tokens live in the `@theme` block of `app/globals.css`), lucide-react,
-InsForge backend (database, auth, storage). PostHog for analytics. Google Gemini
-(via `lib/llm.ts`) for AI.
+MongoDB / Better Auth. Google Gemini (via `lib/llm.ts`) for AI.
 
 ### Design tokens
 
@@ -62,199 +61,38 @@ InsForge backend (database, auth, storage). PostHog for analytics. Google Gemini
 - Reuse existing components (cards, buttons, badges, empty states, skeletons)
   before creating new ones.
 
-### Backend (InsForge)
+### Backend (MongoDB & Better Auth)
 
-- Access InsForge the same way existing code already does. Follow the existing
-  client/helper patterns. Do not assume SDK method names.
-- Before any database change, inspect the current schema (InsForge CLI or
-  migration files) and show what was found. Do not use the MCP `run-raw-sql`
-  tool for this project — see the note in the InsForge section below.
-- Every user-owned table has `user_id` and must be restricted to the signed-in
-  user: use row level security if this project uses it, and also check ownership
-  in every API route.
-- Validate all API input (use zod if the repo already has it).
+- Access MongoDB via the official driver singleton (`lib/mongodb.ts`) using `getCollection<TSchema>("collection_name")`.
+- Authentication is handled by Better Auth (`lib/betterAuth.ts`). For server components and actions, resolve the current user with `getCurrentUser()` or `requireUser()` from `lib/auth.ts`.
+- Every user-owned document must store `userId` (or `user_id`) matching the signed-in user's ID, and all queries/mutations must be scoped to that user.
+- Always serialize MongoDB `_id` to string (`_id.toString()`) and `Date` instances to ISO strings before passing to Client Components.
+- Validate all API inputs using Zod.
+- Transactional emails are dispatched via Resend (`lib/mail.ts`).
 
 ### Production safety
 
-- The live app (top nav: Dashboard, Find Jobs, Profile) has real users and data.
-  Work only on a feature branch and use preview deployments. Do not merge to
-  `main` until I say so.
-- Database changes must be additive: new tables and nullable columns only. Never
-  rename, drop, or change the type of existing tables or columns. Show me the
-  migration SQL before running it, and run it against a copy of the database
-  first.
-- Existing live URLs (/dashboard, /find-jobs, /find-jobs/[id], /profile) must keep
-  working through permanent redirects.
+- The live app has real users and data. Work only on a feature branch and use preview deployments. Do not merge to `main` until instructed.
+- Database changes must be additive. Never drop or rename collections in production.
+- Existing live URLs (/dashboard, /find-jobs, /find-jobs/[id], /profile) must keep working through permanent redirects.
 
 ### Product rules
 
 - No "coming soon" pages. Do not create a route unless it has real content.
-- Never delete a working feature. Move it. Old routes must redirect permanently
-  to their new home.
-- Never render fake or mock data in the UI. Empty states must guide the user to
-  the next action.
+- Never delete a working feature. Move it. Old routes must redirect permanently to their new home.
+- Never render fake or mock data in the UI. Empty states must guide the user to the next action.
 - Every page needs loading, empty, and error states using existing tokens.
 - Mobile first. The sidebar becomes a drawer below the lg breakpoint.
 
 ### Workflow
 
-- For any task touching more than 3 files, start in plan mode and wait for
-  approval.
-- After each task: run typecheck, lint, and build. List files changed. Give a
-  short manual test checklist.
+- For any task touching more than 3 files, start in plan mode and wait for approval.
+- After each task: run typecheck, lint, and build. List files changed. Give a short manual test checklist.
 - Keep commits small. Do not refactor unrelated code.
 
+---
 
-# InsForge SDK Documentation - Overview
+## Important Architecture Notes
 
-## What is InsForge?
-
-Backend-as-a-service (BaaS) platform providing:
-
-- **Database**: PostgreSQL with PostgREST API
-- **Authentication**: Email/password + OAuth (Google, GitHub)
-- **Storage**: File upload/download
-- **AI**: Google Gemini via `@google/genai` (`GEMINI_API_KEY` / `GEMINI_MODEL`), all access funnelled through `lib/llm.ts`
-- **Functions**: Serverless function deployment
-- **Realtime**: WebSocket pub/sub (database + client events)
-
-## Installation
-
-The following is a step-by-step guide to installing and using the InsForge TypeScript SDK for Web applications. If you are building other types of applications, please refer to:
-- [Swift SDK documentation](/sdks/swift/overview) for iOS, macOS, tvOS, and watchOS applications.
-- [Kotlin SDK documentation](/sdks/kotlin/overview) for Android applications.
-- [REST API documentation](/sdks/rest/overview) for direct HTTP API access.
-
-### 🚨 CRITICAL: Follow these steps in order
-
-### Step 1: Download Template
-
-Use the `download-template` MCP tool to create a new project with your backend URL and anon key pre-configured.
-
-### Step 2: Install SDK
-
-```bash
-npm install @insforge/sdk@latest
-```
-
-### Step 3: Create SDK Client
-
-You must create a client instance using `createClient()` with your base URL and anon key:
-
-```javascript
-import { createClient } from '@insforge/sdk';
-
-const client = createClient({
-  baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
-  anonKey: 'your-anon-key-here'       // Get this from backend metadata
-});
-
-```
-
-**API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
-
-## Getting Detailed Documentation
-
-### 🚨 CRITICAL: Always Fetch Documentation Before Writing Code
-
-InsForge provides official SDKs and REST APIs, use them to interact with InsForge services from your application code.
-
-- [TypeScript SDK](/sdks/typescript/overview) - JavaScript/TypeScript
-- [Swift SDK](/sdks/swift/overview) - iOS, macOS, tvOS, and watchOS
-- [Kotlin SDK](/sdks/kotlin/overview) - Android and Kotlin Multiplatform
-- [REST API](/sdks/rest/overview) - Direct HTTP API access
-
-Before writing or editing any InsForge integration code, you **MUST** call the `fetch-docs` or `fetch-sdk-docs` MCP tool to get the latest SDK documentation. This ensures you have accurate, up-to-date implementation patterns.
-
-### Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:
-
-Available documentation types:
-
-- `"instructions"` - Essential backend setup (START HERE)
-- `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
-- `"db-sdk-typescript"` - Database operations with TypeScript SDK
-- **Authentication** - Choose based on implementation:
-  - `"auth-sdk-typescript"` - TypeScript SDK methods for custom auth flows
-  - `"auth-components-react"` - Pre-built auth UI for React+Vite (single-page app)
-  - `"auth-components-react-router"` - Pre-built auth UI for React(Vite+React Router) (multi-page app)
-  - `"auth-components-nextjs"` - Pre-built auth UI for Next.js (SSR app)
-- `"storage-sdk"` - File storage operations
-- `"functions-sdk"` - Serverless functions invocation
-- `"ai-integration-sdk"` - AI integration patterns (this project uses Google Gemini directly, not OpenRouter)
-- `"deployment"` - Deploy frontend applications via MCP tool
-- `"payments"` - Stripe Checkout, Billing Portal, webhook projections, and fulfillment patterns
-
-These docs are mostly for the TypeScript SDK. For other languages, you can also use the `fetch-sdk-docs` MCP tool to get specific documentation.
-
-### Use the InsForge `fetch-sdk-docs` MCP tool to get specific SDK documentation
-
-You can fetch SDK documentation using the `fetch-sdk-docs` MCP tool with a specific feature type and language.
-
-Available feature types:
-- `db` - Database operations
-- `storage` - File storage operations
-- `functions` - Serverless functions invocation
-- `auth` - User authentication
-- `ai` - AI integration (this project uses Google Gemini directly, not OpenRouter)
-- `realtime` - Real-time pub/sub (database + client events) via WebSockets
-- `payments` - Stripe Checkout and Billing Portal with webhook-based fulfillment
-
-Available languages:
-- `typescript` - JavaScript/TypeScript SDK
-- `swift` - Swift SDK (for iOS, macOS, tvOS, and watchOS)
-- `kotlin` - Kotlin SDK (for Android and JVM applications)
-- `rest-api` - REST API
-
-Payments currently has TypeScript SDK docs only. Use the Payments API reference for non-TypeScript clients.
-
-## When to Use SDK vs MCP Tools
-
-### Always SDK for Application Logic:
-
-- Authentication (register, login, logout, profiles)
-- Database CRUD (select, insert, update, delete)
-- Storage operations (upload, download files)
-- AI integration via `@google/genai` (Google Gemini) — see `lib/llm.ts`
-- Serverless function invocation
-- Payments checkout and customer portal session creation
-
-### Use MCP Tools for Infrastructure:
-
-- Project scaffolding (`download-template`) - Download starter templates with InsForge integration
-- Backend setup and metadata (`get-backend-metadata`)
-- Database schema management (`run-raw-sql`, `get-table-schema`)
-- Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
-- Serverless function deployment (`create-function`, `update-function`, `delete-function`)
-- Frontend deployment (`create-deployment`) - Deploy frontend apps to InsForge hosting
-
-## Important Notes
-
-- For auth: use `auth-sdk` for custom UI, or framework-specific components for pre-built UI
-- SDK returns `{data, error}` structure for all operations
-- Database inserts require array format: `[{...}]`
-- Serverless functions have one endpoint and do not support nested route paths
-- Storage: Upload files to buckets, store URLs in database
-- AI integrations use **Google Gemini** through `@google/genai`, keyed by a server-side `GEMINI_API_KEY`, with the model in `GEMINI_MODEL` (default `gemini-3-flash-preview`). Call sites must go through `lib/llm.ts` (`callGeminiJson`), never construct a client inline.
-- **EXTRA IMPORTANT**: Use Tailwind CSS v4 (currently `tailwindcss@4.3.3` with `@tailwindcss/postcss@4.3.3`). Design tokens live in the `@theme` block at the top of `app/globals.css` and are consumed as Tailwind utilities (`bg-surface`, `text-text-primary`, `border-border`, …) or via `var(--color-*)`. Never hardcode hex or reach for Tailwind's built-in palette in feature code — this includes the neutral entries `bg-white`, `text-white` and `border-black`; use `bg-surface`, `text-accent-foreground`, `border-inverse-foreground` and `border-ink` instead. In inline SVG use `currentColor` or `style={{ fill: "var(--color-*)" }}`, never a literal in `fill=`/`stroke=`. The only sanctioned hex exceptions are `app/opengraph-image.tsx` and `app/api/resume/generate/ResumePDF.tsx` (both render in engines that cannot read CSS custom properties) and the third-party trademark colours in `components/homepage/Logos.tsx` and `components/homepage/TopCompanies.tsx`; each is commented where it is used. Lock these dependencies in `package.json`
-
-<!-- INSFORGE:START -->
-## InsForge backend
-
-This project uses [InsForge](https://insforge.dev): an all-in-one, open-source Postgres-based backend (BaaS) that gives this app a database, authentication, file storage, edge functions, realtime, an AI model gateway, and payments through one platform.
-
-- **Project:** **Jobbers** (API base `https://y7fvq3ie.us-east.insforge.app`)
-- **Skills:** these InsForge skills are installed for supported coding agents. Reach for them before implementing any InsForge feature instead of guessing the API:
-  - `insforge`: app code with the `@insforge/sdk` client (database CRUD, auth, storage, edge functions, realtime, AI, email, and Stripe payments).
-  - `insforge-cli`: backend and infrastructure via the `insforge` CLI (projects, SQL, migrations, RLS policies, storage buckets, functions, secrets, payment setup, schedules, deploys).
-  - `insforge-debug`: diagnosing failures (SDK/HTTP errors, RLS denials, auth and OAuth issues) and running security or performance audits.
-  - `insforge-integrations`: wiring external auth providers (Clerk, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
-  - `find-skills`: discovering additional skills on demand.
-- **Credentials:** app code reads keys from `.env.local`; the CLI reads `.insforge/project.json`. Never hardcode or commit keys.
-- **Database access: use the CLI only** (`npx -y @insforge/cli db query`). The MCP `run-raw-sql` / `get-table-schema` tools are pointed at a *different* InsForge project: the workspace-level config at `/home/frontendgeek/Downloads/Project/opencode.json` sets `API_BASE_URL=https://gq35cmzq.us-east.insforge.app` (the `zenith-access` project), while Jobbers is `https://y7fvq3ie.us-east.insforge.app`. Queries through MCP therefore return an unrelated schema. Diagnosed 2026-10-07; decision: leave the MCP config alone and use the CLI, which reads the correct key from `.insforge/project.json`.
-
-Key patterns:
-
-- Database inserts take an array: `insert([{ ... }])`.
-- Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
-- For storage uploads, persist both the returned `url` and `key`.
-<!-- INSFORGE:END -->
+- AI integrations use **Google Gemini** through `@google/genai`, keyed by a server-side `GEMINI_API_KEY`, with the model in `GEMINI_MODEL` (default `gemini-3-flash-preview`). Call sites must go through `lib/llm.ts` (`generateJson`), never construct a client inline.
+- **EXTRA IMPORTANT**: Use Tailwind CSS v4 (currently `tailwindcss@4.3.3` with `@tailwindcss/postcss@4.3.3`). Design tokens live in the `@theme` block at the top of `app/globals.css` and are consumed as Tailwind utilities (`bg-surface`, `text-text-primary`, `border-border`, …) or via `var(--color-*)`. Never hardcode hex or reach for Tailwind's built-in palette in feature code — this includes the neutral entries `bg-white`, `text-white` and `border-black`; use `bg-surface`, `text-accent-foreground`, `border-inverse-foreground` and `border-ink` instead. In inline SVG use `currentColor` or `style={{ fill: "var(--color-*)" }}`, never a literal in `fill=`/`stroke=`. The only sanctioned hex exceptions are `app/opengraph-image.tsx` and `app/api/resume/generate/ResumePDF.tsx` (both render in engines that cannot read CSS custom properties) and the third-party trademark colours in `components/homepage/Logos.tsx` and `components/homepage/TopCompanies.tsx`; each is commented where it is used. Lock these dependencies in `package.json`.
