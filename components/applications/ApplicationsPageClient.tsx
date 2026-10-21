@@ -8,7 +8,7 @@ import {
   CalendarCheck,
   Trophy,
   MapPin,
-  Sparkles,
+  Target,
   ChevronRight,
   Briefcase,
 } from "lucide-react";
@@ -178,7 +178,7 @@ export function ApplicationsPageClient({ initialApplications }: Props) {
                               </h3>
                               {matchScore !== null && matchScore > 0 && (
                                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface/80 px-2 py-0.5 text-xs font-bold text-accent shadow-2xs">
-                                  <Sparkles className="h-3 w-3" />
+                                  <Target className="h-3 w-3" />
                                   {matchScore}%
                                 </span>
                               )}

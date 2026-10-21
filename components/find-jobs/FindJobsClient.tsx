@@ -11,7 +11,7 @@ import {
   Loader2,
   MapPin,
   Search,
-  Sparkles,
+  Target,
   SearchX,
   X,
 } from "lucide-react";
@@ -423,7 +423,7 @@ export function FindJobsClient({
         />
       ) : tab === "for-you" && !isProfileComplete ? (
         <FeedEmpty
-          icon={<Sparkles className="h-6 w-6 text-accent" />}
+          icon={<Target className="h-6 w-6 text-accent" />}
           title="Complete your profile to get tailored jobs"
           body="Add your target roles, skills, and experience to unlock AI-matched jobs scored specifically for you."
           action={
@@ -434,7 +434,7 @@ export function FindJobsClient({
         />
       ) : !hasTargetRoles ? (
         <FeedEmpty
-          icon={<Sparkles className="h-6 w-6 text-text-muted" />}
+          icon={<Target className="h-6 w-6 text-text-muted" />}
           title="No recommendations yet"
           body="Tell Jobbers which roles you are after and every listing gets scored against your profile."
           action={
@@ -465,7 +465,7 @@ export function FindJobsClient({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="flex h-5 items-center gap-1 rounded-full bg-accent-muted px-2 text-[11px] font-semibold text-accent">
-                <Sparkles className="h-3 w-3" />
+                <Target className="h-3 w-3" />
                 Live Job Discovery
               </span>
             </div>
@@ -523,7 +523,7 @@ export function FindJobsClient({
               {isSearching ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Sparkles className="h-3.5 w-3.5" />
+                <Search className="h-3.5 w-3.5" />
               )}
               {isSearching ? "Searching…" : "Search live"}
             </Button>

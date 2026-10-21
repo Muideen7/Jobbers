@@ -7,20 +7,51 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Jobbers Scope Revamp — Completed ✅
-**Scope:** 9 Clean Features across 3 Navigation Groups
+**Scope:** 10 Clean Features across 3 Navigation Groups + Dedicated Settings Action
 
-### 9 Core Navigation Features
-1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers. (Analytics section moved out).
+### 10 Core Navigation Features
+1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers.
 2. **Jobs (`/jobs`)** — Multi-source live discovery feed with automatic instant search for new users with target roles.
-3. **Job Details (`/jobs/[id]`)** — Full role breakdown, profile score alignment, company research dossier.
-4. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions.
-5. **Resumes (`/resumes`)** — AI resume extraction from upload + instant PDF resume generation via Gemini and `@react-pdf/renderer`.
-6. **Analytics (`/analytics`)** — Dedicated tools page with 3 data-driven charts (Jobs Over Time, Score Distribution, Company Research).
+3. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions (no Kanban, no charts).
+4. **Interviews & Calendar (`/interviews`)** — Interview tracker integrated with platform tracked jobs, missing interview date alerts, and live calendar sync.
+5. **Follow-ups & Communications (`/follow-ups`)** — Recruiter communication log, response deadline tracking, status filters, and 1-click Gemini AI follow-up email drafts.
+6. **Resumes (`/resumes`)** — Tailored AI resume studio, ATS-optimized PDF generation via Gemini and `@react-pdf/renderer`.
 7. **Research (`/company-research`)** — Company research dossiers & queue of viewed roles awaiting research.
-8. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills) & completion tracker.
-9. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
+8. **Integrations (`/integrations`)** — Dedicated integration hub for Google Calendar, Apple Calendar/Outlook live `.ics` subscription feeds (`/api/calendar/feed`), and pipeline auto-sync.
+9. **Analytics (`/analytics`)** — Dedicated tools page with data-driven metric breakdown and score distributions.
+10. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills, education) & completion tracker.
+*(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Integrations Hub & Live Calendar Feed (`/integrations`, `/api/calendar/feed`)**:
+  1. *Live RFC 5545 Calendar Feed*: Created `/api/calendar/feed` generating valid `.ics` calendar subscriptions for Google Calendar, Apple Calendar (iOS/macOS), and Microsoft Outlook. Subscribing once automatically reflects all added, updated, or rescheduled interviews across devices.
+  2. *Single Settings Entry*: Removed duplicate `/settings` entry from `NAV_GROUPS` under Account, leaving the pinned sidebar bottom action for Settings, and adding `/integrations` under Tools.
+  3. *Pipeline Auto-Sync*: Embedded bidirectional stage synchronization so scheduling an interview for a tracked job automatically advances the application to the `interview` stage.
+- **Tracked Jobs & Platform Pipeline on Interviews (`/interviews`)**:
+  1. *Tracked Role Detection*: Directly pulls applications in `interview` and `applied` stages. If an interview stage role has no scheduled date, Jobbers prominently flags "Date Needed" with a 1-click "+ Schedule Round" button pre-filled with the job's company, title, and ID.
+  2. *Applied Role Quick Conversion*: Displays roles in `applied` stage with a quick launcher to schedule an interview when an employer reaches out.
+  3. *Live Calendar Feed Banner*: In-page banner with 1-click "Subscribe in Google Calendar" and "Copy Live iCal URL" buttons.
+- **Fixed Stale Follow-ups Redirect (`next.config.ts`)**:
+  1. Removed stale pre-revamp redirect `{ source: "/follow-ups", destination: "/home" }` which was intercepting clicks to the Follow-ups page and routing back to dashboard. Added `/follow-ups`, `/interviews`, and `/integrations` to security headers and proxy matchers.
+- **Interviews & 100% Free Calendar Sync (`/interviews`)**:
+- **Interviews & 100% Free Calendar Sync (`/interviews`)**:
+  1. *Schema & APIs (`types/index.ts`, `app/api/interviews/`)*: Added `Interview` schema with round type, datetime, meeting URL, recruiter contact, interviewer names, and notes. Created full REST endpoints (`GET`, `POST`, `PATCH`, `DELETE`) with MongoDB user isolation.
+  2. *Free Calendar Integration*: Implemented 1-click Google Calendar web event generator (`https://calendar.google.com/calendar/render?action=TEMPLATE&...`) and native `.ics` iCalendar file generator for Outlook/Apple Calendar/Thunderbird with zero external API fees or OAuth scopes required.
+  3. *High-Density List UI (`components/interviews/InterviewsClient.tsx`)*: Clean Upcoming vs. Past tabs, status badges, one-click meeting launcher, and scheduling modal linked to user's saved jobs.
+- **Follow-ups & Recruiter Communication Tracker (`/follow-ups`)**:
+  1. *Schema & APIs (`types/index.ts`, `app/api/communications/`)*: Added `Communication` schema with company, role, contact info, channel (email, phone, LinkedIn), direction (inbound, outbound), summary, occurred date, follow-up deadline, and status (`needs_reply`, `follow_up_due`, `waiting`, `resolved`).
+  2. *Gemini AI Follow-up Draft Generator (`/api/communications/draft`)*: Created Gemini-powered draft generation supporting 4 common candidate scenarios: post-interview thank you, post-application follow-up, status check, and offer response. Includes 1-click copy-to-clipboard and `mailto:` launcher.
+  3. *Action Filter Interface (`components/follow-ups/FollowUpsClient.tsx`)*: Clean list view partitioned into Action Required (`needs_reply`, `follow_up_due`), Waiting on Employer, and All messages.
+- **Complete Sparkles Replacement**:
+  1. Replaced generic `Sparkles` icon throughout the entire project (resumes, dashboard, applications, analytics, job discovery, profile, dossiers, home) with purposeful domain icons (`Target`, `Calendar`, `MailCheck`, `Bot`, `Wand2`, `Search`).
+- **Sidebar Expansion to 10 Clean Nav Items (`components/layout/AppShell.tsx`)**:
+  1. Updated `NAV_GROUPS` to provide exactly 10 accessible, high-density, real routes across Workspace (`Home`, `Jobs`, `Applications`, `Interviews`, `Follow-ups`), Tools (`Resumes`, `Research`, `Analytics`), and Account (`Profile`, `Settings`). Strict prohibition on charts and Kanban boards respected.
+- **Option C: Tailored AI Resume Studio (`/resumes`)**:
+  1. *Targeted Role Selection*: In `components/ai-resume/AiResumeClient.tsx`, added ability to choose any target role directly from the candidate's saved pipeline (or enter custom title, company, and job description requirements).
+  2. *Skills Alignment & Gap Highlights*: Automatically visualizes matched skills (green badges) and target skills to emphasize (amber badges) for the selected position.
+  3. *Gemini Tailoring Engine (`/api/resume/generate`)*: Upgraded backend generation endpoint to accept `jobId`, `targetRole`, and `targetCompany`. Gemini customizes the professional summary and rewrites experience bullet points to emphasize relevant technical competencies and measurable achievements.
+  4. *Clean Studio Layout*: Built high-density segmented tabbed interface (`Tailor for a Role`, `Saved Resumes Library`, `Master PDF`). Preserves 100% of the existing sidebar and navigation structure.
+  5. *PDF Vector Output*: Updated `ResumePDF.tsx` to display target title and ATS-optimized formatting, downloadable via direct streaming endpoint.
 - **Repository Sweep & Dead Code Pruning**:
   1. *Removed Stale UI & Prototypes*: Deleted 12 unreferenced legacy prototype components (`SearchControls`, `JobsTable`, `JobFilters`, `ProfileForm`, `ProfileOverview`, `ProfilePageClient`, `FeedHero`, `JobDetailPanel`, `Navbar`, `Footer`, `PricingModal`, `TourModal`), 3 unused UI primitives (`card.tsx`, `slider.tsx`, `scroll-area.tsx`), and obsolete ambient types (`types/resend.d.ts`).
   2. *Pruned Unused Dependencies*: Removed `@browserbasehq/stagehand`, `playwright-core`, `@openrouter/ai-sdk-provider`, `@radix-ui/react-slider`, `@radix-ui/react-scroll-area` from `package.json` and synchronized `pnpm-lock.yaml`. Deleted redundant `package-lock.json`.

@@ -14,7 +14,7 @@ import {
   MapPin,
   Percent,
   Search,
-  Sparkles,
+  Target,
   TrendingUp,
 } from "lucide-react";
 // recharts imports reserved for future analytics chart rendering
@@ -231,7 +231,7 @@ export function DashboardClient({
                   : "text-text-secondary hover:text-text-primary",
               )}
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <Target className="h-3.5 w-3.5" />
               Top AI Matches
             </button>
 
@@ -297,7 +297,7 @@ export function DashboardClient({
               ) : activeTab === "applied" ? (
                 <Briefcase className="h-6 w-6 text-text-muted" />
               ) : !profileComplete ? (
-                <Sparkles className="h-6 w-6 text-accent" />
+                <Target className="h-6 w-6 text-accent" />
               ) : (
                 <Search className="h-6 w-6 text-text-muted" />
               )}

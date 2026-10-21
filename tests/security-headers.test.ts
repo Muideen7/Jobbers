@@ -131,10 +131,13 @@ test("the non-proxy source excludes every session-gated route", () => {
     "/jobs",
     "/jobs/abc",
     "/applications",
+    "/interviews",
+    "/follow-ups",
     "/resumes",
     "/resumes/abc",
     "/analytics",
     "/company-research",
+    "/integrations",
     "/settings",
   ]) {
     const path = owned.slice(1);

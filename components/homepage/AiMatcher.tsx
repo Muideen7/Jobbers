@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Target, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 import { CompanyLogo } from "@/components/homepage/Logos";
 import { marketSkills } from "@/components/homepage/data";
@@ -24,7 +24,7 @@ export function AiMatcher() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-secondary text-xs font-semibold text-text-darkest">
-              <Sparkles className="w-3.5 h-3.5 text-text-strong fill-current" />
+              <Target className="w-3.5 h-3.5 text-text-strong" />
               <span>AI analysis</span>
             </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CloudUpload, FileText, Loader2, Sparkles } from "lucide-react";
+import { CloudUpload, FileText, Loader2, Wand2 } from "lucide-react";
 
 import { extractProfile, uploadResume } from "@/actions/profile";
 import type { ExtractedProfile } from "@/actions/profile";
@@ -145,7 +145,7 @@ export function ResumeDropzone({ onApplied }: Props) {
                 Drop resume PDF or browse
               </p>
               <p className="flex items-center gap-1 text-[11px] text-text-muted">
-                <Sparkles className="h-2.5 w-2.5 text-accent" />
+                <Wand2 className="h-2.5 w-2.5 text-accent" />
                 Auto-fills profile with AI
               </p>
             </div>

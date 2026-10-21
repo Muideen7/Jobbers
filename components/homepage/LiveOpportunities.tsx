@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Loader2, Search, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Loader2, Search, Target } from "lucide-react";
 
 import { CompanyLogo } from "@/components/homepage/Logos";
 import { SourceCredits } from "@/components/shared/SourceCredits";
@@ -448,7 +448,7 @@ export function LiveOpportunities() {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto space-y-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-secondary text-xs font-semibold text-text-darkest">
-            <Sparkles className="w-3.5 h-3.5 text-text-strong fill-current" />
+            <Target className="w-3.5 h-3.5 text-text-strong" />
             <span>Live Opportunities</span>
           </div>
 

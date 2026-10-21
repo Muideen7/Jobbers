@@ -5,8 +5,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  Bot,
   ExternalLink,
-  Sparkles,
 } from "lucide-react";
 
 import { notFound } from "next/navigation";
@@ -152,7 +152,7 @@ export default async function DossierPage({ params }: Props) {
             ) : (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface px-6 py-16 text-center shadow-card">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-muted">
-                  <Sparkles className="h-6 w-6 text-accent" />
+                  <Bot className="h-6 w-6 text-accent" />
                 </div>
                 <p className="mt-5 text-sm font-semibold leading-5 text-text-primary">
                   No dossier yet

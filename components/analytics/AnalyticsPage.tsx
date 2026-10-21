@@ -7,7 +7,8 @@ import {
   Building2,
   ArrowRight,
   Calendar,
-  Sparkles,
+  Briefcase,
+  Search,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -139,7 +140,7 @@ export function AnalyticsPage({ jobs, now }: Props) {
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Total Roles", value: String(jobs.length), icon: Sparkles, color: "text-accent", bg: "bg-accent-muted" },
+          { label: "Total Roles", value: String(jobs.length), icon: Briefcase, color: "text-accent", bg: "bg-accent-muted" },
           { label: "Avg Match", value: avgScore !== null ? `${avgScore}%` : "—", icon: TrendingUp, color: "text-success", bg: "bg-success-lightest" },
           { label: "High Matches (≥60%)", value: String(highMatches), icon: Calendar, color: "text-info-medium", bg: "bg-surface-secondary" },
           { label: "Researched", value: String(researched), icon: Building2, color: "text-warning", bg: "bg-surface-secondary" },
@@ -168,7 +169,7 @@ export function AnalyticsPage({ jobs, now }: Props) {
           </p>
           <Button asChild size="sm" className="mt-5 rounded-full font-semibold">
             <Link href="/jobs">
-              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              <Search className="h-3.5 w-3.5 mr-1.5" />
               Find your first roles
             </Link>
           </Button>

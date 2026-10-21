@@ -257,3 +257,55 @@ export interface PublicJob {
   url: string;
   description: string;
 }
+
+export type InterviewRoundType =
+  | "recruiter_screen"
+  | "technical"
+  | "system_design"
+  | "hiring_manager"
+  | "behavioral"
+  | "final_round";
+
+export interface Interview {
+  id: string;
+  user_id: string;
+  job_id?: string | null;
+  company: string;
+  role: string;
+  round_type: InterviewRoundType;
+  interview_at: string;
+  duration_minutes: number;
+  meeting_url?: string | null;
+  interviewer_name?: string | null;
+  interviewer_email?: string | null;
+  notes?: string | null;
+  status: "scheduled" | "completed" | "cancelled";
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommunicationChannel = "email" | "linkedin" | "phone" | "portal";
+export type CommunicationStatus =
+  | "needs_reply"
+  | "follow_up_due"
+  | "waiting"
+  | "resolved";
+
+export interface Communication {
+  id: string;
+  user_id: string;
+  job_id?: string | null;
+  company: string;
+  role: string;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  channel: CommunicationChannel;
+  direction: "inbound" | "outbound";
+  subject?: string | null;
+  summary: string;
+  occurred_at: string;
+  follow_up_deadline?: string | null;
+  status: CommunicationStatus;
+  created_at: string;
+  updated_at: string;
+}

@@ -24,7 +24,7 @@ const LEGACY_REDIRECTS: { source: string; destination: string }[] = [
   { source: "/dossiers/:id", destination: "/jobs/:id?tab=company" },
   { source: "/ai-resume", destination: "/resumes" },
   { source: "/interview-prep", destination: "/applications?stage=interview" },
-  { source: "/follow-ups", destination: "/home" },
+  { source: "/calendar", destination: "/interviews" },
 ];
 
 const nextConfig: NextConfig = {
