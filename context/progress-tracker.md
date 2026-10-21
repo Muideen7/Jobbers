@@ -7,21 +7,33 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Jobbers Scope Revamp — Completed ✅
-**Scope:** 10 Clean Features across 3 Navigation Groups
+**Scope:** 10 Clean Features across 3 Navigation Groups + Dedicated Settings Action
 
 ### 10 Core Navigation Features
 1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers.
 2. **Jobs (`/jobs`)** — Multi-source live discovery feed with automatic instant search for new users with target roles.
 3. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions (no Kanban, no charts).
-4. **Interviews & Calendar (`/interviews`)** — Interview tracker with round management, meeting links, and 100% free calendar sync (Google Calendar 1-click web launcher + native `.ics` download).
+4. **Interviews & Calendar (`/interviews`)** — Interview tracker integrated with platform tracked jobs, missing interview date alerts, and live calendar sync.
 5. **Follow-ups & Communications (`/follow-ups`)** — Recruiter communication log, response deadline tracking, status filters, and 1-click Gemini AI follow-up email drafts.
 6. **Resumes (`/resumes`)** — Tailored AI resume studio, ATS-optimized PDF generation via Gemini and `@react-pdf/renderer`.
 7. **Research (`/company-research`)** — Company research dossiers & queue of viewed roles awaiting research.
-8. **Analytics (`/analytics`)** — Dedicated tools page with data-driven metric breakdown and score distributions.
-9. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills, education) & completion tracker.
-10. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
+8. **Integrations (`/integrations`)** — Dedicated integration hub for Google Calendar, Apple Calendar/Outlook live `.ics` subscription feeds (`/api/calendar/feed`), and pipeline auto-sync.
+9. **Analytics (`/analytics`)** — Dedicated tools page with data-driven metric breakdown and score distributions.
+10. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills, education) & completion tracker.
+*(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Integrations Hub & Live Calendar Feed (`/integrations`, `/api/calendar/feed`)**:
+  1. *Live RFC 5545 Calendar Feed*: Created `/api/calendar/feed` generating valid `.ics` calendar subscriptions for Google Calendar, Apple Calendar (iOS/macOS), and Microsoft Outlook. Subscribing once automatically reflects all added, updated, or rescheduled interviews across devices.
+  2. *Single Settings Entry*: Removed duplicate `/settings` entry from `NAV_GROUPS` under Account, leaving the pinned sidebar bottom action for Settings, and adding `/integrations` under Tools.
+  3. *Pipeline Auto-Sync*: Embedded bidirectional stage synchronization so scheduling an interview for a tracked job automatically advances the application to the `interview` stage.
+- **Tracked Jobs & Platform Pipeline on Interviews (`/interviews`)**:
+  1. *Tracked Role Detection*: Directly pulls applications in `interview` and `applied` stages. If an interview stage role has no scheduled date, Jobbers prominently flags "Date Needed" with a 1-click "+ Schedule Round" button pre-filled with the job's company, title, and ID.
+  2. *Applied Role Quick Conversion*: Displays roles in `applied` stage with a quick launcher to schedule an interview when an employer reaches out.
+  3. *Live Calendar Feed Banner*: In-page banner with 1-click "Subscribe in Google Calendar" and "Copy Live iCal URL" buttons.
+- **Fixed Stale Follow-ups Redirect (`next.config.ts`)**:
+  1. Removed stale pre-revamp redirect `{ source: "/follow-ups", destination: "/home" }` which was intercepting clicks to the Follow-ups page and routing back to dashboard. Added `/follow-ups`, `/interviews`, and `/integrations` to security headers and proxy matchers.
+- **Interviews & 100% Free Calendar Sync (`/interviews`)**:
 - **Interviews & 100% Free Calendar Sync (`/interviews`)**:
   1. *Schema & APIs (`types/index.ts`, `app/api/interviews/`)*: Added `Interview` schema with round type, datetime, meeting URL, recruiter contact, interviewer names, and notes. Created full REST endpoints (`GET`, `POST`, `PATCH`, `DELETE`) with MongoDB user isolation.
   2. *Free Calendar Integration*: Implemented 1-click Google Calendar web event generator (`https://calendar.google.com/calendar/render?action=TEMPLATE&...`) and native `.ics` iCalendar file generator for Outlook/Apple Calendar/Thunderbird with zero external API fees or OAuth scopes required.

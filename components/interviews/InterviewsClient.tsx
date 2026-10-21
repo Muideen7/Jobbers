@@ -1,12 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
+  AlertCircle,
+  Briefcase,
   Calendar,
   CalendarCheck2,
   CalendarPlus,
   Check,
+  CheckCircle2,
   Clock,
+  Copy,
   ExternalLink,
   Laptop,
   Loader2,
@@ -14,15 +19,30 @@ import {
   Trash2,
   User,
   Video,
+  Workflow,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Interview, InterviewRoundType, Job } from "@/types";
 
+export type TrackedPipelineRole = {
+  application_id: string;
+  job_id: string;
+  company: string;
+  title: string;
+  status: "interview" | "applied";
+  match_score?: number | null;
+  scheduledInterviewCount: number;
+  nextInterviewAt: string | null;
+  nextRoundType: string | null;
+};
+
 type Props = {
   initialInterviews: Interview[];
   savedJobs: Job[];
+  pipelineRoles: TrackedPipelineRole[];
+  feedUrl: string;
 };
 
 const ROUND_LABELS: Record<InterviewRoundType, string> = {
@@ -43,7 +63,7 @@ export function createGoogleCalendarUrl({
 }: {
   title: string;
   description: string;
-  location?: string;
+  location?: string | null | undefined;
   startDate: Date;
   durationMinutes: number;
 }): string {
@@ -69,7 +89,7 @@ export function downloadIcsFile({
 }: {
   title: string;
   description: string;
-  location?: string;
+  location?: string | null | undefined;
   startDate: Date;
   durationMinutes: number;
 }) {
@@ -102,13 +122,20 @@ export function downloadIcsFile({
   URL.revokeObjectURL(url);
 }
 
-export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
+export function InterviewsClient({
+  initialInterviews,
+  savedJobs,
+  pipelineRoles,
+  feedUrl,
+}: Props) {
   const [interviews, setInterviews] = useState<Interview[]>(initialInterviews);
   const [filter, setFilter] = useState<"upcoming" | "past" | "all">("upcoming");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedFeed, setCopiedFeed] = useState(false);
 
   // Form state
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [roundType, setRoundType] =
@@ -121,6 +148,8 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
   const [notes, setNotes] = useState("");
 
   const now = new Date().getTime();
+
+  const webcalUrl = feedUrl.replace(/^https?:\/\//i, "webcal://");
 
   const { upcoming, past } = useMemo(() => {
     const up: Interview[] = [];
@@ -150,12 +179,44 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
   const displayedList =
     filter === "upcoming" ? upcoming : filter === "past" ? past : interviews;
 
+  const interviewStageRoles = useMemo(
+    () => pipelineRoles.filter((r) => r.status === "interview"),
+    [pipelineRoles],
+  );
+
+  const appliedRolesWithoutInterview = useMemo(
+    () =>
+      pipelineRoles.filter(
+        (r) => r.status === "applied" && r.scheduledInterviewCount === 0,
+      ),
+    [pipelineRoles],
+  );
+
   function handleSelectSavedJob(jobId: string) {
+    setSelectedJobId(jobId);
     const job = savedJobs.find((j) => j.id === jobId);
     if (job) {
       setCompany(job.company || "");
       setRole(job.title || "");
     }
+  }
+
+  function openScheduleForRole(target: {
+    job_id?: string | null;
+    company: string;
+    title: string;
+  }) {
+    setSelectedJobId(target.job_id || null);
+    setCompany(target.company);
+    setRole(target.title);
+    setInterviewAt("");
+    setIsModalOpen(true);
+  }
+
+  function handleCopyFeed() {
+    navigator.clipboard.writeText(feedUrl);
+    setCopiedFeed(true);
+    setTimeout(() => setCopiedFeed(false), 2500);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -168,6 +229,7 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          job_id: selectedJobId || null,
           company,
           role,
           round_type: roundType,
@@ -185,6 +247,7 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
         setInterviews((prev) => [...prev, data.interview]);
         setIsModalOpen(false);
         // Reset form
+        setSelectedJobId(null);
         setCompany("");
         setRole("");
         setInterviewAt("");
@@ -243,23 +306,242 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
               <Calendar className="h-5 w-5" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-              Interviews & Schedule
+              Interviews & Calendar
             </h1>
           </div>
           <p className="mt-1 text-sm text-text-secondary">
-            Keep track of upcoming rounds, store meeting links, and sync with your Google or Outlook calendar in 1 click.
+            Keep track of upcoming rounds, store meeting links, and sync with your Google or Apple calendar in real time.
           </p>
         </div>
 
-        <Button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="btn btn-primary rounded-full shrink-0 font-bold"
-        >
-          <CalendarPlus className="mr-2 h-4 w-4" />
-          Schedule Interview
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <Button asChild variant="outline" size="sm" className="rounded-full text-xs font-semibold">
+            <Link href="/integrations" className="flex items-center gap-1.5">
+              <Workflow className="h-3.5 w-3.5 text-accent" />
+              <span>Calendar Sync Hub</span>
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setSelectedJobId(null);
+              setCompany("");
+              setRole("");
+              setInterviewAt("");
+              setIsModalOpen(true);
+            }}
+            className="btn btn-primary rounded-full shrink-0 font-bold"
+          >
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Schedule Interview
+          </Button>
+        </div>
       </header>
+
+      {/* Calendar Integration Banner */}
+      <section className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-gradient-to-r from-accent-muted/20 via-surface to-surface p-5 shadow-card sm:flex-row sm:items-center">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-2xs">
+            <Calendar className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-text-primary">
+                Live Calendar Feed Integration
+              </h2>
+              <span className="rounded-full bg-success-lightest px-2 py-0.5 text-[10px] font-semibold text-success-foreground">
+                Active
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-text-muted leading-relaxed">
+              Auto-syncs every round into Google Calendar, Apple Calendar, and Outlook via live RFC 5545 feed.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleCopyFeed}
+            className="rounded-xl text-xs"
+          >
+            {copiedFeed ? (
+              <>
+                <Check className="h-3.5 w-3.5 mr-1.5 text-success" />
+                iCal Feed Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                Copy Live iCal URL
+              </>
+            )}
+          </Button>
+
+          <Button
+            asChild
+            size="sm"
+            className="rounded-xl text-xs font-semibold"
+          >
+            <a
+              href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+                webcalUrl,
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Subscribe in Google
+            </a>
+          </Button>
+        </div>
+      </section>
+
+      {/* Tracked Job Pipeline Integration Section */}
+      {interviewStageRoles.length > 0 && (
+        <section className="rounded-2xl border border-border bg-surface p-6 shadow-card">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
+                  Tracked Pipeline Roles in Interview Stage ({interviewStageRoles.length})
+                </h3>
+              </div>
+              <p className="mt-1 text-xs text-text-muted">
+                Roles moved to the &quot;Interview&quot; stage in your applications pipeline. Check dates or log your next round.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3.5 md:grid-cols-2">
+            {interviewStageRoles.map((roleItem) => {
+              const hasScheduled = roleItem.scheduledInterviewCount > 0;
+              const formattedDate = roleItem.nextInterviewAt
+                ? new Date(roleItem.nextInterviewAt).toLocaleDateString(
+                    undefined,
+                    {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    },
+                  )
+                : null;
+
+              return (
+                <div
+                  key={roleItem.job_id}
+                  className={`flex flex-col justify-between gap-3 rounded-xl border p-4 transition-all ${
+                    hasScheduled
+                      ? "border-border bg-surface-secondary/20"
+                      : "border-warning/40 bg-warning/5"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-text-primary">
+                        {roleItem.company}
+                      </h4>
+                      <p className="text-xs font-medium text-text-secondary">
+                        {roleItem.title}
+                      </p>
+                    </div>
+
+                    {hasScheduled ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-[11px] font-semibold text-success-foreground">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {roleItem.scheduledInterviewCount}{" "}
+                        {roleItem.scheduledInterviewCount === 1
+                          ? "Round"
+                          : "Rounds"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-2.5 py-0.5 text-[11px] font-semibold text-warning">
+                        <AlertCircle className="h-3 w-3" />
+                        Date Needed
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-border/70 pt-2.5 text-xs">
+                    {hasScheduled ? (
+                      <span className="text-text-muted">
+                        Next:{" "}
+                        <strong className="text-text-primary">
+                          {formattedDate}
+                        </strong>
+                      </span>
+                    ) : (
+                      <span className="text-warning font-medium">
+                        No upcoming round date logged
+                      </span>
+                    )}
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={hasScheduled ? "outline" : "default"}
+                      onClick={() =>
+                        openScheduleForRole({
+                          job_id: roleItem.job_id,
+                          company: roleItem.company,
+                          title: roleItem.title,
+                        })
+                      }
+                      className="rounded-lg text-xs py-1 h-7 font-semibold"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      {hasScheduled ? "Add Next Round" : "Schedule Round"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Applied Roles Quick Launcher (if user has applied jobs awaiting interview) */}
+      {appliedRolesWithoutInterview.length > 0 && interviewStageRoles.length === 0 && (
+        <section className="rounded-2xl border border-dashed border-border bg-surface-secondary/30 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-text-primary">
+                Applied to {appliedRolesWithoutInterview.length} roles on Jobbers
+              </p>
+              <p className="text-xs text-text-muted">
+                Did an employer reach out? Schedule an interview and the role will automatically advance to your Interview pipeline.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                onChange={(e) => {
+                  const targetJob = appliedRolesWithoutInterview.find(
+                    (j) => j.job_id === e.target.value,
+                  );
+                  if (targetJob) {
+                    openScheduleForRole(targetJob);
+                  }
+                }}
+                defaultValue=""
+                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-primary focus:border-accent focus:outline-none"
+              >
+                <option value="" disabled>
+                  Select an applied role…
+                </option>
+                {appliedRolesWithoutInterview.map((job) => (
+                  <option key={job.job_id} value={job.job_id}>
+                    {job.company} — {job.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Filter Tabs & Summary Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
@@ -295,179 +577,230 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            All ({interviews.length})
+            All Rounds ({interviews.length})
           </button>
         </div>
+
+        <span className="text-xs font-medium text-text-muted">
+          Showing {displayedList.length} of {interviews.length} rounds
+        </span>
       </div>
 
-      {/* Interview Cards List */}
+      {/* Interview List View (Strictly list/cards, no Kanban, no charts) */}
       {displayedList.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface p-12 text-center shadow-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-muted text-accent">
-            <CalendarCheck2 className="h-6 w-6" />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface px-6 py-16 text-center shadow-card">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-secondary text-text-muted">
+            <CalendarCheck2 className="h-7 w-7" />
           </div>
-          <h3 className="mt-4 text-base font-semibold text-text-primary">
+          <p className="mt-4 text-base font-semibold text-text-primary">
             {filter === "upcoming"
               ? "No upcoming interviews scheduled"
-              : "No past interviews found"}
-          </h3>
+              : filter === "past"
+                ? "No completed or past interviews"
+                : "No interviews recorded yet"}
+          </p>
           <p className="mt-1 max-w-sm text-xs leading-5 text-text-muted">
-            Add an upcoming recruiter chat, technical round, or final interview to sync it with your calendar.
+            Track interview rounds, store Google Meet / Zoom links, and sync with your calendar automatically.
           </p>
           <Button
             type="button"
+            size="sm"
             onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary btn-sm mt-5 rounded-full"
+            className="btn btn-primary mt-6 rounded-full font-bold"
           >
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Schedule your first interview
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Schedule an Interview
           </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {displayedList.map((item) => {
-            const dateObj = new Date(item.interview_at);
-            const isCompleted = item.status === "completed";
-            const calTitle = `${item.company} Interview: ${item.role} (${ROUND_LABELS[item.round_type] || item.round_type})`;
-            const calDesc = `Interview for ${item.role} at ${item.company}.\nRound: ${ROUND_LABELS[item.round_type] || item.round_type}\nInterviewer: ${item.interviewer_name || "N/A"}\nNotes: ${item.notes || "None"}\nMeeting Link: ${item.meeting_url || "N/A"}`;
-            const gcalUrl = createGoogleCalendarUrl({
-              title: calTitle,
-              description: calDesc,
-              location: item.meeting_url || item.company,
-              startDate: dateObj,
-              durationMinutes: item.duration_minutes,
+          {displayedList.map((interview) => {
+            const date = new Date(interview.interview_at);
+            const dateStr = date.toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            const timeStr = date.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+            });
+
+            const isPast = date.getTime() < now;
+            const isCompleted = interview.status === "completed";
+
+            const googleCalUrl = createGoogleCalendarUrl({
+              title: `${interview.company} Interview: ${ROUND_LABELS[interview.round_type] || interview.round_type}`,
+              description: `Interview for ${interview.role} at ${interview.company}.\nMeeting URL: ${interview.meeting_url || "N/A"}\nNotes: ${interview.notes || "None"}`,
+              location: interview.meeting_url || undefined,
+              startDate: date,
+              durationMinutes: interview.duration_minutes || 45,
             });
 
             return (
               <div
-                key={item.id}
-                className={`flex flex-col justify-between gap-5 rounded-2xl border p-5 shadow-card transition-all ${
-                  isCompleted
-                    ? "border-border/60 bg-surface/60 opacity-80"
-                    : "border-border bg-surface hover:border-border-muted"
+                key={interview.id}
+                className={`flex flex-col justify-between gap-4 rounded-2xl border border-border bg-surface p-5 shadow-card transition-all hover:border-border-muted ${
+                  isCompleted ? "opacity-75" : ""
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-muted text-accent">
-                      <Laptop className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-text-primary">
-                          {item.role}
-                        </h3>
-                        <span className="rounded-full bg-accent-light px-2.5 py-0.5 text-[11px] font-bold text-accent">
-                          {ROUND_LABELS[item.round_type] || item.round_type}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-accent-muted px-2.5 py-0.5 text-xs font-semibold text-accent">
+                        {ROUND_LABELS[interview.round_type] ||
+                          interview.round_type}
+                      </span>
+                      {isCompleted ? (
+                        <span className="rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
+                          Completed
                         </span>
-                        {isCompleted && (
-                          <span className="rounded-full bg-success-lightest px-2.5 py-0.5 text-[11px] font-bold text-success-darker">
-                            Completed
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-sm font-semibold text-text-secondary">
-                        {item.company}
-                      </p>
-
-                      <div className="mt-2.5 flex flex-wrap items-center gap-4 text-xs text-text-muted">
-                        <span className="flex items-center gap-1.5 font-medium text-text-primary">
-                          <Clock className="h-3.5 w-3.5 text-accent" />
-                          {dateObj.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}{" "}
-                          at{" "}
-                          {dateObj.toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}{" "}
-                          ({item.duration_minutes}m)
+                      ) : isPast ? (
+                        <span className="rounded-full bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                          Past Due
                         </span>
-
-                        {item.interviewer_name && (
-                          <span className="flex items-center gap-1">
-                            <User className="h-3.5 w-3.5" />
-                            {item.interviewer_name}
-                            {item.interviewer_email && ` (${item.interviewer_email})`}
-                          </span>
-                        )}
-                      </div>
+                      ) : (
+                        <span className="rounded-full bg-info-lightest px-2.5 py-0.5 text-xs font-semibold text-info-medium">
+                          Scheduled
+                        </span>
+                      )}
                     </div>
+
+                    <h3 className="text-lg font-bold text-text-primary">
+                      {interview.company}
+                    </h3>
+                    <p className="text-sm font-medium text-text-secondary">
+                      {interview.role}
+                    </p>
                   </div>
 
-                  {/* Meeting link trigger */}
-                  {item.meeting_url && (
-                    <a
-                      href={item.meeting_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-primary btn-sm rounded-full shrink-0 gap-1.5 font-semibold"
-                    >
-                      <Video className="h-3.5 w-3.5" />
-                      Join Meeting
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
+                  {/* Date & Time pill */}
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary sm:flex-col sm:items-end sm:border-0 sm:bg-transparent sm:p-0">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <Clock className="h-3.5 w-3.5 text-accent" />
+                      <span>{dateStr}</span>
+                    </div>
+                    <span className="text-text-muted">
+                      {timeStr} ({interview.duration_minutes}m)
+                    </span>
+                  </div>
                 </div>
 
-                {/* Notes box */}
-                {item.notes && (
-                  <div className="rounded-xl border border-border/70 bg-surface-secondary/40 p-3 text-xs leading-relaxed text-text-secondary">
-                    <span className="font-semibold text-text-primary">Prep Notes: </span>
-                    {item.notes}
+                {/* Details strip */}
+                {(interview.interviewer_name ||
+                  interview.meeting_url ||
+                  interview.notes) && (
+                  <div className="grid grid-cols-1 gap-2.5 rounded-xl border border-border/80 bg-surface-secondary/30 p-3 text-xs sm:grid-cols-2">
+                    {interview.interviewer_name && (
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <User className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                        <span className="truncate">
+                          Interviewer:{" "}
+                          <strong className="text-text-primary font-semibold">
+                            {interview.interviewer_name}
+                          </strong>
+                          {interview.interviewer_email
+                            ? ` (${interview.interviewer_email})`
+                            : ""}
+                        </span>
+                      </div>
+                    )}
+
+                    {interview.meeting_url && (
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Video className="h-3.5 w-3.5 text-accent shrink-0" />
+                        <a
+                          href={interview.meeting_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-accent hover:underline flex items-center gap-1"
+                        >
+                          Join Meeting ({interview.meeting_url})
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      </div>
+                    )}
+
+                    {interview.notes && (
+                      <p className="col-span-full text-text-muted italic">
+                        &quot;{interview.notes}&quot;
+                      </p>
+                    )}
                   </div>
                 )}
 
-                {/* Bottom Action Strip */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+                {/* Actions row */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={gcalUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-secondary btn-sm rounded-full gap-1.5 text-xs font-medium"
-                    >
-                      <CalendarPlus className="h-3.5 w-3.5" />
-                      Add to Google Calendar
-                    </a>
+                    {interview.meeting_url && (
+                      <Button
+                        asChild
+                        size="sm"
+                        className="rounded-full text-xs font-semibold"
+                      >
+                        <a
+                          href={interview.meeting_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Video className="mr-1.5 h-3.5 w-3.5" />
+                          Launch Meeting
+                        </a>
+                      </Button>
+                    )}
 
-                    <button
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full text-xs"
+                    >
+                      <a href={googleCalUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                        Google Calendar
+                      </a>
+                    </Button>
+
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() =>
                         downloadIcsFile({
-                          title: calTitle,
-                          description: calDesc,
-                          location: item.meeting_url || item.company,
-                          startDate: dateObj,
-                          durationMinutes: item.duration_minutes,
+                          title: `${interview.company} Interview (${ROUND_LABELS[interview.round_type] || interview.round_type})`,
+                          description: `Interview for ${interview.role}.\nMeeting URL: ${interview.meeting_url || "N/A"}`,
+                          location: interview.meeting_url || undefined,
+                          startDate: date,
+                          durationMinutes: interview.duration_minutes || 45,
                         })
                       }
-                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                      className="rounded-full text-xs"
                     >
-                      Download .ics
-                    </button>
+                      <Laptop className="mr-1.5 h-3.5 w-3.5" />
+                      Add to Apple/Outlook
+                    </Button>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleToggleStatus(item)}
-                      className={`btn btn-sm rounded-full text-xs font-medium ${
-                        isCompleted ? "btn-secondary" : "btn-secondary text-success-darker hover:border-success"
+                      onClick={() => handleToggleStatus(interview)}
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        isCompleted
+                          ? "bg-surface-secondary text-text-secondary hover:bg-surface-secondary/80"
+                          : "bg-success-lightest text-success-foreground hover:bg-success-lightest/80"
                       }`}
                     >
-                      <Check className="mr-1 h-3.5 w-3.5" />
-                      {isCompleted ? "Mark as Upcoming" : "Mark as Completed"}
+                      <Check className="h-3 w-3" />
+                      {isCompleted ? "Mark Scheduled" : "Mark Completed"}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="rounded-lg p-2 text-text-muted hover:bg-error-light hover:text-error"
-                      title="Delete interview"
+                      onClick={() => handleDelete(interview.id)}
+                      className="rounded-lg p-1.5 text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                      title="Delete entry"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -479,35 +812,39 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
         </div>
       )}
 
-      {/* SCHEDULE INTERVIEW MODAL */}
+      {/* Schedule Interview Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h2 className="text-lg font-bold text-text-primary">
-                Schedule New Interview
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2">
+                <CalendarPlus className="h-5 w-5 text-accent" />
+                <h3 className="text-base font-bold text-text-primary">
+                  Schedule Interview Round
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-secondary hover:text-text-primary"
+                className="rounded-lg p-1 text-text-muted hover:text-text-primary"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-4">
-              {/* Autofill from saved jobs dropdown */}
+            <form onSubmit={handleCreate} className="mt-5 space-y-4">
+              {/* Autofill from saved/pipeline jobs */}
               {savedJobs.length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-text-muted">
-                    Quick-fill from Saved Jobs (Optional)
+                  <label className="text-xs font-semibold text-text-secondary">
+                    Link with Tracked Platform Role (Optional)
                   </label>
                   <select
+                    value={selectedJobId || ""}
                     onChange={(e) => handleSelectSavedJob(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs font-medium text-text-primary focus:border-accent focus:outline-none"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs font-medium text-text-primary focus:border-accent focus:outline-none"
                   >
-                    <option value="">Select a saved role...</option>
+                    <option value="">-- Choose from your tracked roles --</option>
                     {savedJobs.map((j) => (
                       <option key={j.id} value={j.id}>
                         {j.company} — {j.title}
@@ -517,18 +854,18 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-text-secondary">
-                    Company Name *
+                    Company *
                   </label>
                   <input
                     type="text"
                     required
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    placeholder="e.g. Stripe, Linear"
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+                    placeholder="e.g. Stripe"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -541,13 +878,13 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                     required
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    placeholder="e.g. Frontend Engineer"
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+                    placeholder="e.g. Senior Frontend Engineer"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-text-secondary">
                     Round Type *
@@ -557,11 +894,11 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                     onChange={(e) =>
                       setRoundType(e.target.value as InterviewRoundType)
                     }
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm font-medium text-text-primary focus:border-accent focus:outline-none"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs font-medium text-text-primary focus:border-accent focus:outline-none"
                   >
-                    {Object.entries(ROUND_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>
-                        {label}
+                    {Object.entries(ROUND_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
                       </option>
                     ))}
                   </select>
@@ -574,19 +911,20 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                   <select
                     value={durationMinutes}
                     onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm font-medium text-text-primary focus:border-accent focus:outline-none"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs font-medium text-text-primary focus:border-accent focus:outline-none"
                   >
                     <option value={30}>30 minutes</option>
                     <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes</option>
-                    <option value={90}>90 minutes</option>
+                    <option value={60}>60 minutes (1 hour)</option>
+                    <option value={90}>90 minutes (1.5 hours)</option>
+                    <option value={120}>2 hours</option>
                   </select>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary">
-                  Interview Date & Time *
+                  Date and Time *
                 </label>
                 <input
                   type="datetime-local"
@@ -599,18 +937,18 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary">
-                  Meeting Link (Zoom / Google Meet / Teams)
+                  Meeting URL / Video Link (Optional)
                 </label>
                 <input
                   type="url"
                   value={meetingUrl}
                   onChange={(e) => setMeetingUrl(e.target.value)}
-                  placeholder="https://meet.google.com/... or https://zoom.us/..."
-                  className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+                  placeholder="https://meet.google.com/... or zoom.us/j/..."
+                  className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary focus:border-accent focus:outline-none"
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-text-secondary">
                     Interviewer Name (Optional)
@@ -619,8 +957,8 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                     type="text"
                     value={interviewerName}
                     onChange={(e) => setInterviewerName(e.target.value)}
-                    placeholder="e.g. Sarah Connor"
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+                    placeholder="e.g. Jane Smith"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -632,21 +970,21 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
                     type="email"
                     value={interviewerEmail}
                     onChange={(e) => setInterviewerEmail(e.target.value)}
-                    placeholder="e.g. sarah@company.com"
-                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+                    placeholder="e.g. recruiter@company.com"
+                    className="rounded-xl border border-border bg-surface-secondary/40 px-3 py-2 text-xs text-text-primary focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary">
-                  Prep Notes / Talking Points
+                  Preparation Notes (Optional)
                 </label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Key topics, company values to reference, or questions to ask..."
+                  placeholder="Focus areas, system design topics, questions to ask..."
                   className="rounded-xl border border-border bg-surface-secondary/40 p-2.5 text-xs text-text-primary focus:border-accent focus:outline-none"
                 />
               </div>
@@ -654,25 +992,21 @@ export function InterviewsClient({ initialInterviews, savedJobs }: Props) {
               <div className="mt-2 flex items-center justify-end gap-2.5 border-t border-border pt-4">
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   onClick={() => setIsModalOpen(false)}
-                  className="btn btn-secondary btn-sm rounded-full"
+                  className="rounded-full text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn btn-primary btn-sm rounded-full font-bold"
+                  className="btn btn-primary rounded-full text-xs font-bold"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Interview"
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                   )}
+                  Save & Sync Round
                 </Button>
               </div>
             </form>

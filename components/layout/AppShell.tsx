@@ -18,6 +18,7 @@ import {
   Search,
   Settings2,
   User,
+  Workflow,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -62,6 +63,7 @@ const NAV_GROUPS: {
     items: [
       { href: "/resumes", label: "Resumes", icon: FileText },
       { href: "/company-research", label: "Research", icon: Building2 },
+      { href: "/integrations", label: "Integrations", icon: Workflow },
       { href: "/analytics", label: "Analytics", icon: BarChart2 },
     ],
   },
@@ -69,7 +71,6 @@ const NAV_GROUPS: {
     label: "Account",
     items: [
       { href: "/profile", label: "Profile", icon: User },
-      { href: "/settings", label: "Settings", icon: Settings2 },
     ],
   },
 ];

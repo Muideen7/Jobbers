@@ -61,6 +61,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const collection = await getCollection<Interview>("interviews");
     await collection.insertOne(newInterview);
 
+    if (newInterview.job_id) {
+      try {
+        const appsCollection = await getCollection<{
+          id: string;
+          user_id: string;
+          job_id: string;
+          status: string;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        }>("applications");
+
+        await appsCollection.updateOne(
+          { user_id: user.id, job_id: newInterview.job_id },
+          {
+            $set: {
+              status: "interview",
+              updated_at: now,
+            },
+            $setOnInsert: {
+              id: randomUUID(),
+              user_id: user.id,
+              job_id: newInterview.job_id,
+              position: 0,
+              created_at: now,
+            },
+          },
+          { upsert: true },
+        );
+      } catch (appSyncErr) {
+        console.warn("[api/interviews] Failed to auto-sync application stage", appSyncErr);
+      }
+    }
+
     return NextResponse.json({ success: true, interview: newInterview });
   } catch (error) {
     console.error("[api/interviews] POST", error);

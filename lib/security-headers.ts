@@ -23,9 +23,12 @@ export const PROXY_OWNED_ROUTE_PREFIXES = [
   "/home",
   "/jobs",
   "/applications",
+  "/interviews",
+  "/follow-ups",
   "/resumes",
   "/analytics",
   "/company-research",
+  "/integrations",
   "/profile",
   "/settings",
 ] as const;
