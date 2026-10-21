@@ -17,6 +17,8 @@ export type GeneratedContent = {
 type Props = {
   profile: Profile;
   generated: GeneratedContent;
+  targetRole?: string | null | undefined;
+  targetCompany?: string | null | undefined;
 };
 
 /**
@@ -101,10 +103,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export function ResumePDF({ profile, generated }: Props) {
+export function ResumePDF({ profile, generated, targetRole }: Props) {
   const contactParts = [profile.email, profile.phone].filter(Boolean);
   const linkParts = [profile.linkedin_url, profile.portfolio_url].filter(Boolean);
-  const subtitleParts = [profile.current_title, profile.location].filter(Boolean);
+  const subtitleParts = [targetRole || profile.current_title, profile.location].filter(Boolean);
 
   return (
     <Document>
