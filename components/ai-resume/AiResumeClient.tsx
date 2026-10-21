@@ -10,8 +10,8 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  Sparkles,
   Star,
+  Target,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -210,7 +210,7 @@ export function AiResumeClient({
         <div>
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-muted text-accent">
-              <Sparkles className="h-4 w-4" />
+              <Target className="h-4 w-4" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
               AI Resume Studio
@@ -232,7 +232,7 @@ export function AiResumeClient({
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <Target className="h-3.5 w-3.5" />
             Tailor for a Role
           </button>
           <button
@@ -401,7 +401,7 @@ export function AiResumeClient({
                           key={s}
                           className="inline-flex items-center gap-1 rounded-lg bg-surface-secondary px-2.5 py-1 text-xs font-medium text-text-secondary border border-border"
                         >
-                          <Sparkles className="h-3 w-3 text-accent" />
+                          <Target className="h-3 w-3 text-accent" />
                           {s}
                         </span>
                       ))}
@@ -437,7 +437,7 @@ export function AiResumeClient({
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
+                    <Target className="mr-2 h-4 w-4" />
                     Generate Tailored Resume
                   </>
                 )}

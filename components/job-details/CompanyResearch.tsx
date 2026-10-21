@@ -9,7 +9,8 @@ import {
   ListChecks,
   MessageSquareText,
   ShieldCheck,
-  Sparkles,
+  Bot,
+  Globe,
   Users,
 } from "lucide-react";
 
@@ -219,7 +220,7 @@ export function CompanyResearch({
           </DossierCard>
 
           {Array.isArray(research.sources) && research.sources.length > 0 && (
-            <DossierCard title="Sources" icon={Sparkles} className="sm:col-span-2">
+            <DossierCard title="Sources" icon={Globe} className="sm:col-span-2">
               <div className="flex flex-wrap gap-2">
                 {research.sources.map((source) => (
                   <Link
@@ -249,7 +250,7 @@ export function CompanyResearch({
             &apos;s public pages and build a dossier.
           </p>
           <div className="mt-5 flex items-center gap-2 rounded-full bg-accent-muted px-3 py-1 text-xs font-medium text-accent">
-            <Sparkles className="h-3 w-3" />
+            <Bot className="h-3 w-3" />
             Candidate-specific briefing
           </div>
           <div className="mt-4">

@@ -6,10 +6,12 @@ import {
   BarChart2,
   Bell,
   Building2,
+  Calendar,
   Columns3,
   FileText,
   LayoutDashboard,
   LogOut,
+  MailCheck,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -51,20 +53,23 @@ const NAV_GROUPS: {
       { href: "/home", label: "Home", icon: LayoutDashboard },
       { href: "/jobs", label: "Jobs", icon: Search },
       { href: "/applications", label: "Applications", icon: Columns3 },
+      { href: "/interviews", label: "Interviews", icon: Calendar },
+      { href: "/follow-ups", label: "Follow-ups", icon: MailCheck },
     ],
   },
   {
     label: "Tools",
     items: [
       { href: "/resumes", label: "Resumes", icon: FileText },
-      { href: "/analytics", label: "Analytics", icon: BarChart2 },
       { href: "/company-research", label: "Research", icon: Building2 },
+      { href: "/analytics", label: "Analytics", icon: BarChart2 },
     ],
   },
   {
     label: "Account",
     items: [
       { href: "/profile", label: "Profile", icon: User },
+      { href: "/settings", label: "Settings", icon: Settings2 },
     ],
   },
 ];

@@ -7,20 +7,33 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Jobbers Scope Revamp — Completed ✅
-**Scope:** 9 Clean Features across 3 Navigation Groups
+**Scope:** 10 Clean Features across 3 Navigation Groups
 
-### 9 Core Navigation Features
-1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers. (Analytics section moved out).
+### 10 Core Navigation Features
+1. **Home (`/home`)** — High-level stats, top match job recommendations, quick action triggers.
 2. **Jobs (`/jobs`)** — Multi-source live discovery feed with automatic instant search for new users with target roles.
-3. **Job Details (`/jobs/[id]`)** — Full role breakdown, profile score alignment, company research dossier.
-4. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions.
-5. **Resumes (`/resumes`)** — AI resume extraction from upload + instant PDF resume generation via Gemini and `@react-pdf/renderer`.
-6. **Analytics (`/analytics`)** — Dedicated tools page with 3 data-driven charts (Jobs Over Time, Score Distribution, Company Research).
+3. **Applications (`/applications`)** — Clean stage-grouped pipeline view (Saved → Applied → Interview → Offer) with inline stage transitions (no Kanban, no charts).
+4. **Interviews & Calendar (`/interviews`)** — Interview tracker with round management, meeting links, and 100% free calendar sync (Google Calendar 1-click web launcher + native `.ics` download).
+5. **Follow-ups & Communications (`/follow-ups`)** — Recruiter communication log, response deadline tracking, status filters, and 1-click Gemini AI follow-up email drafts.
+6. **Resumes (`/resumes`)** — Tailored AI resume studio, ATS-optimized PDF generation via Gemini and `@react-pdf/renderer`.
 7. **Research (`/company-research`)** — Company research dossiers & queue of viewed roles awaiting research.
-8. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills) & completion tracker.
-9. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
+8. **Analytics (`/analytics`)** — Dedicated tools page with data-driven metric breakdown and score distributions.
+9. **Profile (`/profile`)** — Full user profile (personal details, target roles, experience, skills, education) & completion tracker.
+10. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
 
 ### Summary of Revamp Work Done:
+- **Interviews & 100% Free Calendar Sync (`/interviews`)**:
+  1. *Schema & APIs (`types/index.ts`, `app/api/interviews/`)*: Added `Interview` schema with round type, datetime, meeting URL, recruiter contact, interviewer names, and notes. Created full REST endpoints (`GET`, `POST`, `PATCH`, `DELETE`) with MongoDB user isolation.
+  2. *Free Calendar Integration*: Implemented 1-click Google Calendar web event generator (`https://calendar.google.com/calendar/render?action=TEMPLATE&...`) and native `.ics` iCalendar file generator for Outlook/Apple Calendar/Thunderbird with zero external API fees or OAuth scopes required.
+  3. *High-Density List UI (`components/interviews/InterviewsClient.tsx`)*: Clean Upcoming vs. Past tabs, status badges, one-click meeting launcher, and scheduling modal linked to user's saved jobs.
+- **Follow-ups & Recruiter Communication Tracker (`/follow-ups`)**:
+  1. *Schema & APIs (`types/index.ts`, `app/api/communications/`)*: Added `Communication` schema with company, role, contact info, channel (email, phone, LinkedIn), direction (inbound, outbound), summary, occurred date, follow-up deadline, and status (`needs_reply`, `follow_up_due`, `waiting`, `resolved`).
+  2. *Gemini AI Follow-up Draft Generator (`/api/communications/draft`)*: Created Gemini-powered draft generation supporting 4 common candidate scenarios: post-interview thank you, post-application follow-up, status check, and offer response. Includes 1-click copy-to-clipboard and `mailto:` launcher.
+  3. *Action Filter Interface (`components/follow-ups/FollowUpsClient.tsx`)*: Clean list view partitioned into Action Required (`needs_reply`, `follow_up_due`), Waiting on Employer, and All messages.
+- **Complete Sparkles Replacement**:
+  1. Replaced generic `Sparkles` icon throughout the entire project (resumes, dashboard, applications, analytics, job discovery, profile, dossiers, home) with purposeful domain icons (`Target`, `Calendar`, `MailCheck`, `Bot`, `Wand2`, `Search`).
+- **Sidebar Expansion to 10 Clean Nav Items (`components/layout/AppShell.tsx`)**:
+  1. Updated `NAV_GROUPS` to provide exactly 10 accessible, high-density, real routes across Workspace (`Home`, `Jobs`, `Applications`, `Interviews`, `Follow-ups`), Tools (`Resumes`, `Research`, `Analytics`), and Account (`Profile`, `Settings`). Strict prohibition on charts and Kanban boards respected.
 - **Option C: Tailored AI Resume Studio (`/resumes`)**:
   1. *Targeted Role Selection*: In `components/ai-resume/AiResumeClient.tsx`, added ability to choose any target role directly from the candidate's saved pipeline (or enter custom title, company, and job description requirements).
   2. *Skills Alignment & Gap Highlights*: Automatically visualizes matched skills (green badges) and target skills to emphasize (amber badges) for the selected position.

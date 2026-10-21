@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Loader2,
   GraduationCap,
-  Sparkles,
+  Target,
   Plus,
   X,
 } from "lucide-react";
@@ -722,7 +722,7 @@ export function IdentityProfileClient({ profile }: Props) {
                 <div>
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-accent" />
+                      <Target className="h-4 w-4 text-accent" />
                       <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
                         Skills & Technical Proficiencies
                       </h3>

@@ -1,4 +1,4 @@
-import { Check, Sparkles, X } from "lucide-react";
+import { Check, Target, X } from "lucide-react";
 
 function SkillBadge({
   skill,
@@ -28,7 +28,7 @@ export function MatchReasonCard({ matchReason }: { matchReason: string | null })
     <section className="h-full rounded-2xl border border-border bg-surface p-6 shadow-card">
       <div className="mb-5 flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success-lightest">
-          <Sparkles className="h-4 w-4 text-success" />
+          <Target className="h-4 w-4 text-success" />
         </div>
         <h2 className="text-xs font-semibold uppercase leading-4 tracking-wide text-text-secondary">
           Match Reasoning
