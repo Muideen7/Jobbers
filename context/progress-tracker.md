@@ -21,6 +21,10 @@ Update this file after every completed feature. Any AI agent reading this should
 9. **Settings (`/settings`)** — Dedicated account preferences, notification toggle, and account actions.
 
 ### Summary of Revamp Work Done:
+- **Repository Sweep & Dead Code Pruning**:
+  1. *Removed Stale UI & Prototypes*: Deleted 12 unreferenced legacy prototype components (`SearchControls`, `JobsTable`, `JobFilters`, `ProfileForm`, `ProfileOverview`, `ProfilePageClient`, `FeedHero`, `JobDetailPanel`, `Navbar`, `Footer`, `PricingModal`, `TourModal`), 3 unused UI primitives (`card.tsx`, `slider.tsx`, `scroll-area.tsx`), and obsolete ambient types (`types/resend.d.ts`).
+  2. *Pruned Unused Dependencies*: Removed `@browserbasehq/stagehand`, `playwright-core`, `@openrouter/ai-sdk-provider`, `@radix-ui/react-slider`, `@radix-ui/react-scroll-area` from `package.json` and synchronized `pnpm-lock.yaml`. Deleted redundant `package-lock.json`.
+  3. *Verified Build & Tests*: Ran full test suite (160/160 passing), TypeScript check (0 errors), ESLint (0 errors), and Next.js Turbopack production build (all routes static/dynamic compiled successfully).
 - **Profile Skills & Education Inputs (`/profile`)**:
   1. *Interactive Skills Input*: In `components/profile/IdentityProfileClient.tsx`, added full interactive Skills management allowing users to type skills (with Enter/comma multi-skill parsing), pick from popular suggestions, view active skill chips, and remove skills with an `X` button.
   2. *Education & Credentials Input*: Added comprehensive Education inputs for Degree / Level (dropdown), Field of Study, Institution / University, and Graduation Year.
