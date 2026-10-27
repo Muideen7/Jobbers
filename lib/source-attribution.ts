@@ -23,6 +23,7 @@ export const SOURCE_ATTRIBUTION: Record<JobSourceId | "search", SourceCredit> = 
   remoteok: { label: "RemoteOK", url: "https://remoteok.com" },
   remotive: { label: "Remotive", url: "https://remotive.com" },
   jobicy: { label: "Jobicy", url: "https://jobicy.com" },
+  themuse: { label: "The Muse", url: "https://www.themuse.com" },
   search: { label: "Direct", url: "https://jobbers-black.vercel.app" },
 };
 

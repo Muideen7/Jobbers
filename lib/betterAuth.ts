@@ -22,6 +22,11 @@ export const auth = betterAuth({
   baseURL: siteBaseUrl,
   database: mongodbAdapter(db, { client }),
   secret: process.env.BETTER_AUTH_SECRET!,
+  user: {
+    deleteUser: {
+      enabled: true,
+    },
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,

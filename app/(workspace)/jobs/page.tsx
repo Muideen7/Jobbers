@@ -212,17 +212,30 @@ export default async function JobsPage({ searchParams }: Props) {
         const scoreMap = new Map(scores.map((s) => [s.jobId, s]));
         const now = new Date().toISOString();
 
+        const hasProfile = Boolean(
+          (profile?.skills && profile.skills.length > 0) ||
+          (profile?.job_titles_seeking && profile.job_titles_seeking.length > 0) ||
+          Boolean(profile?.current_title?.trim())
+        );
+
         const records = searchResult.jobs.map((job) =>
           buildJobRecord({
             job,
             userId: user.id,
             runId: null,
-            score: scoreMap.get(scoringId(job)) ?? {
-              matchScore: 70,
-              matchReason: "Matches your search criteria",
-              matchedSkills: [],
-              missingSkills: [],
-            },
+            score: hasProfile
+              ? (scoreMap.get(scoringId(job)) ?? {
+                  matchScore: null,
+                  matchReason: null,
+                  matchedSkills: [],
+                  missingSkills: [],
+                })
+              : {
+                  matchScore: null,
+                  matchReason: null,
+                  matchedSkills: [],
+                  missingSkills: [],
+                },
             foundAt: now,
           }),
         );

@@ -12,7 +12,8 @@ export type JobSourceId =
   | "arbeitnow"
   | "remoteok"
   | "remotive"
-  | "jobicy";
+  | "jobicy"
+  | "themuse";
 
 export type JobHighlights = {
   responsibilities: string[];

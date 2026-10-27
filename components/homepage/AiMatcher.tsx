@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { Target, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Target, ArrowUpRight, ArrowDownRight, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { CompanyLogo } from "@/components/homepage/Logos";
 import { marketSkills } from "@/components/homepage/data";
+import { useScrollReveal } from "@/lib/animations/useScrollReveal";
 
 const legend: ReadonlyArray<{ label: string; percent: string; dotClass: string }> = [
   { label: "Full stack", percent: "50%", dotClass: "bg-skill-slate" },
@@ -12,38 +16,63 @@ const legend: ReadonlyArray<{ label: string; percent: string; dotClass: string }
 ];
 
 export function AiMatcher() {
+  const { ref: sectionRef, isVisible } = useScrollReveal({ threshold: 0.15 });
+  const [animatedScore, setAnimatedScore] = useState(0);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    let current = 0;
+    const target = 94;
+    const duration = 1200;
+    const interval = 20;
+    const step = target / (duration / interval);
+
+    const timer = setInterval(() => {
+      current += step;
+      if (current >= target) {
+        setAnimatedScore(target);
+        clearInterval(timer);
+      } else {
+        setAnimatedScore(Math.floor(current));
+      }
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [isVisible]);
+
   return (
     <section
       id="ai-matcher"
       className="w-full py-16 sm:py-24 relative overflow-hidden bg-surface-tertiary border-b border-border/60 rounded-b-[20px]"
+      ref={sectionRef}
     >
-      <div className="absolute top-0 right-0 w-[550px] h-[550px] bg-violet-glow/50 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-      <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-info-lightest/60 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+      <div className="absolute top-0 right-0 w-[550px] h-[550px] bg-violet-glow/50 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 animate-pulse-glow" />
+      <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-info-lightest/60 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20 animate-pulse-glow" />
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-secondary text-xs font-semibold text-text-darkest">
+            <div className="reveal-init inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-secondary text-xs font-semibold text-text-darkest">
               <Target className="w-3.5 h-3.5 text-text-strong" />
               <span>AI analysis</span>
             </div>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">
+            <h2 className="reveal-init text-3xl sm:text-4xl lg:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">
               Your personal AI job matcher.
             </h2>
 
-            <p className="text-text-strong text-sm sm:text-base leading-relaxed">
+            <p className="reveal-init text-text-strong text-sm sm:text-base leading-relaxed">
               While you sleep, Jobbers is scanning. While you work, it is scoring. Our AI reads
               every live listing against your skills, experience and target direction, then shows
               you only the roles worth your time — with a plain-English reason for each score. No
               more guessing which of the 400 tabs to open.
             </p>
 
-            <div className="flex flex-wrap gap-2.5 pt-2">
+            <div className="reveal-init flex flex-wrap gap-2.5 pt-2">
               {marketSkills.map((item) => (
                 <div
                   key={item.name}
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border/80 bg-surface-tertiary/60 text-xs sm:text-sm font-medium text-text-darkest shadow-2xs hover:bg-surface transition"
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border/80 bg-surface-tertiary/60 text-xs sm:text-sm font-medium text-text-darkest shadow-2xs hover:bg-surface hover:scale-105 transition-all"
                 >
                   <span>{item.name}</span>
                   <span
@@ -62,19 +91,19 @@ export function AiMatcher() {
               ))}
             </div>
 
-            <div className="pt-2">
+            <div className="reveal-init pt-2">
               <Link
                 href="/login?mode=signup"
-                className="btn btn-secondary"
+                className="btn btn-secondary hover:border-accent/40 transition-colors"
               >
                 Start matching
               </Link>
             </div>
           </div>
 
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-6 reveal-scale-init">
             <div className="bg-gradient-to-b from-surface-tertiary via-surface-tertiary to-pastel-lilac p-5 sm:p-7 rounded-[32px] border border-border-light shadow-xs space-y-4">
-              <div className="bg-surface rounded-2xl p-5 shadow-xs border border-border-light">
+              <div className="bg-surface rounded-2xl p-5 shadow-xs border border-border-light hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between pb-3">
                   <span className="text-sm font-semibold text-text-primary">Your match today</span>
                   <span className="text-text-muted font-bold text-base">+</span>
@@ -148,11 +177,12 @@ export function AiMatcher() {
                 </div>
               </div>
 
-              <div className="bg-surface rounded-2xl p-5 shadow-xs border border-border-light space-y-3">
+              <div className="bg-surface rounded-2xl p-5 shadow-xs border border-border-light space-y-3 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between text-xs text-text-secondary">
                   <span>United Kingdom</span>
-                  <span className="px-2 py-0.5 rounded-md bg-success-lightest text-success-foreground font-semibold">
-                    94% match
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-success-lightest text-success-foreground font-semibold">
+                    <Sparkles className="h-3 w-3" />
+                    <span>{animatedScore}% match</span>
                   </span>
                 </div>
 

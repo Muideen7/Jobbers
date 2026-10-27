@@ -14,8 +14,8 @@
 import type { NormalizedJob, JobSourceId } from "./types.ts";
 
 export type JobScoreFields = {
-  matchScore: number;
-  matchReason: string;
+  matchScore: number | null;
+  matchReason: string | null;
   matchedSkills: string[];
   missingSkills: string[];
 };
@@ -66,8 +66,8 @@ export type JobDbRecord = {
   responsibilities: string[];
   requirements: string[];
   benefits: string[];
-  match_score: number;
-  match_reason: string;
+  match_score: number | null;
+  match_reason: string | null;
   matched_skills: string[];
   missing_skills: string[];
   found_at: string;

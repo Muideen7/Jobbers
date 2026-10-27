@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
-import { Heart, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { Heart, ChevronLeft, ChevronRight, MapPin, Star, Sparkles } from "lucide-react";
 
 import { testimonials } from "@/components/homepage/data";
+import { useScrollReveal } from "@/lib/animations/useScrollReveal";
 
 const AUTO_SCROLL_INTERVAL_MS = 4500;
 
 export function WallOfLove() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { ref: sectionRef } = useScrollReveal({ threshold: 0.1 });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -22,9 +24,8 @@ export function WallOfLove() {
     setCanScrollLeft(scrollLeft > 10);
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
 
-    // Compute approximate active card index
     const cardWidth = el.firstElementChild
-      ? (el.firstElementChild as HTMLElement).offsetWidth + 20 // 20px gap
+      ? (el.firstElementChild as HTMLElement).offsetWidth + 20
       : 320;
     const current = Math.round(scrollLeft / cardWidth);
     setActiveIndex(Math.min(testimonials.length - 1, Math.max(0, current)));
@@ -49,7 +50,6 @@ export function WallOfLove() {
     el.scrollTo({ left: index * cardWidth, behavior: "smooth" });
   }, []);
 
-  // Keyboard navigation when user is focused on or hovering the section
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {
       if (e.key === "ArrowLeft") {
@@ -63,7 +63,6 @@ export function WallOfLove() {
     [scrollTo],
   );
 
-  // Auto-scroll loop
   useEffect(() => {
     if (isPaused) return;
 
@@ -73,7 +72,6 @@ export function WallOfLove() {
 
       const { scrollLeft, scrollWidth, clientWidth } = el;
       if (scrollLeft >= scrollWidth - clientWidth - 20) {
-        // Rewind to beginning
         el.scrollTo({ left: 0, behavior: "smooth" });
       } else {
         scrollTo("right");
@@ -83,7 +81,6 @@ export function WallOfLove() {
     return () => clearInterval(timer);
   }, [isPaused, scrollTo]);
 
-  // Track scroll position for arrow disabled states
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -99,7 +96,8 @@ export function WallOfLove() {
   return (
     <section
       id="wall-of-love"
-      className="w-full py-14 md:py-24 overflow-hidden"
+      ref={sectionRef}
+      className="w-full py-14 md:py-24 relative overflow-hidden"
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsPaused(true)}
@@ -108,13 +106,17 @@ export function WallOfLove() {
       onBlur={() => setIsPaused(false)}
       aria-label="Testimonials Wall of Love"
     >
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Background ambient radial glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none animate-pulse-glow" />
+
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10">
+        <div className="reveal-init flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10">
           <div className="space-y-3 max-w-xl">
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-soft text-xs font-semibold text-rose border border-rose/30 shadow-2xs">
               <Heart className="w-3.5 h-3.5 fill-rose" />
               <span>Wall of love</span>
+              <Sparkles className="w-3 h-3 text-rose ml-1" />
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">
@@ -134,7 +136,7 @@ export function WallOfLove() {
                 onClick={() => scrollTo("left")}
                 disabled={!canScrollLeft}
                 aria-label="Previous testimonial"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-text-primary shadow-xs transition-all hover:bg-surface-secondary active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-text-primary shadow-xs transition-all hover:bg-surface-secondary hover:scale-105 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -143,7 +145,7 @@ export function WallOfLove() {
                 onClick={() => scrollTo("right")}
                 disabled={!canScrollRight}
                 aria-label="Next testimonial"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-text-primary shadow-xs transition-all hover:bg-surface-secondary active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-text-primary shadow-xs transition-all hover:bg-surface-secondary hover:scale-105 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
@@ -154,13 +156,15 @@ export function WallOfLove() {
         {/* Carousel Container */}
         <div
           ref={scrollContainerRef}
-          className="flex gap-5 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scrollbar-none scroll-smooth"
+          className="reveal-init flex gap-5 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory scrollbar-none scroll-smooth"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {testimonials.map((item) => (
+          {testimonials.map((item, idx) => (
             <figure
               key={item.id}
-              className="relative shrink-0 w-[290px] sm:w-[320px] md:w-[340px] rounded-[28px] overflow-hidden min-h-[440px] sm:min-h-[480px] flex flex-col justify-end p-6 shadow-md snap-start group transition-transform duration-300 hover:-translate-y-1.5"
+              className={`relative shrink-0 w-[290px] sm:w-[320px] md:w-[340px] rounded-[28px] overflow-hidden min-h-[440px] sm:min-h-[480px] flex flex-col justify-between p-6 shadow-md snap-start group transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
+                activeIndex === idx ? "ring-2 ring-accent/40 shadow-lg scale-[1.01]" : ""
+              }`}
             >
               <div className="absolute inset-0 z-0">
                 <Image
@@ -170,26 +174,38 @@ export function WallOfLove() {
                   sizes="(max-width: 640px) 290px, (max-width: 1024px) 320px, 340px"
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-scrim/90 via-scrim/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-scrim/95 via-scrim/45 to-transparent" />
               </div>
 
-              {/* Location Badge */}
-              <div className="absolute top-5 left-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-scrim/40 px-3 py-1 text-[11px] font-medium text-inverse-foreground backdrop-blur-md border border-inverse-foreground/20">
-                <MapPin className="h-3 w-3 text-accent-light shrink-0" />
-                <span className="truncate">{item.location}</span>
+              {/* Location & Star Rating Header */}
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-scrim/50 px-3 py-1 text-[11px] font-medium text-inverse-foreground backdrop-blur-md border border-inverse-foreground/20">
+                  <MapPin className="h-3 w-3 text-accent-light shrink-0" />
+                  <span className="truncate">{item.location}</span>
+                </div>
+                <div className="flex items-center gap-0.5 rounded-full bg-scrim/50 px-2 py-0.5 backdrop-blur-md border border-inverse-foreground/20">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-2.5 w-2.5 fill-amber text-amber" />
+                  ))}
+                </div>
               </div>
 
               <figcaption className="relative z-10 space-y-3 text-inverse-foreground">
                 <p className="text-sm sm:text-[15px] font-medium leading-relaxed tracking-tight text-inverse-foreground/95">
                   &ldquo;{item.quote}&rdquo;
                 </p>
-                <div>
-                  <p className="text-sm font-semibold text-inverse-foreground tracking-wide">
-                    {item.name}
-                  </p>
-                  <p className="text-xs text-inverse-foreground/75 font-normal">
-                    {item.role}
-                  </p>
+                <div className="pt-1 border-t border-inverse-foreground/15 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-inverse-foreground tracking-wide">
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-inverse-foreground/75 font-normal">
+                      {item.role}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent-light bg-accent/30 px-2 py-0.5 rounded-md">
+                    Verified
+                  </span>
                 </div>
               </figcaption>
             </figure>
@@ -197,7 +213,7 @@ export function WallOfLove() {
         </div>
 
         {/* Indicator dots */}
-        <div className="flex items-center justify-center gap-2 pt-6">
+        <div className="reveal-init flex items-center justify-center gap-2 pt-6">
           {testimonials.map((item, idx) => (
             <button
               key={item.id}

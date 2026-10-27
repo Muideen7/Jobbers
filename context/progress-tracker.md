@@ -23,6 +23,33 @@ Update this file after every completed feature. Any AI agent reading this should
 *(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Account Deletion Full Sweep & Session Erase (`/settings`, `actions/account.ts`, `lib/betterAuth.ts`)**:
+  1. *Better Auth deleteUser*: Enabled `user: { deleteUser: { enabled: true } }` in Better Auth configuration.
+  2. *Triple User Key Cascade*: Purges user by `email`, `_id`, and `id` in `user`, and `userId` (both as `ObjectId` and string) in `account` and `session`.
+  3. *Secure Cookie Purge*: Clears both standard and HTTPS `__Secure-better-auth.*` cookie variants on Vercel, invalidating all sessions and permitting immediate re-registration with the same email.
+- **Language Filtering, Provider Balancing & The Muse API (`lib/jobs/*`)**:
+  1. *German Language Filter*: Added `isLikelyGermanJob` to `lib/jobs/arbeitnow.ts` filtering out all German listings (`(m/w/d)`, `Mitarbeiter in der Kundenbetreuung`, etc.) from non-German searches.
+  2. *Round-Robin Interleaving*: Balanced `lib/jobs/search-all.ts` so no single provider (e.g. Arbeitnow with 300+ entries) can flood the feed; jobs are interleaved across all healthy providers.
+  3. *The Muse Provider*: Added `lib/jobs/themuse.ts` aggregating public English roles across all disciplines (healthcare, finance, operations, management, marketing, sales).
+- **Match Scoring Honesty (`app/(workspace)/jobs/page.tsx`)**:
+  1. Eliminated the arbitrary 70% fallback match score when a profile is empty. If the user has not filled skills or target roles, `match_score` is kept `null`.
+  2. The "For You" tab displays a guidance empty state prompting the candidate to upload a resume or complete their profile.
+- **Resume Extraction Overhaul (`actions/profile.ts`, `lib/llm.ts`)**:
+  1. *Token Limit Expansion*: Increased `maxOutputTokens` from 800 to 3500 to prevent mid-JSON truncations and syntax errors.
+  2. *Multimodal PDF Reader*: Added direct Gemini multimodal PDF parsing (`inlineData: { mimeType: "application/pdf" }`) when text extraction is sparse or fails.
+  3. *Immediate Persistence*: Extracted skills, target roles, and work history automatically persist to MongoDB.
+- **Instant Page Navigation Feedback & Route Suspense (`components/layout/NavigationProgressBar.tsx`, `components/layout/AppShell.tsx`, `app/(workspace)/loading.tsx`)**:
+  1. *Immediate Navigation Bar*: Created `NavigationProgressBar` with glowing accent head that springs into action on internal link clicks, eliminating dead-click latency.
+  2. *Sidebar Pending State*: Enhanced `AppShell` to immediately reflect active pending indicators on clicked sidebar nav rows.
+  3. *Workspace Suspense Skeleton*: Added `app/(workspace)/loading.tsx` to provide immediate skeleton rendering during server-side transitions.
+- **Landing Page Scroll Reveal & Motion Overhaul (`components/homepage/*`, `lib/animations/useScrollReveal.ts`, `app/globals.css`)**:
+  1. *Animation Engine*: Added GPU-accelerated spring keyframes (`floatSlow`, `pulseGlow`, `marqueeScroll`, `shimmerSlide`), scroll reveal utility classes, and `useScrollReveal` IntersectionObserver hook with `prefers-reduced-motion` compliance.
+  2. *Hero Section*: Added 3D perspective mouse tilt, floating satellite match badges, and staggered text/button entrance.
+  3. *Top Companies Marquee*: Continuous infinite brand glide with side gradient fade masks and pause-on-hover.
+  4. *AI Matcher*: Interactive animated match score counter (0 -> 94%) and staggered skill reveals.
+  5. *How It Works*: Connected progression line and staggered card reveals on scroll.
+  6. *Live Opportunities*: Staggered card grid entrance with hover lift physics.
+  7. *Wall of Love*: Depth carousel with active card scaling, quote shimmer, star rating micro-bounce, and smooth glide.
 - **Account Deletion & Data Wipe (`/settings`, `actions/account.ts`, `components/settings/DeleteAccountSection.tsx`)**:
   1. *Complete Database Cascade*: Built server action `deleteAccountAction` completely purging user from `user`, `session`, `account`, `profiles`, `jobs`, `applications`, `interviews`, `communications`, `resumes`, `agent_runs`, and `agent_logs`.
   2. *Safety Modal*: Requires the user to type "DELETE" before enabling destructive action.

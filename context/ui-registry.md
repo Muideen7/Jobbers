@@ -996,23 +996,34 @@ Last updated: 2026-10-15
 **Pattern notes:**
 Integrates directly into `FilterSidebar` and `JobFilters`. Drives `filters.jobBoard` in `DashboardFilters` without hardcoded colors or paid APIs.
 
-### DeleteAccountSection
+### NavigationProgressBar
 
-File: components/settings/DeleteAccountSection.tsx
+File: components/layout/NavigationProgressBar.tsx
 Last updated: 2026-10-27
 
 | Property | Value |
 | --- | --- |
-| Container | `rounded-2xl border border-error/20 bg-error/5 p-6 space-y-4` |
-| Heading | `flex items-center gap-2 text-sm font-semibold text-error` with Lucide `AlertTriangle` (`h-4 w-4`) |
-| Description | `text-xs leading-relaxed text-text-secondary` |
-| Danger trigger | `rounded-lg border border-error/30 bg-surface px-4 py-2 text-xs font-medium text-error hover:bg-error hover:text-white transition-colors` |
-| Modal overlay | `fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs` |
-| Modal card | `w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl space-y-4` |
-| Confirmation input | `w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-error focus:ring-1 focus:ring-error` |
-| Delete confirmation button | `rounded-lg bg-error px-4 py-2 text-xs font-semibold text-white transition-colors disabled:opacity-40` |
+| Container | `fixed top-0 left-0 right-0 z-[9999] h-[3px] w-full overflow-hidden` |
+| Progress track | `absolute inset-0 bg-accent/15` |
+| Glowing bar | `relative h-full bg-accent transition-[width] duration-200 ease-out` |
+| Glowing head | `absolute right-0 top-1/2 -translate-y-1/2 h-2.5 w-24 rounded-full bg-violet-glow blur-xs shadow-[0_0_12px_var(--color-accent)]` |
 
 **Pattern notes:**
-Destructive action modal in `/settings`. Follows the standard safety guard of requiring typed phrase "DELETE". Triggers `deleteAccountAction` to purge all MongoDB collections (`user`, `session`, `account`, `profiles`, `jobs`, `applications`, `interviews`, `communications`, `resumes`, `agent_runs`, `agent_logs`) and signs the user out cleanly with redirect to `/login?deleted=1`.
+Mounted globally in root `app/layout.tsx`. Intercepts internal link clicks for immediate zero-latency feedback, animating from 20% to ~85% during route changes, and completing to 100% and fading upon arrival. Dispatches `jobbers-navigation-pending` so navigation sidebars can render contextual pending states.
+
+### WorkspaceLoading Skeleton
+
+File: app/(workspace)/loading.tsx
+Last updated: 2026-10-27
+
+| Property | Value |
+| --- | --- |
+| Layout | Responsive column container with top action bar, 4-stat card grid, and table content skeleton |
+| Cards | `rounded-[28px] border border-border bg-surface p-5 sm:p-6 shadow-xs` |
+| Skeletons | `rounded bg-surface-secondary animate-pulse` with tokens |
+
+**Pattern notes:**
+Streaming suspense boundary for all workspace routes (`/home`, `/jobs`, `/applications`, `/interviews`, `/follow-ups`, `/resumes`, `/company-research`, `/integrations`, `/analytics`, `/profile`, `/settings`).
+
 
 

@@ -31,6 +31,11 @@ export type GenerateJsonInput = {
   prompt: string;
   temperature: number;
   maxOutputTokens: number;
+  /** Optional inline file data (e.g. application/pdf, image/png) in base64 */
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
   /**
    * Reasoning tokens to allow. Defaults to 0 (off) because thinking tokens
    * are drawn from maxOutputTokens and can truncate otherwise-valid JSON.
@@ -90,11 +95,20 @@ export async function generateJson<T extends z.ZodTypeAny>(
   }
 
   const primaryModel = getGeminiModel();
+  const formattedContents = input.inlineData
+    ? [
+        {
+          inlineData: input.inlineData,
+        },
+        input.prompt,
+      ]
+    : input.prompt;
+
   let response;
   try {
     response = await getGemini().models.generateContent({
       model: primaryModel,
-      contents: input.prompt,
+      contents: formattedContents,
       config: {
         systemInstruction: input.system,
         temperature: input.temperature,
@@ -119,7 +133,7 @@ export async function generateJson<T extends z.ZodTypeAny>(
       );
       response = await getGemini().models.generateContent({
         model: FALLBACK_GEMINI_MODEL,
-        contents: input.prompt,
+        contents: formattedContents,
         config: {
           systemInstruction: input.system,
           temperature: input.temperature,

@@ -40,6 +40,42 @@ const arbeitnowResponseSchema = z.object({
 
 export type ArbeitnowJob = z.infer<typeof arbeitnowJobSchema>;
 
+const GERMAN_GENDER_PATTERNS = [
+  /\((m|w|d)\/(m|w|d)\/(m|w|d)\)/i,
+  /\b(m\/w\/d|d\/m\/w|w\/m\/d)\b/i,
+  /\[(m|w|d)\/(m|w|d)\/(m|w|d)\]/i,
+];
+
+const GERMAN_INDICATOR_WORDS = [
+  /\bmitarbeiter(in)?\b/i,
+  /\bkundenbetreuung\b/i,
+  /\bsachbearbeiter(in)?\b/i,
+  /\bwerkstudent(in)?\b/i,
+  /\bpraktikant(in)?\b/i,
+  /\bfachkraft\b/i,
+  /\bassistenz\b/i,
+  /\bbuchhalter(in)?\b/i,
+  /\bvertrieb\b/i,
+  /\bentwickler(in)?\b/i,
+  /\bvollzeit\b/i,
+  /\bteilzeit\b/i,
+  /\bin der\b/i,
+  /\büber uns\b/i,
+  /\bwir bieten\b/i,
+  /\bihr profil\b/i,
+];
+
+export function isLikelyGermanJob(title: string, description?: string | null): boolean {
+  for (const re of GERMAN_GENDER_PATTERNS) {
+    if (re.test(title)) return true;
+    if (description && re.test(description)) return true;
+  }
+  for (const re of GERMAN_INDICATOR_WORDS) {
+    if (re.test(title)) return true;
+  }
+  return false;
+}
+
 export function normalizeArbeitnowJob(job: ArbeitnowJob): NormalizedJob {
   return {
     source: "arbeitnow",
@@ -63,7 +99,11 @@ export function normalizeArbeitnowJob(job: ArbeitnowJob): NormalizedJob {
   };
 }
 
-export function parseArbeitnowResponse(payload: unknown): NormalizedJob[] {
+export function parseArbeitnowResponse(
+  payload: unknown,
+  options: { filterGerman?: boolean } = {},
+): NormalizedJob[] {
+  const { filterGerman = false } = options;
   const wrapper = arbeitnowResponseSchema.safeParse(payload);
   if (!wrapper.success) {
     throw new Error("Arbeitnow returned an unexpected response shape");
@@ -73,6 +113,9 @@ export function parseArbeitnowResponse(payload: unknown): NormalizedJob[] {
   for (const entry of wrapper.data.data) {
     const parsed = arbeitnowJobSchema.safeParse(entry);
     if (parsed.success) {
+      if (filterGerman && isLikelyGermanJob(parsed.data.title, parsed.data.description)) {
+        continue;
+      }
       jobs.push(normalizeArbeitnowJob(parsed.data));
     }
   }
@@ -81,9 +124,9 @@ export function parseArbeitnowResponse(payload: unknown): NormalizedJob[] {
 
 export async function searchArbeitnow(
   _query: JobSearchQuery,
-  options: { fetchImpl?: typeof fetch } = {},
+  options: { fetchImpl?: typeof fetch; filterGerman?: boolean } = {},
 ): Promise<NormalizedJob[]> {
-  const { fetchImpl = fetch } = options;
+  const { fetchImpl = fetch, filterGerman = true } = options;
   const response = await fetchImpl(ARBEITNOW_ENDPOINT, {
     cache: "no-store",
     headers: {
@@ -103,7 +146,7 @@ export async function searchArbeitnow(
     throw new Error("Arbeitnow returned a response that was not valid JSON.");
   }
 
-  return parseArbeitnowResponse(payload);
+  return parseArbeitnowResponse(payload, { filterGerman });
 }
 
 export const arbeitnowProvider: JobProvider = {

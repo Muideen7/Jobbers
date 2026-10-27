@@ -168,6 +168,27 @@ export function AppShell({ user, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handlePending = (e: Event) => {
+      const customEvent = e as CustomEvent<{ href?: string; pending?: boolean }>;
+      if (customEvent.detail?.pending && customEvent.detail.href) {
+        setPendingHref(customEvent.detail.href);
+      } else {
+        setPendingHref(null);
+      }
+    };
+
+    window.addEventListener("jobbers-navigation-pending", handlePending);
+    return () => {
+      window.removeEventListener("jobbers-navigation-pending", handlePending);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname, searchParams]);
   const { summary, isLoading } = useSidebarSummary();
 
   const collapsed = useSyncExternalStore(
@@ -226,6 +247,14 @@ export function AppShell({ user, children }: Props) {
           <ul className="flex flex-col gap-1">
             {group.items.map((item) => {
               const active = isItemActive(pathname, item.href);
+              const isPending = Boolean(
+                pendingHref &&
+                  (item.href === "/home"
+                    ? pendingHref === "/home"
+                    : pendingHref === item.href ||
+                      pendingHref.startsWith(`${item.href}/`) ||
+                      pendingHref.startsWith(`${item.href}?`)),
+              );
               const Icon = item.icon;
               return (
                 <li key={item.href}>
@@ -234,19 +263,26 @@ export function AppShell({ user, children }: Props) {
                     {...(opts.onNavigate ? { onClick: opts.onNavigate } : {})}
                     aria-current={active ? "page" : undefined}
                     title={opts.collapsed ? item.label : undefined}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                       active
                         ? "bg-accent-light text-accent"
                         : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
-                    }`}
+                    } ${isPending ? "ring-1 ring-accent/30 bg-accent/5" : ""}`}
                   >
-                    <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                    <Icon className={`h-5 w-5 shrink-0 ${isPending ? "animate-pulse text-accent" : ""}`} aria-hidden />
                     {!opts.collapsed && <span className="truncate">{item.label}</span>}
-                    <NavBadge
-                      count={badgeFor(item.href, summary)}
-                      collapsed={opts.collapsed}
-                      loading={isLoading}
-                    />
+                    {isPending ? (
+                      <span className="ml-auto flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+                      </span>
+                    ) : (
+                      <NavBadge
+                        count={badgeFor(item.href, summary)}
+                        collapsed={opts.collapsed}
+                        loading={isLoading}
+                      />
+                    )}
                   </Link>
 
                   {/* Applications sub-nav: only while browsing that page. */}

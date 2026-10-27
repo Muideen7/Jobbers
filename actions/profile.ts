@@ -226,13 +226,17 @@ export async function uploadResume(
     let extractionMessage: string | null = null;
 
     try {
-      const pdfData = await pdfParse(Buffer.from(arrayBuffer));
-      const extractedText = pdfData?.text;
-      if (extractedText && extractedText.trim().length >= 50) {
-        extractedData = (await generateJson({
-          system:
-            "You are a resume parser. Extract structured profile data from the resume text and return only valid JSON matching the exact schema provided. Use null for missing fields. Arrays must always be arrays (never null). experience_level must be one of: Junior, Mid-Level, Senior, Lead, Manager, Director, Executive — pick the closest match or null.",
-          prompt: `Extract profile data from this resume and return JSON with this exact shape:
+      let extractedText: string | null = null;
+      try {
+        const pdfData = await pdfParse(Buffer.from(arrayBuffer));
+        extractedText = pdfData?.text ?? null;
+      } catch (pdfErr) {
+        console.warn("[actions/profile] pdfParse error, using Gemini multimodal PDF reader:", (pdfErr as Error).message);
+      }
+
+      const prompt =
+        extractedText && extractedText.trim().length >= 50
+          ? `Extract profile data from this resume text and return JSON with this exact shape:
 {
   "full_name": string | null,
   "phone": string | null,
@@ -250,15 +254,44 @@ export async function uploadResume(
 }
 
 Resume text:
-${extractedText.slice(0, 6000)}`,
-          temperature: 0.3,
-          maxOutputTokens: 800,
-        })) as ExtractedProfile;
-      } else {
-        extractionMessage =
-          "Could not extract text from this PDF. Please fill in your profile details manually below.";
+${extractedText.slice(0, 10000)}`
+          : `Extract structured profile data from this uploaded resume document and return JSON with this exact shape:
+{
+  "full_name": string | null,
+  "phone": string | null,
+  "location": string | null,
+  "current_title": string | null,
+  "experience_level": "Junior"|"Mid-Level"|"Senior"|"Lead"|"Manager"|"Director"|"Executive"|null,
+  "years_experience": number | null,
+  "skills": string[],
+  "industries": string[],
+  "work_experience": [{ "company": string, "title": string, "start_date": string, "end_date": string|null, "is_current": boolean, "responsibilities": string }],
+  "education": { "degree": string|null, "field": string|null, "institution": string|null, "graduation_year": string|null },
+  "job_titles_seeking": string[],
+  "linkedin_url": string|null,
+  "portfolio_url": string|null
+}`;
+
+      extractedData = (await generateJson({
+        system:
+          "You are an expert resume parser. Extract structured profile data from the candidate's resume and return only valid JSON matching the exact schema provided. Use null for missing fields. Arrays must always be arrays (never null). experience_level must be one of: Junior, Mid-Level, Senior, Lead, Manager, Director, Executive — pick the closest match or null.",
+        prompt,
+        temperature: 0.2,
+        maxOutputTokens: 3500,
+        ...(extractedText && extractedText.trim().length >= 50
+          ? {}
+          : { inlineData: { mimeType: "application/pdf", data: base64Data } }),
+      })) as ExtractedProfile;
+
+      if (extractedData) {
+        try {
+          await applyExtractedProfile(extractedData);
+        } catch (applyErr) {
+          console.warn("[uploadResume] auto-apply profile warning:", (applyErr as Error).message);
+        }
       }
-    } catch {
+    } catch (extractErr) {
+      console.error("[actions/profile] resume parsing error:", extractErr);
       extractionMessage =
         "Automated extraction could not read this PDF. Please fill in your profile details manually below.";
     }
@@ -405,22 +438,18 @@ export async function extractProfile(): Promise<{
       };
     }
 
-    const buffer = Buffer.from(resume.file_data, "base64");
-    const pdfData = await pdfParse(buffer);
-    const extractedText = pdfData.text;
-
-    if (!extractedText || extractedText.trim().length < 50) {
-      return {
-        success: false,
-        error:
-          "Could not extract text from this PDF. Please try a different file.",
-      };
+    let extractedText: string | null = null;
+    try {
+      const buffer = Buffer.from(resume.file_data, "base64");
+      const pdfData = await pdfParse(buffer);
+      extractedText = pdfData?.text ?? null;
+    } catch (pdfErr) {
+      console.warn("[actions/profile] extractProfile pdfParse error, using Gemini multimodal PDF reader:", (pdfErr as Error).message);
     }
 
-    const extracted = (await generateJson({
-      system:
-        "You are a resume parser. Extract structured profile data from the resume text and return only valid JSON matching the exact schema provided. Use null for missing fields. Arrays must always be arrays (never null). experience_level must be one of: Junior, Mid-Level, Senior, Lead, Manager, Director, Executive — pick the closest match or null.",
-      prompt: `Extract profile data from this resume and return JSON with this exact shape:
+    const prompt =
+      extractedText && extractedText.trim().length >= 50
+        ? `Extract profile data from this resume text and return JSON with this exact shape:
 {
   "full_name": string | null,
   "phone": string | null,
@@ -438,10 +467,42 @@ export async function extractProfile(): Promise<{
 }
 
 Resume text:
-${extractedText.slice(0, 6000)}`,
-      temperature: 0.3,
-      maxOutputTokens: 800,
+${extractedText.slice(0, 10000)}`
+        : `Extract structured profile data from this uploaded resume document and return JSON with this exact shape:
+{
+  "full_name": string | null,
+  "phone": string | null,
+  "location": string | null,
+  "current_title": string | null,
+  "experience_level": "Junior"|"Mid-Level"|"Senior"|"Lead"|"Manager"|"Director"|"Executive"|null,
+  "years_experience": number | null,
+  "skills": string[],
+  "industries": string[],
+  "work_experience": [{ "company": string, "title": string, "start_date": string, "end_date": string|null, "is_current": boolean, "responsibilities": string }],
+  "education": { "degree": string|null, "field": string|null, "institution": string|null, "graduation_year": string|null },
+  "job_titles_seeking": string[],
+  "linkedin_url": string|null,
+  "portfolio_url": string|null
+}`;
+
+    const extracted = (await generateJson({
+      system:
+        "You are an expert resume parser. Extract structured profile data from the resume text and return only valid JSON matching the exact schema provided. Use null for missing fields. Arrays must always be arrays (never null). experience_level must be one of: Junior, Mid-Level, Senior, Lead, Manager, Director, Executive — pick the closest match or null.",
+      prompt,
+      temperature: 0.2,
+      maxOutputTokens: 3500,
+      ...(extractedText && extractedText.trim().length >= 50
+        ? {}
+        : { inlineData: { mimeType: "application/pdf", data: resume.file_data } }),
     })) as ExtractedProfile;
+
+    if (extracted) {
+      try {
+        await applyExtractedProfile(extracted);
+      } catch (applyErr) {
+        console.warn("[extractProfile] auto-apply profile warning:", (applyErr as Error).message);
+      }
+    }
 
     return { success: true, data: extracted };
   } catch (error) {

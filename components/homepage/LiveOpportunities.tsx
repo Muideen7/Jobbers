@@ -7,6 +7,7 @@ import { Check, ChevronDown, Loader2, Search, Target } from "lucide-react";
 import { CompanyLogo } from "@/components/homepage/Logos";
 import { SourceCredits } from "@/components/shared/SourceCredits";
 import { resolveSourceCredits } from "@/lib/source-attribution";
+import { useScrollReveal } from "@/lib/animations/useScrollReveal";
 import type { PublicJob } from "@/types";
 
 type Status = "idle" | "loading" | "done" | "error";
@@ -443,10 +444,12 @@ export function LiveOpportunities() {
     filters.salary !== "any" ||
     filters.employment !== "any";
 
+  const { ref: sectionRef } = useScrollReveal({ threshold: 0.1 });
+
   return (
-    <section id="live-opportunities" className="w-full py-16 sm:py-24 relative">
+    <section id="live-opportunities" className="w-full py-16 sm:py-24 relative" ref={sectionRef}>
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto space-y-4">
+        <div className="reveal-init text-center max-w-2xl mx-auto space-y-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-secondary text-xs font-semibold text-text-darkest">
             <Target className="w-3.5 h-3.5 text-text-strong" />
             <span>Live Opportunities</span>
@@ -464,7 +467,7 @@ export function LiveOpportunities() {
 
         <form
           onSubmit={handleSubmit}
-          className="mt-10 rounded-[28px] border border-border/80 bg-surface p-4 sm:p-5 shadow-xs"
+          className="reveal-init mt-10 rounded-[28px] border border-border/80 bg-surface p-4 sm:p-5 shadow-xs"
         >
           <label htmlFor="landing-job-search" className="sr-only">
             Search jobs by title, skill or company
@@ -530,7 +533,7 @@ export function LiveOpportunities() {
           {liveJobs.slice(0, 6).map((job, index) => (
             <article
               key={job.id}
-              className={`${backgroundFor(index)} rounded-[28px] p-6 sm:p-7 flex flex-col justify-between border border-ink/[0.04] min-h-[300px] sm:min-h-[320px] transition-all duration-200`}
+              className={`reveal-init ${backgroundFor(index)} rounded-[28px] p-6 sm:p-7 flex flex-col justify-between border border-ink/[0.04] min-h-[300px] sm:min-h-[320px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:border-accent/30`}
             >
               <div>
                 <div className="flex items-center justify-between text-xs sm:text-[13px] text-text-secondary font-medium pb-4 sm:pb-5">

@@ -14,19 +14,21 @@
 import { arbeitnowProvider } from "./arbeitnow.ts";
 import { jsearchProvider } from "./jsearch.ts";
 import { jobicyProvider, remoteokProvider, remotiveProvider } from "./remote-feeds.ts";
+import { themuseProvider } from "./themuse.ts";
 import type { JobProvider, JobSearchQuery, JobSourceId, NormalizedJob } from "./types.ts";
 
 /**
  * Search order = output priority:
  * 1. JSearch (Google for Jobs: indexes LinkedIn, Indeed, Jobberman, MyJobMag, and company ATS like Greenhouse/Lever safely via official API)
- * 2. Public developer feeds (Arbeitnow, RemoteOK, Jobicy, Remotive)
+ * 2. Multi-sector & remote public feeds (The Muse, RemoteOK, Jobicy, Remotive, Arbeitnow)
  */
 export const PROVIDER_REGISTRY: JobProvider[] = [
   jsearchProvider,
-  arbeitnowProvider,
+  themuseProvider,
   remoteokProvider,
   jobicyProvider,
   remotiveProvider,
+  arbeitnowProvider,
 ];
 
 const DEFAULT_MAX_RESULTS = 40;
@@ -35,6 +37,7 @@ const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
 const SOURCE_TTL_MS: Record<JobSourceId, number> = {
   jsearch: DEFAULT_TTL_MS,
+  themuse: 30 * 60 * 1000,
   // Arbeitnow promises hourly updates; RemoteOK/Jobicy feeds are big payloads.
   arbeitnow: 30 * 60 * 1000,
   remoteok: 30 * 60 * 1000,
@@ -271,10 +274,22 @@ export async function searchAll(
     }
   }
 
-  const merged = dedupeNormalizedJobs(runs.flatMap((run) => run.jobs)).slice(
-    0,
-    maxResults,
-  );
+  // Interleave jobs round-robin from each successful provider so that no single
+  // feed (e.g. Arbeitnow with 300+ entries) monopolizes the result list.
+  const queues = runs.map((run) => [...run.jobs]);
+  const interleaved: NormalizedJob[] = [];
+  let found = true;
+  while (found && interleaved.length < maxResults * 3) {
+    found = false;
+    for (const queue of queues) {
+      if (queue.length > 0) {
+        interleaved.push(queue.shift()!);
+        found = true;
+      }
+    }
+  }
+
+  const merged = dedupeNormalizedJobs(interleaved).slice(0, maxResults);
 
   return { jobs: merged, outcomes: runs.map((run) => run.outcome) };
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Mona_Sans } from "next/font/google";
 
+import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
 import "./globals.css";
 
 const monaSans = Mona_Sans({
@@ -78,6 +79,7 @@ export default function RootLayout({
         className="flex min-h-full flex-col bg-background"
         suppressHydrationWarning
       >
+        <NavigationProgressBar />
         {children}
       </body>
     </html>

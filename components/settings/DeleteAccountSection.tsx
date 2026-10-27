@@ -21,12 +21,17 @@ export function DeleteAccountSection() {
 
     try {
       const res = await deleteAccountAction();
+      if (res && res.success) {
+        window.location.href = "/login?deleted=1";
+        return;
+      }
       if (res && !res.success) {
         setError(res.error || "Failed to delete account");
         setIsDeleting(false);
       }
     } catch {
-      // redirect throws in Next.js, which is expected
+      // Fallback redirect
+      window.location.href = "/login?deleted=1";
     }
   }
 
@@ -132,3 +137,4 @@ export function DeleteAccountSection() {
     </>
   );
 }
+
