@@ -79,7 +79,7 @@ export function JobCard({
   const detailHref = `/jobs/${job.id}`;
   const hasResearch = Boolean(job.company_research);
   const isRemote = isRemoteListing(job);
-  const topSkills = job.matched_skills.slice(0, 2);
+  const topSkills = (job.matched_skills ?? []).slice(0, 2);
   const isSaved = application !== null;
 
   return (

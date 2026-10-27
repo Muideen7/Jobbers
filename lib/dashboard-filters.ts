@@ -142,9 +142,9 @@ export function isAiFocusListing(job: Job): boolean {
     job.title,
     job.about_role,
     job.job_type,
-    ...job.matched_skills,
-    ...job.requirements,
-    ...job.nice_to_have,
+    ...(job.matched_skills ?? []),
+    ...(job.requirements ?? []),
+    ...(job.nice_to_have ?? []),
   ]
     .filter(Boolean)
     .join(" ")
@@ -232,9 +232,9 @@ export function matchesQuery(job: Job, rawQuery: string): boolean {
     job.company,
     job.location,
     job.about_role,
-    ...job.matched_skills,
-    ...job.requirements,
-    ...job.nice_to_have,
+    ...(job.matched_skills ?? []),
+    ...(job.requirements ?? []),
+    ...(job.nice_to_have ?? []),
   ]
     .filter(Boolean)
     .join(" ")

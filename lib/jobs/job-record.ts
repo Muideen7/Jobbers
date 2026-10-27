@@ -65,11 +65,18 @@ export type JobDbRecord = {
   about_role: string;
   responsibilities: string[];
   requirements: string[];
+  nice_to_have: string[];
   benefits: string[];
+  about_company: string | null;
   match_score: number | null;
   match_reason: string | null;
   matched_skills: string[];
   missing_skills: string[];
+  cover_letter: string | null;
+  tailored_resume_url: string | null;
+  tailored_match_score: number | null;
+  is_tailored: boolean;
+  company_research: null;
   found_at: string;
 };
 
@@ -96,15 +103,20 @@ export function buildJobRecord(input: {
     salary: formatSalaryForDb(job),
     job_type: job.employmentType ?? "fulltime",
     about_role: job.description,
-    // C3: JSearch highlights land in their columns; sources without them
-    // insert empty arrays (matching the columns' '{}' default).
-    responsibilities: job.highlights.responsibilities,
-    requirements: job.highlights.requirements,
-    benefits: job.highlights.benefits,
+    responsibilities: job.highlights?.responsibilities ?? [],
+    requirements: job.highlights?.requirements ?? [],
+    nice_to_have: [],
+    benefits: job.highlights?.benefits ?? [],
+    about_company: null,
     match_score: score.matchScore,
     match_reason: score.matchReason,
-    matched_skills: score.matchedSkills,
-    missing_skills: score.missingSkills,
+    matched_skills: score.matchedSkills ?? [],
+    missing_skills: score.missingSkills ?? [],
+    cover_letter: null,
+    tailored_resume_url: null,
+    tailored_match_score: null,
+    is_tailored: false,
+    company_research: null,
     found_at: input.foundAt,
   };
 }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Sparkles, Star } from "lucide-react";
+import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { CompanyLogo, JobbersIcon } from "@/components/homepage/Logos";
@@ -31,16 +31,6 @@ export function Hero() {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header Group */}
         <div className="text-center max-w-4xl mx-auto space-y-4">
-          {/* Subtle announcement pill with shimmer */}
-          <div className="reveal-init inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-4 py-1.5 text-xs font-semibold text-accent shadow-xs backdrop-blur-xs">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
-            </span>
-            <span className="shimmer-text font-bold">New: Multi-Source Job Discovery Engine</span>
-            <Sparkles className="h-3.5 w-3.5 text-accent" />
-          </div>
-
           <h1 className="reveal-init text-4xl sm:text-5xl md:text-6xl lg:text-[72px] font-bold text-text-primary tracking-tight leading-[1.08]">
             Stop scrolling job boards.
             <br />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Target, ArrowUpRight, ArrowDownRight, Sparkles } from "lucide-react";
+import { Target, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CompanyLogo } from "@/components/homepage/Logos";
@@ -180,9 +180,8 @@ export function AiMatcher() {
               <div className="bg-surface rounded-2xl p-5 shadow-xs border border-border-light space-y-3 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between text-xs text-text-secondary">
                   <span>United Kingdom</span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-success-lightest text-success-foreground font-semibold">
-                    <Sparkles className="h-3 w-3" />
-                    <span>{animatedScore}% match</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-success-lightest text-success-foreground font-semibold">
+                    {animatedScore}% match
                   </span>
                 </div>
 

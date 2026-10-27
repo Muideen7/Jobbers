@@ -114,6 +114,12 @@ export default async function JobsPage({ searchParams }: Props) {
         return {
           ...rest,
           id: job.id || (_id ? String(_id) : ""),
+          matched_skills: job.matched_skills ?? [],
+          missing_skills: job.missing_skills ?? [],
+          requirements: job.requirements ?? [],
+          responsibilities: job.responsibilities ?? [],
+          nice_to_have: job.nice_to_have ?? [],
+          benefits: job.benefits ?? [],
         };
       }),
     );
@@ -145,6 +151,12 @@ export default async function JobsPage({ searchParams }: Props) {
             return {
               ...rest,
               id: job.id || (_id ? String(_id) : ""),
+              matched_skills: job.matched_skills ?? [],
+              missing_skills: job.missing_skills ?? [],
+              requirements: job.requirements ?? [],
+              responsibilities: job.responsibilities ?? [],
+              nice_to_have: job.nice_to_have ?? [],
+              benefits: job.benefits ?? [],
             };
           }),
         );
@@ -251,22 +263,24 @@ export default async function JobsPage({ searchParams }: Props) {
             }));
             await jobsCollection.bulkWrite(operations, { ordered: false });
           }
-          jobs = records as unknown as Job[];
+          jobs = serializeMongo(records) as unknown as Job[];
         } catch (insertError) {
           console.warn("[jobs] auto-seed insert warning:", (insertError as Error).message);
-          jobs = records.map((record, idx) => ({
-            ...record,
-            id: `live_${record.source}_${idx}`,
-            created_at: now,
-            updated_at: now,
-            company_research: null,
-            cover_letter: null,
-            tailored_resume_url: null,
-            tailored_match_score: null,
-            is_tailored: false,
-            nice_to_have: [],
-            about_company: null,
-          })) as unknown as Job[];
+          jobs = serializeMongo(
+            records.map((record, idx) => ({
+              ...record,
+              id: `live_${record.source}_${idx}`,
+              created_at: now,
+              updated_at: now,
+              company_research: null,
+              cover_letter: null,
+              tailored_resume_url: null,
+              tailored_match_score: null,
+              is_tailored: false,
+              nice_to_have: [],
+              about_company: null,
+            })),
+          ) as unknown as Job[];
         }
 
         // Rank by best matched and most recent for "for-you",

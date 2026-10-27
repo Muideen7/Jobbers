@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
-import { Heart, ChevronLeft, ChevronRight, MapPin, Star, Sparkles } from "lucide-react";
+import { Heart, ChevronLeft, ChevronRight, MapPin, Star } from "lucide-react";
 
 import { testimonials } from "@/components/homepage/data";
 import { useScrollReveal } from "@/lib/animations/useScrollReveal";
@@ -116,7 +116,6 @@ export function WallOfLove() {
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-soft text-xs font-semibold text-rose border border-rose/30 shadow-2xs">
               <Heart className="w-3.5 h-3.5 fill-rose" />
               <span>Wall of love</span>
-              <Sparkles className="w-3 h-3 text-rose ml-1" />
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight leading-[1.12]">

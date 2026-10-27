@@ -215,7 +215,15 @@ async function runProvider(provider: JobProvider, ctx: RunContext): Promise<Prov
   }
 
   try {
-    const raw = await provider.search(ctx.query);
+    const searchPromise = provider.search(ctx.query);
+    const timeoutPromise = new Promise<NormalizedJob[]>((_, reject) => {
+      const id = setTimeout(
+        () => reject(new Error(`${provider.id} timed out after 6000ms`)),
+        6000,
+      );
+      id.unref?.();
+    });
+    const raw = await Promise.race([searchPromise, timeoutPromise]);
     ctx.state.entries.set(cacheKey, { expires: timestamp + ttl, jobs: raw });
     evictOldest(ctx.state.entries);
 
