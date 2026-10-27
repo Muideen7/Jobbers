@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { CompanyLogo, JobbersIcon } from "@/components/homepage/Logos";
@@ -77,12 +77,6 @@ export function Hero() {
           <div className="col-span-1 md:col-span-4 lg:col-span-4 bg-peach rounded-[32px] sm:rounded-[36px] overflow-hidden relative flex flex-col justify-end min-h-[480px] sm:min-h-[520px] md:min-h-full p-4 sm:p-5 shadow-2xs border border-amber-deep/5 group">
             <div className="absolute inset-0 bg-radial from-transparent via-peach-soft/20 to-peach-deep/40 pointer-events-none" />
 
-            {/* Satellite floating badge */}
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2 rounded-full bg-surface/90 px-3.5 py-1.5 shadow-md border border-border backdrop-blur-xs text-xs font-semibold text-text-primary animate-float">
-              <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-              <span>96% Match Found</span>
-            </div>
-
             <div className="absolute inset-x-0 bottom-0 top-4 sm:top-6 flex items-end justify-center pointer-events-none">
               <Image
                 src={HERO_AVATAR}
@@ -113,12 +107,6 @@ export function Hero() {
           {/* Card 2: Zero-Effort Matching & Metrics */}
           <div className="col-span-1 md:col-span-8 lg:col-span-5 flex flex-col justify-between gap-5">
             <div className="bg-gradient-to-tr from-lavender via-lavender-soft to-peach rounded-[32px] p-6 sm:p-7 border border-border/60 shadow-2xs relative overflow-hidden flex flex-col justify-between min-h-[240px] flex-1 group">
-              {/* Satellite Floating Badge */}
-              <div className="absolute top-4 right-4 z-20 hidden sm:flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1 shadow-xs border border-border/70 text-[11px] font-medium text-text-primary animate-float-reverse">
-                <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-                <span>Instant Auto-Rank</span>
-              </div>
-
               <div>
                 <h3 className="font-bold text-text-primary text-xl tracking-tight">
                   Zero-Effort Matching
