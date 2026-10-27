@@ -1,22 +1,9 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 
-/**
- * Global Navigation Progress Bar
- *
- * Provides instantaneous visual feedback when the user clicks any internal link,
- * preventing double-clicks and uncertainty during App Router page transitions.
- *
- * Features:
- * - Immediate start on click of any valid internal link.
- * - Smooth CSS transition with glowing head using Jobbers accent tokens.
- * - Automatic completion (100% and fade) when pathname or searchParams change.
- * - Dispatches 'jobbers-navigation-pending' custom event with the pending href so
- *   sidebars/navbars can show localized pending states.
- */
-export function NavigationProgressBar() {
+function NavigationProgressBarInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [progress, setProgress] = useState(0);
@@ -139,5 +126,19 @@ export function NavigationProgressBar() {
         <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2.5 w-24 rounded-full bg-violet-glow blur-xs shadow-[0_0_12px_var(--color-accent)]" />
       </div>
     </div>
+  );
+}
+
+/**
+ * Global Navigation Progress Bar
+ *
+ * Wrapped in Suspense to satisfy Next.js CSR bailout requirements during
+ * static page generation (e.g. /_not-found, /404).
+ */
+export function NavigationProgressBar() {
+  return (
+    <Suspense fallback={null}>
+      <NavigationProgressBarInner />
+    </Suspense>
   );
 }
