@@ -996,16 +996,23 @@ Last updated: 2026-10-15
 **Pattern notes:**
 Integrates directly into `FilterSidebar` and `JobFilters`. Drives `filters.jobBoard` in `DashboardFilters` without hardcoded colors or paid APIs.
 
-### Wall of Love Testimonials Carousel
+### DeleteAccountSection
 
-File: components/homepage/WallOfLove.tsx
-Last updated: 2026-10-15
+File: components/settings/DeleteAccountSection.tsx
+Last updated: 2026-10-27
 
 | Property | Value |
 | --- | --- |
-| Carousel size | 8 diverse testimonials across Africa, Asia, Europe, Middle East, and Americas with mixed genders and engineering/design/data roles |
-| Interaction | Auto-advances every 5s; pauses on hover; Left/Right navigation arrow buttons; keyboard `ArrowLeft` / `ArrowRight` accessible |
-| Indicators | Interactive indicator dots (`bg-ink` when active, `bg-ink/20` when inactive) |
-| Cards | `rounded-[28px] border border-border bg-surface p-6 shadow-card` with location badge (`bg-surface-secondary text-text-secondary`) and 5-star ratings |
-| Photos | High-resolution editorial portraits generated and saved to `public/landing/testimonial_{amara,priya,elena,zayd}.jpg` |
+| Container | `rounded-2xl border border-error/20 bg-error/5 p-6 space-y-4` |
+| Heading | `flex items-center gap-2 text-sm font-semibold text-error` with Lucide `AlertTriangle` (`h-4 w-4`) |
+| Description | `text-xs leading-relaxed text-text-secondary` |
+| Danger trigger | `rounded-lg border border-error/30 bg-surface px-4 py-2 text-xs font-medium text-error hover:bg-error hover:text-white transition-colors` |
+| Modal overlay | `fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs` |
+| Modal card | `w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl space-y-4` |
+| Confirmation input | `w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-error focus:ring-1 focus:ring-error` |
+| Delete confirmation button | `rounded-lg bg-error px-4 py-2 text-xs font-semibold text-white transition-colors disabled:opacity-40` |
+
+**Pattern notes:**
+Destructive action modal in `/settings`. Follows the standard safety guard of requiring typed phrase "DELETE". Triggers `deleteAccountAction` to purge all MongoDB collections (`user`, `session`, `account`, `profiles`, `jobs`, `applications`, `interviews`, `communications`, `resumes`, `agent_runs`, `agent_logs`) and signs the user out cleanly with redirect to `/login?deleted=1`.
+
 

@@ -23,6 +23,17 @@ Update this file after every completed feature. Any AI agent reading this should
 *(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Account Deletion & Data Wipe (`/settings`, `actions/account.ts`, `components/settings/DeleteAccountSection.tsx`)**:
+  1. *Complete Database Cascade*: Built server action `deleteAccountAction` completely purging user from `user`, `session`, `account`, `profiles`, `jobs`, `applications`, `interviews`, `communications`, `resumes`, `agent_runs`, and `agent_logs`.
+  2. *Safety Modal*: Requires the user to type "DELETE" before enabling destructive action.
+  3. *Session Invalidation & Alert*: Clears session cookies and redirects to `/login?deleted=1` with an in-page green confirmation banner.
+- **Resilient Google Gemini LLM Integration (`lib/llm.ts`)**:
+  1. Updated primary model default to `gemini-3.8-flash`.
+  2. Built automatic fallback to `gemini-flash-latest` when API returns `NOT_FOUND` / 404 / deprecation errors, safeguarding against Google preview model deprecations.
+- **Universal Multi-Sector Job Discovery & Safe Upsert (`app/(workspace)/jobs/page.tsx`, `app/api/agent/find/route.ts`)**:
+  1. Completely removed hardcoded role queries (e.g. `"developer"`) so any career field (nursing, accounting, marketing, administration, engineering) can search and discover live jobs.
+  2. Swapped raw `insertMany` for safe MongoDB `bulkWrite` with `updateOne({ id, user_id }, { $set: record }, { upsert: true })` to prevent duplicate key `E11000` 500 errors.
+  3. Made profile context lookups graceful so new users without completed profiles can search immediately without 404 errors.
 - **Integrations Hub & Live Calendar Feed (`/integrations`, `/api/calendar/feed`)**:
   1. *Live RFC 5545 Calendar Feed*: Created `/api/calendar/feed` generating valid `.ics` calendar subscriptions for Google Calendar, Apple Calendar (iOS/macOS), and Microsoft Outlook. Subscribing once automatically reflects all added, updated, or rescheduled interviews across devices.
   2. *Single Settings Entry*: Removed duplicate `/settings` entry from `NAV_GROUPS` under Account, leaving the pinned sidebar bottom action for Settings, and adding `/integrations` under Tools.
