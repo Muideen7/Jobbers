@@ -109,10 +109,8 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 RESEND_API_KEY=re_your_resend_api_key
 EMAIL_FROM=Jobbers <onboarding@resend.dev>
 
-# Job Search APIs (Optional live aggregators)
+# Job Search APIs (Google for Jobs / JSearch)
 JSEARCH_API_KEY=your-jsearch-api-key
-ADZUNA_APP_ID=your-adzuna-app-id
-ADZUNA_APP_KEY=your-adzuna-app-key
 ```
 
 ### 4. Run the development server

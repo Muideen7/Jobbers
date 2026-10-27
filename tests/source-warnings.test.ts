@@ -11,14 +11,14 @@ import type { JobProvider, NormalizedJob } from "../lib/jobs/types.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 
-test("B2: a failing source (e.g. Adzuna 404) becomes an agent_logs warning row", () => {
+test("B2: a failing source becomes an agent_logs warning row", () => {
   const outcomes: ProviderOutcome[] = [
     { source: "jsearch", count: 12 },
     { source: "arbeitnow", count: 8 },
     {
-      source: "adzuna",
+      source: "remotive",
       count: 0,
-      error: "Adzuna API error: 404 (UNSUPPORTED_COUNTRY)",
+      error: "Remotive API error: 503 (SERVICE_UNAVAILABLE)",
     },
   ];
 
@@ -37,8 +37,8 @@ test("B2: a failing source (e.g. Adzuna 404) becomes an agent_logs warning row",
   assert.equal(row.user_id, "user-1");
   assert.equal(row.job_id, null);
   assert.equal(row.created_at, NOW);
-  assert.match(row.message, /adzuna/);
-  assert.match(row.message, /UNSUPPORTED_COUNTRY/);
+  assert.match(row.message, /remotive/);
+  assert.match(row.message, /SERVICE_UNAVAILABLE/);
   // The message must also state that the run kept going (never "failed").
   assert.match(row.message, /continued/);
 });
@@ -108,10 +108,10 @@ test("B2 end-to-end: Adzuna 404 → run gets a warning row, other sources' jobs 
   };
   // Stands in for the real adzunaProvider throwing HTTP 404 UNSUPPORTED_COUNTRY.
   const failing: JobProvider = {
-    id: "adzuna",
+    id: "remotive",
     searchMode: "server",
     async search() {
-      throw new Error("Adzuna API error: 404 (UNSUPPORTED_COUNTRY)");
+      throw new Error("Remotive API error: 503 (SERVICE_UNAVAILABLE)");
     },
   };
 
@@ -137,6 +137,6 @@ test("B2 end-to-end: Adzuna 404 → run gets a warning row, other sources' jobs 
   const [row] = rows;
   assert.ok(row);
   assert.equal(row.level, "warning");
-  assert.match(row.message, /adzuna/);
-  assert.match(row.message, /UNSUPPORTED_COUNTRY/);
+  assert.match(row.message, /remotive/);
+  assert.match(row.message, /SERVICE_UNAVAILABLE/);
 });

@@ -149,7 +149,7 @@ test("C2: the per-job budget divides the shared total and caps at the maximum", 
 test("C2: prompt lists every job once with a source-namespaced id", () => {
   const jobs = [
     makeJob({ source: "jsearch", externalId: "123", title: "Frontend Dev" }),
-    makeJob({ source: "adzuna", externalId: "123", title: "UI Engineer" }),
+    makeJob({ source: "arbeitnow", externalId: "123", title: "UI Engineer" }),
     makeJob({ source: "remoteok", externalId: "77", title: "React Dev" }),
   ];
 
@@ -162,7 +162,7 @@ test("C2: prompt lists every job once with a source-namespaced id", () => {
   assert.equal((prompt.match(/\(id: "/g) ?? []).length, 3);
   // Same raw externalId, different jobs — the namespace keeps them apart.
   assert.match(prompt, /\(id: "jsearch:123"\)/);
-  assert.match(prompt, /\(id: "adzuna:123"\)/);
+  assert.match(prompt, /\(id: "arbeitnow:123"\)/);
   // C1: the full profile context is embedded verbatim.
   assert.ok(prompt.includes(buildProfileContext(profile)));
   // C4: system wording unchanged.
@@ -210,7 +210,7 @@ test("scoringId namespaces external ids by source", () => {
     "jsearch:42",
   );
   assert.equal(
-    scoringId(makeJob({ source: "adzuna", externalId: "42", title: "Dev" })),
-    "adzuna:42",
+    scoringId(makeJob({ source: "arbeitnow", externalId: "42", title: "Dev" })),
+    "arbeitnow:42",
   );
 });

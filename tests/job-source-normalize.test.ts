@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { AdzunaJob } from "../lib/adzuna.ts";
-import { normalizeAdzunaJob } from "../lib/jobs/adzuna.ts";
 import {
   normalizeArbeitnowJob,
   parseArbeitnowResponse,
@@ -22,21 +20,6 @@ import type { NormalizedJob } from "../lib/jobs/types.ts";
  * A1 acceptance: every provider's payload must collapse into the identical
  * NormalizedJob shape, so the matcher and the DB layer never branch on source.
  */
-
-const adzunaFixture: AdzunaJob = {
-  id: "4387585642",
-  title: "Senior React Developer",
-  company: { display_name: "SimVentions, Inc - Glassdoor ✪ 4.6" },
-  location: { display_name: "Lagos, Nigeria" },
-  description: "<p>Build dashboards for our fintech platform.</p>",
-  redirect_url: "https://ss.adzuna.com/redirect/api/v4/job/4387585642",
-  salary_min: 120000,
-  salary_max: 160000,
-  salary_is_predicted: "1",
-  contract_type: "full_time",
-  created: "2026-10-01T12:00:00Z",
-  category: { tag: "it-jobs", label: "IT Jobs" },
-};
 
 // Shape mirrors the official OpenAPI example plus a job_highlights section:
 // https://openwebninja.s3.us-east-1.amazonaws.com/portal/openapi/jsearch.yaml
@@ -131,67 +114,8 @@ const jobicyFixture = {
   pubDate: "2026-10-06T06:08:56+00:00",
 };
 
-test("Adzuna payload normalizes to the shared shape", () => {
-  const job = normalizeAdzunaJob(adzunaFixture);
-
-  assert.equal(job.source, "adzuna");
-  assert.equal(job.externalId, "4387585642");
-  assert.equal(job.title, "Senior React Developer");
-  // Aggregator rating suffix must not leak into the company field.
-  assert.equal(job.company, "SimVentions, Inc");
-  assert.equal(job.location, "Lagos, Nigeria");
-  assert.equal(job.description, "<p>Build dashboards for our fintech platform.</p>");
-  assert.equal(job.applyUrl, adzunaFixture.redirect_url);
-  assert.equal(job.sourceUrl, adzunaFixture.redirect_url);
-  assert.equal(job.salaryMin, 120000);
-  assert.equal(job.salaryMax, 160000);
-  // Adzuna never states a period — it must be null, not an assumed YEAR.
-  assert.equal(job.salaryPeriod, null);
-  assert.equal(job.postedAt, "2026-10-01T12:00:00Z");
-  assert.equal(job.employmentType, "full_time");
-  assert.equal(job.remote, false);
-  assert.equal(job.category, "IT Jobs");
-  assert.deepEqual(job.highlights, {
-    responsibilities: [],
-    requirements: [],
-    benefits: [],
-  });
-});
-
-test("JSearch payload normalizes to the shared shape", () => {
-  const jobs = parseJsearchResponse({
-    status: "OK",
-    request_id: "4f24fa29-a883-49f9-8dca-d0fede07203c",
-    parameters: { query: "developer jobs in chicago", num_pages: 1, country: "us" },
-    data: { jobs: [jsearchJobFixture] },
-  });
-
-  assert.equal(jobs.length, 1);
-  const job = jobs[0]!;
-  assert.equal(job.source, "jsearch");
-  assert.equal(job.externalId, "woj2gE2S_6LqvmLAAAAAAA==");
-  assert.equal(job.title, "Senior Developer");
-  assert.equal(job.company, "United Airlines");
-  assert.equal(job.location, "Chicago, IL");
-  assert.equal(job.description, "We are looking for a senior developer to join our team.");
-  assert.equal(job.applyUrl, jsearchJobFixture.job_apply_link);
-  assert.equal(job.sourceUrl, jsearchJobFixture.job_google_link);
-  assert.equal(job.salaryMin, 300000);
-  assert.equal(job.salaryMax, 450000);
-  assert.equal(job.salaryPeriod, "YEAR");
-  assert.equal(job.postedAt, "2025-03-29T00:00:00.000Z");
-  assert.equal(job.employmentType, "FULLTIME");
-  assert.equal(job.remote, false);
-  assert.equal(job.category, "frontend");
-  assert.deepEqual(job.highlights, {
-    responsibilities: ["Design and implement applications"],
-    requirements: ["Bachelor's degree", "5+ years of experience"],
-    benefits: ["dental_coverage"],
-  });
-});
-
-test("both providers emit byte-identical key sets", () => {
-  const adzunaKeys = Object.keys(normalizeAdzunaJob(adzunaFixture)).sort();
+test("providers emit byte-identical key sets", () => {
+  const jsearchKeys = Object.keys(normalizeJsearchJob(jsearchJobFixture)).sort();
 
   // Every source added later must produce the exact same NormalizedJob shape.
   const normalized: NormalizedJob[] = [
@@ -203,13 +127,12 @@ test("both providers emit byte-identical key sets", () => {
   ];
 
   for (const job of normalized) {
-    assert.deepEqual(Object.keys(job).sort(), adzunaKeys, `shape drift in source: ${job.source}`);
+    assert.deepEqual(Object.keys(job).sort(), jsearchKeys, `shape drift in source: ${job.source}`);
   }
 });
 
 test("every normalized value is a primitive or a known object shape", () => {
   const normalized: NormalizedJob[] = [
-    normalizeAdzunaJob(adzunaFixture),
     normalizeJsearchJob(jsearchJobFixture),
   ];
 

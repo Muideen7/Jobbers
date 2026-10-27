@@ -87,8 +87,21 @@ export function buildJsearchParams(
   const location = query.location.trim();
   const country = query.country.trim().toLowerCase() || DEFAULT_COUNTRY;
 
+  let queryText = "";
+  if (title && location) {
+    queryText = `${title} jobs in ${location}`;
+  } else if (title) {
+    queryText = `${title} jobs`;
+  } else if (location) {
+    queryText = `jobs in ${location}`;
+  } else if (country === "ng") {
+    queryText = "jobs in Nigeria";
+  } else {
+    queryText = "open jobs";
+  }
+
   return new URLSearchParams({
-    query: location ? `${title} jobs in ${location}` : `${title} jobs`,
+    query: queryText,
     country,
     num_pages: String(clampNumPages(numPages)),
     // Spec: "Only return work from home / remote jobs."

@@ -68,7 +68,9 @@ type BrowserResearch = {
 // NOTE: MAX_REDIRECTS and MAX_SUB_PAGES were used for Browserbase redirect handling, which has been disabled.
 
 const jobBoardHosts = [
-  "adzuna.com",
+  "jobberman.com",
+  "linkedin.com",
+  "indeed.com",
   "greenhouse.io",
   "lever.co",
   "workdayjobs.com",

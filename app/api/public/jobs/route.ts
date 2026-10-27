@@ -57,8 +57,8 @@ const cache = new Map<string, { expires: number; payload: PublicJobsResponse["da
  * so that an unauthenticated visitor cannot burn the free-tier quotas on every
  * keystroke.
  *
- * Runs on the multi-source `searchAll` orchestrator (JSearch + Arbeitnow + remote
- * feeds, Adzuna as fallback) — no single provider gates this endpoint anymore;
+ * Runs on the multi-source `searchAll` orchestrator (Google for Jobs via JSearch + Arbeitnow + remote
+ * feeds) — no single provider gates this endpoint anymore;
  * individual failures surface only when *every* source fails.
  *
  * Beyond `q`/`filter`, the five LiveOpportunities dropdowns narrow the same
@@ -111,10 +111,10 @@ export async function GET(req: NextRequest) {
   try {
     const searchResult = await searchAll(
       {
-        title: query || "developer",
+        title: query,
         // The Countries dropdown scopes the search itself (JSearch embeds the
-        // location in its query, Adzuna gets its market country); with no
-        // selection detection has no candidates and yields the "us" default —
+        // location in its query); with no
+        // selection detection has no candidates and yields the default —
         // same single source of truth as the signed-in find route.
         location: searchLocation,
         country: countryCode,

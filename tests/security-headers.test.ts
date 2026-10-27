@@ -76,9 +76,9 @@ test("connect-src allowlists self and nothing else", () => {
   const connect = directive(buildContentSecurityPolicy(), "connect-src");
 
   assert.equal(connect, "connect-src 'self'");
-  // Adzuna and Browserbase are server-side only and must never be reachable
+  // External scraping endpoints are server-side only and must never be reachable
   // from the browser.
-  assert.ok(!connect.includes("adzuna"), connect);
+  assert.ok(!connect.includes("jsearch"), connect);
   assert.ok(!connect.includes("browserbase"), connect);
 });
 

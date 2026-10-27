@@ -11,18 +11,15 @@
  * Relative imports (not "@/…") keep the module loadable under `node --test`.
  */
 
-import { adzunaProvider } from "./adzuna.ts";
 import { arbeitnowProvider } from "./arbeitnow.ts";
 import { jsearchProvider } from "./jsearch.ts";
 import { jobicyProvider, remoteokProvider, remotiveProvider } from "./remote-feeds.ts";
 import type { JobProvider, JobSearchQuery, JobSourceId, NormalizedJob } from "./types.ts";
 
 /**
- * Search order = output priority: JSearch leads (global, full-text, server
- * matched), then the locally-filtered keyless feeds, and **Adzuna sits last as
- * a fallback only** — its API covers 19 countries and cannot serve Nigeria or
- * most of the world, so it must never again be the core source (duplicates are
- * collapsed by dedupe, ties go to the earlier entry).
+ * Search order = output priority:
+ * 1. JSearch (Google for Jobs: indexes LinkedIn, Indeed, Jobberman, MyJobMag, and company ATS like Greenhouse/Lever safely via official API)
+ * 2. Public developer feeds (Arbeitnow, RemoteOK, Jobicy, Remotive)
  */
 export const PROVIDER_REGISTRY: JobProvider[] = [
   jsearchProvider,
@@ -30,7 +27,6 @@ export const PROVIDER_REGISTRY: JobProvider[] = [
   remoteokProvider,
   jobicyProvider,
   remotiveProvider,
-  adzunaProvider,
 ];
 
 const DEFAULT_MAX_RESULTS = 40;
@@ -38,7 +34,6 @@ export const MAX_CACHE_ENTRIES = 300;
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
 const SOURCE_TTL_MS: Record<JobSourceId, number> = {
-  adzuna: DEFAULT_TTL_MS,
   jsearch: DEFAULT_TTL_MS,
   // Arbeitnow promises hourly updates; RemoteOK/Jobicy feeds are big payloads.
   arbeitnow: 30 * 60 * 1000,

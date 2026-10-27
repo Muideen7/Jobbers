@@ -12,6 +12,7 @@ import {
 } from "@/lib/workspace/jobs-tab";
 import { NEW_MATCH_SCORE_THRESHOLD } from "@/lib/workspace/constants";
 import { searchAll } from "@/lib/jobs/search-all";
+import { detectCountry } from "@/lib/jobs/country";
 import { buildJobRecord } from "@/lib/jobs/job-record";
 import { keywordScoreBatch } from "@/lib/jobs/keyword-score";
 import { scoringId, type ProfileScoreContext } from "@/lib/jobs/scoring-prompt";
@@ -161,20 +162,32 @@ export default async function JobsPage({ searchParams }: Props) {
 
   if (canAutoDiscover) {
     try {
-      // If user enters a query, search for that query
-      // Otherwise, if tab === "for-you", use their target role
-      // If tab === "all", use a broad query across all boards
+      // Detect appropriate country from profile or search query
+      const userCountry = detectCountry(
+        profile?.location,
+        profile?.preferred_locations ?? [],
+      );
+
+      // No hardcoded roles:
+      // - If query 'q' provided, search exactly that query
+      // - If on 'for-you', strictly target user's resume/profile seeking title
+      // - If on 'all', search broad opportunities across all industries
       const initialTitle =
         q ||
         (tab === "for-you"
-          ? profile?.job_titles_seeking?.[0] || profile?.current_title || "developer"
-          : "developer");
+          ? profile?.job_titles_seeking?.[0] || profile?.current_title || ""
+          : "");
+
+      const searchLocation =
+        tab === "for-you"
+          ? profile?.location || ""
+          : profile?.location || (userCountry === "ng" ? "Nigeria" : "");
 
       const searchResult = await searchAll(
         {
           title: initialTitle,
-          location: tab === "for-you" ? (profile?.location || "") : "",
-          country: "us",
+          location: searchLocation,
+          country: userCountry,
         },
         { maxResults: 40 },
       );

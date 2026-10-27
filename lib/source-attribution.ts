@@ -19,13 +19,11 @@ export type SourceCredit = {
 
 export const SOURCE_ATTRIBUTION: Record<JobSourceId | "search", SourceCredit> = {
   jsearch: { label: "JSearch", url: "https://www.openwebninja.com/api/jsearch" },
-  adzuna: { label: "Adzuna", url: "https://www.adzuna.com" },
   arbeitnow: { label: "Arbeitnow", url: "https://www.arbeitnow.com" },
   remoteok: { label: "RemoteOK", url: "https://remoteok.com" },
   remotive: { label: "Remotive", url: "https://remotive.com" },
   jobicy: { label: "Jobicy", url: "https://jobicy.com" },
-  // Legacy rows (pre-A7) all stored source "search" and were Adzuna-only.
-  search: { label: "Adzuna", url: "https://www.adzuna.com" },
+  search: { label: "Direct", url: "https://jobbers-black.vercel.app" },
 };
 
 /**

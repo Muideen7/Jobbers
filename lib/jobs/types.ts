@@ -8,7 +8,6 @@
  */
 
 export type JobSourceId =
-  | "adzuna"
   | "jsearch"
   | "arbeitnow"
   | "remoteok"

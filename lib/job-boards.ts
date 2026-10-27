@@ -65,10 +65,28 @@ export const JOB_BOARDS: readonly JobBoardItem[] = [
     domainPatterns: ["jobicy.com"],
   },
   {
-    id: "adzuna",
-    label: "Adzuna",
-    sourceIds: ["adzuna", "search"],
-    domainPatterns: ["adzuna.com", "adzuna.co.uk"],
+    id: "jobberman",
+    label: "Jobberman",
+    sourceIds: ["jobberman"],
+    domainPatterns: ["jobberman.com"],
+  },
+  {
+    id: "linkedin",
+    label: "LinkedIn",
+    sourceIds: ["linkedin"],
+    domainPatterns: ["linkedin.com"],
+  },
+  {
+    id: "indeed",
+    label: "Indeed",
+    sourceIds: ["indeed"],
+    domainPatterns: ["indeed.com"],
+  },
+  {
+    id: "careerjet",
+    label: "Careerjet",
+    sourceIds: ["careerjet"],
+    domainPatterns: ["careerjet.com", "careerjet.com.ng"],
   },
   {
     id: "jsearch",

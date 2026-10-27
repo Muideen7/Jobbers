@@ -69,8 +69,8 @@ function countingProvider(
 }
 
 test("one failing provider never takes the others down", async () => {
-  const goodA = countingProvider("adzuna", [
-    makeJob({ source: "adzuna", externalId: "a1", title: "Frontend Developer" }),
+  const goodA = countingProvider("jobicy", [
+    makeJob({ source: "jobicy", externalId: "a1", title: "Frontend Developer" }),
   ]);
   const failing = countingProvider("jsearch", [], { fail: true });
   const goodB = countingProvider("arbeitnow", [
@@ -85,21 +85,21 @@ test("one failing provider never takes the others down", async () => {
   assert.equal(result.jobs.length, 2);
   assert.deepEqual(
     result.outcomes.map((o) => o.source),
-    ["adzuna", "jsearch", "arbeitnow"],
+    ["jobicy", "jsearch", "arbeitnow"],
   );
   const failed = result.outcomes.find((o) => o.source === "jsearch");
   assert.equal(failed?.count, 0);
   assert.match(failed?.error ?? "", /jsearch is down/);
-  const okA = result.outcomes.find((o) => o.source === "adzuna");
+  const okA = result.outcomes.find((o) => o.source === "jobicy");
   assert.equal(okA?.error, undefined);
 });
 
 test("cross-source duplicates collapse and the fuller description wins", async () => {
   const collapsed = await searchAll(query, {
     providers: [
-      countingProvider("adzuna", [
+      countingProvider("jobicy", [
         makeJob({
-          source: "adzuna",
+          source: "jobicy",
           externalId: "a1",
           title: "Frontend Developer",
           company: "Moniepoint",
@@ -126,8 +126,8 @@ test("cross-source duplicates collapse and the fuller description wins", async (
   // Distinct employers with the same title must survive the dedupe.
   const distinct = await searchAll(query, {
     providers: [
-      countingProvider("adzuna", [
-        makeJob({ source: "adzuna", externalId: "a2", title: "Frontend Developer", company: "Moniepoint" }),
+      countingProvider("jobicy", [
+        makeJob({ source: "jobicy", externalId: "a2", title: "Frontend Developer", company: "Moniepoint" }),
       ]),
       countingProvider("jsearch", [
         makeJob({ source: "jsearch", externalId: "j2", title: "Frontend Developer", company: "Paystack" }),
@@ -140,8 +140,8 @@ test("cross-source duplicates collapse and the fuller description wins", async (
 
 test("dedupe skips jobs with empty titles", () => {
   const jobs = dedupeNormalizedJobs([
-    makeJob({ source: "adzuna", externalId: "1", title: "   " }),
-    makeJob({ source: "adzuna", externalId: "2", title: "Designer" }),
+    makeJob({ source: "jobicy", externalId: "1", title: "   " }),
+    makeJob({ source: "jobicy", externalId: "2", title: "Designer" }),
   ]);
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0]!.externalId, "2");
@@ -200,9 +200,9 @@ test("client-mode feeds are token-filtered, server-mode sources are not", async 
   const clientFeed = countingProvider("remoteok", [matching, irrelevant], {
     searchMode: "client",
   });
-  const serverSource = countingProvider("adzuna", [
+  const serverSource = countingProvider("jobicy", [
     // Server sources already matched the query — keep whatever they return.
-    makeJob({ source: "adzuna", externalId: "a1", title: "Backend Engineer" }),
+    makeJob({ source: "jobicy", externalId: "a1", title: "Backend Engineer" }),
   ]);
 
   const result = await searchAll(query, {
@@ -302,13 +302,10 @@ test("the cache never grows past MAX_CACHE_ENTRIES", async () => {
   );
 });
 
-test("the default registry leads with JSearch and demotes Adzuna to last", () => {
-  // Adzuna serves only 19 countries — it must never again be the core source
-  // (it cannot serve Nigeria at all). Locks in the demotion from plan A7.
+test("the default registry leads with JSearch and excludes Adzuna", () => {
   assert.equal(PROVIDER_REGISTRY[0]?.id, "jsearch");
-  assert.equal(PROVIDER_REGISTRY[PROVIDER_REGISTRY.length - 1]?.id, "adzuna");
   assert.ok(
-    !PROVIDER_REGISTRY.slice(0, -1).some((p) => p.id === "adzuna"),
-    "adzuna must appear exactly once, in the fallback slot",
+    !PROVIDER_REGISTRY.some((p) => (p.id as string) === "adzuna"),
+    "adzuna must not appear in the provider registry",
   );
 });

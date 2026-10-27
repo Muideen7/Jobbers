@@ -141,12 +141,12 @@ test("contract type is title-cased and falls back to the legacy default", () => 
 });
 
 test("toPublicJob composes a source-unique id and honest fallbacks", () => {
-  const adzuna = toPublicJob(makeJob({ source: "adzuna", externalId: "123" }));
+  const jsearch = toPublicJob(makeJob({ source: "jsearch", externalId: "123" }));
   const remoteok = toPublicJob(makeJob({ source: "remoteok", externalId: "123" }));
   // Ids collide across sources — React keys must not.
-  assert.equal(adzuna.id, "adzuna:123");
+  assert.equal(jsearch.id, "jsearch:123");
   assert.equal(remoteok.id, "remoteok:123");
-  assert.notEqual(adzuna.id, remoteok.id);
+  assert.notEqual(jsearch.id, remoteok.id);
 
   assert.equal(toPublicJob(makeJob({ company: "" })).company, "Unknown company");
   assert.equal(toPublicJob(makeJob({ location: "", remote: true })).location, "Remote");

@@ -70,7 +70,7 @@ test("C3: structured highlights land in their DB columns", () => {
 
 test("C3: sources without highlights insert empty arrays (columns' default)", () => {
   const record = buildJobRecord({
-    job: makeJob({ source: "adzuna", externalId: "9", title: "Dev" }),
+    job: makeJob({ source: "jobicy", externalId: "9", title: "Dev" }),
     userId: "user-1",
     runId: "run-1",
     score,
@@ -164,7 +164,7 @@ test("C4: job_type and location fallbacks behave as before", () => {
 
   const unknown = buildJobRecord({
     job: makeJob({
-      source: "adzuna",
+      source: "jobicy",
       externalId: "3",
       title: "Dev",
       location: "",
@@ -196,7 +196,7 @@ test("salary formatting rules are unchanged by the move", () => {
   );
   assert.equal(
     formatSalaryForDb(
-      makeJob({ source: "adzuna", externalId: "3", title: "Dev", salaryMin: 90_000, salaryPeriod: null }),
+      makeJob({ source: "jobicy", externalId: "3", title: "Dev", salaryMin: 90_000, salaryPeriod: null }),
     ),
     "$90k+",
   );

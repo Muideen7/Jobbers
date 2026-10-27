@@ -1,14 +1,8 @@
 /**
- * Country detection for job search (context/job-search-expansion-plan.md B1).
+ * Country detection for job search.
  *
- * The find route used to hardcode `country: "us"`, which sent Lagos searches
- * into the US index — and Adzuna 404s (`UNSUPPORTED_COUNTRY`) outright for
- * Nigeria. `detectCountry` walks candidates in priority order (search location
- * → profile preferred locations → profile location) and falls back to "us".
- *
- * The result feeds: JSearch (valid ISO code for any country), the Adzuna
- * provider (unsupported codes are skipped there, see `lib/jobs/adzuna.ts`),
- * and the remote feeds (which ignore country entirely).
+ * `detectCountry` walks candidates in priority order (search location
+ * → profile preferred locations → profile location) and falls back to "us" (or "ng" when in Nigeria).
  *
  * Pure and dependency-free — no "@/…" imports, so it loads under `node --test`.
  */
