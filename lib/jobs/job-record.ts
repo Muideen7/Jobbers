@@ -11,7 +11,7 @@
  * Relative/type-only imports keep this module loadable under `node --test`.
  */
 
-import type { NormalizedJob } from "./types.ts";
+import type { NormalizedJob, JobSourceId } from "./types.ts";
 
 export type JobScoreFields = {
   matchScore: number;
@@ -52,9 +52,9 @@ export type JobDbRecord = {
   id: string;
   user_id: string;
   run_id: string | null;
-  // Provider id ("jsearch", "adzuna", …) so every saved row can be attributed
+  // Provider id ("jsearch", …) so every saved row can be attributed
   // to its source (plan A7); legacy rows say "search".
-  source: string;
+  source: "search" | "url" | JobSourceId;
   source_url: string | null;
   external_apply_url: string | null;
   title: string;

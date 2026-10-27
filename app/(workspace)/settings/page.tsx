@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Settings2, User, Bell, Shield, LogOut } from "lucide-react";
 
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { DeleteAccountSection } from "@/components/settings/DeleteAccountSection";
 import { requireUser } from "@/lib/auth";
 import { getUserProfile } from "@/lib/profile";
 import { privateMetadata } from "../../private-metadata";
@@ -113,6 +114,9 @@ export default async function SettingsPage() {
             </LogoutButton>
           </div>
         </section>
+
+        {/* Delete account */}
+        <DeleteAccountSection />
       </div>
     </div>
   );

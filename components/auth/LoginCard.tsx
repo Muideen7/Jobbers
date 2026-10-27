@@ -24,6 +24,7 @@ type AuthMode = "signin" | "signup" | "forgot";
 type Props = {
   error?: string | undefined;
   initialMode?: "signin" | "signup" | "forgot";
+  deleted?: boolean | undefined;
 };
 
 const URL_ERROR_MESSAGES: Record<string, string> = {
@@ -32,7 +33,7 @@ const URL_ERROR_MESSAGES: Record<string, string> = {
   provider: "That authentication provider is currently unavailable.",
 };
 
-export function LoginCard({ error, initialMode = "signin" }: Props) {
+export function LoginCard({ error, initialMode = "signin", deleted }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [name, setName] = useState("");
@@ -41,7 +42,9 @@ export function LoginCard({ error, initialMode = "signin" }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(
+    deleted ? "Your account and all associated data have been permanently deleted." : null,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(
     error ? URL_ERROR_MESSAGES[error] || "An authentication error occurred." : null,
   );

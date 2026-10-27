@@ -25,6 +25,7 @@ type LoginPageProps = {
   searchParams: Promise<{
     error?: string | string[];
     mode?: string | string[];
+    deleted?: string | string[];
   }>;
 };
 
@@ -38,11 +39,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
   const rawMode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const deleted = Array.isArray(params.deleted) ? params.deleted[0] === "1" : params.deleted === "1";
   const initialMode = rawMode === "signup" ? "signup" : "signin";
 
   return (
     <main className="min-h-screen w-full bg-background">
-      <LoginCard error={error} initialMode={initialMode} />
+      <LoginCard error={error} initialMode={initialMode} deleted={deleted} />
     </main>
   );
 }

@@ -228,7 +228,16 @@ export default async function JobsPage({ searchParams }: Props) {
         );
 
         try {
-          await jobsCollection.insertMany(records as unknown as Job[]);
+          if (records.length > 0) {
+            const operations = records.map((record) => ({
+              updateOne: {
+                filter: { id: record.id, user_id: user.id },
+                update: { $set: record },
+                upsert: true,
+              },
+            }));
+            await jobsCollection.bulkWrite(operations, { ordered: false });
+          }
           jobs = records as unknown as Job[];
         } catch (insertError) {
           console.warn("[jobs] auto-seed insert warning:", (insertError as Error).message);

@@ -3,7 +3,8 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
 
-const DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview";
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+const FALLBACK_GEMINI_MODEL = "gemini-flash-latest";
 
 let client: GoogleGenAI | null = null;
 
@@ -88,19 +89,51 @@ export async function generateJson<T extends z.ZodTypeAny>(
     schema = arg2 as T | undefined;
   }
 
-  const response = await getGemini().models.generateContent({
-    model: getGeminiModel(),
-    contents: input.prompt,
-    config: {
-      systemInstruction: input.system,
-      temperature: input.temperature,
-      maxOutputTokens: input.maxOutputTokens,
-      responseMimeType: "application/json",
-      thinkingConfig: {
-        thinkingBudget: input.thinkingBudget ?? 0,
+  const primaryModel = getGeminiModel();
+  let response;
+  try {
+    response = await getGemini().models.generateContent({
+      model: primaryModel,
+      contents: input.prompt,
+      config: {
+        systemInstruction: input.system,
+        temperature: input.temperature,
+        maxOutputTokens: input.maxOutputTokens,
+        responseMimeType: "application/json",
+        thinkingConfig: {
+          thinkingBudget: input.thinkingBudget ?? 0,
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    const errMsg = (err as Error)?.message || "";
+    if (
+      (errMsg.includes("NOT_FOUND") ||
+        errMsg.includes("404") ||
+        errMsg.includes("no longer available") ||
+        errMsg.includes("is not found")) &&
+      primaryModel !== FALLBACK_GEMINI_MODEL
+    ) {
+      console.warn(
+        `[llm] Model ${primaryModel} failed or deprecated; falling back to ${FALLBACK_GEMINI_MODEL}`,
+      );
+      response = await getGemini().models.generateContent({
+        model: FALLBACK_GEMINI_MODEL,
+        contents: input.prompt,
+        config: {
+          systemInstruction: input.system,
+          temperature: input.temperature,
+          maxOutputTokens: input.maxOutputTokens,
+          responseMimeType: "application/json",
+          thinkingConfig: {
+            thinkingBudget: input.thinkingBudget ?? 0,
+          },
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const raw = response.text;
 

@@ -89,26 +89,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const rawProfile = await getUserProfile(user.id);
-    if (!rawProfile) {
-      return NextResponse.json(
-        { success: false, error: "Profile not found" },
-        { status: 404 },
-      );
-    }
 
     const profile: ProfileScoreContext = {
-      skills: rawProfile.skills ?? [],
-      industries: rawProfile.industries ?? [],
-      experience_level: rawProfile.experience_level ?? "mid",
-      job_titles_seeking: rawProfile.job_titles_seeking ?? [],
-      years_experience: rawProfile.years_experience ?? 0,
-      work_experience: rawProfile.work_experience ?? [],
-      remote_preference: rawProfile.remote_preference ?? "any",
+      skills: rawProfile?.skills ?? [],
+      industries: rawProfile?.industries ?? [],
+      experience_level: rawProfile?.experience_level ?? "mid",
+      job_titles_seeking: rawProfile?.job_titles_seeking ?? (jobTitle.trim() ? [jobTitle.trim()] : []),
+      years_experience: rawProfile?.years_experience ?? 0,
+      work_experience: rawProfile?.work_experience ?? [],
+      remote_preference: rawProfile?.remote_preference ?? "any",
       preferred_locations:
-        rawProfile.preferred_locations ??
-        (rawProfile.location ? [rawProfile.location] : []),
-      salary_expectation: rawProfile.salary_expectation ?? null,
-      location: rawProfile.location ?? null,
+        rawProfile?.preferred_locations ??
+        (location.trim() ? [location.trim()] : rawProfile?.location ? [rawProfile.location] : []),
+      salary_expectation: rawProfile?.salary_expectation ?? null,
+      location: location.trim() || rawProfile?.location || null,
     };
 
     runId = randomUUID();
@@ -203,7 +197,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     });
 
-    await jobsCollection.insertMany(jobRecords as unknown as Job[]);
+    if (jobRecords.length > 0) {
+      const operations = jobRecords.map((record) => ({
+        updateOne: {
+          filter: { id: record.id, user_id: user.id },
+          update: { $set: record },
+          upsert: true,
+        },
+      }));
+      await jobsCollection.bulkWrite(operations, { ordered: false });
+    }
 
     await runsCollection.updateOne(
       { id: runId, user_id: user.id },
