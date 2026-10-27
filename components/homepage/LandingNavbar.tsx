@@ -103,10 +103,7 @@ export function LandingNavbar() {
             </Link>
           </div>
 
-          <div className="md:hidden flex items-center gap-2">
-            <Link href="/login?mode=signup" className="btn btn-primary btn-sm cursor-pointer">
-              Get started
-            </Link>
+          <div className="md:hidden flex items-center">
             <button
               type="button"
               onClick={() => setMenuOpen((previous) => !previous)}
@@ -160,7 +157,7 @@ export function LandingNavbar() {
               <span className="text-text-primary flex">
                 <JobbersIcon className="w-6 h-6" />
               </span>
-              Menu
+              Jobbers
             </span>
             <button
               type="button"
