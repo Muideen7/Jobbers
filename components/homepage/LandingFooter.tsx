@@ -127,61 +127,66 @@ export function LandingFooter() {
                 </div>
               </div>
 
-              {/* Column 2 (Span 2 / Product) */}
-              <div className="md:col-span-2 space-y-3.5">
-                <h3 className="text-sm font-semibold text-text-primary tracking-normal">
-                  Product
-                </h3>
-                <ul className="space-y-2.5 text-sm text-text-secondary">
-                  {productLinks.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="inline-block cursor-pointer hover:text-text-primary transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* Link columns wrapper — Y-shape on mobile, flat row on md+ */}
+              <div className="grid grid-cols-2 md:contents gap-8">
+                {/* Column 2 (Span 2 / Product) */}
+                <div className="md:col-span-2 space-y-3.5">
+                  <h3 className="text-sm font-semibold text-text-primary tracking-normal">
+                    Product
+                  </h3>
+                  <ul className="space-y-2.5 text-sm text-text-secondary">
+                    {productLinks.map((link) => (
+                      <li key={link.label}>
+                        <Link
+                          href={link.href}
+                          className="inline-block cursor-pointer hover:text-text-primary transition-colors"
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Column 3 (Span 3 / For job seekers) */}
-              <div className="md:col-span-3 space-y-3.5">
-                <h3 className="text-sm font-semibold text-text-primary tracking-normal">
-                  For job seekers
-                </h3>
-                <ul className="space-y-2.5 text-sm text-text-secondary">
-                  {jobSeekerLinks.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="inline-block cursor-pointer hover:text-text-primary transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                {/* Column 3 (Span 3 / For job seekers) */}
+                <div className="md:col-span-3 space-y-3.5">
+                  <h3 className="text-sm font-semibold text-text-primary tracking-normal">
+                    For job seekers
+                  </h3>
+                  <ul className="space-y-2.5 text-sm text-text-secondary">
+                    {jobSeekerLinks.map((link) => (
+                      <li key={link.label}>
+                        <Link
+                          href={link.href}
+                          className="inline-block cursor-pointer hover:text-text-primary transition-colors"
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Column 4 (Span 3 / Your account) */}
-              <div className="md:col-span-3 space-y-3.5">
-                <h3 className="text-sm font-semibold text-text-primary tracking-normal">
-                  Your account
-                </h3>
-                <ul className="space-y-2.5 text-sm text-text-secondary">
-                  {accountLinks.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="inline-block cursor-pointer hover:text-text-primary transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {/* Column 4 (Span 3 / Your account) — centered below on mobile */}
+                <div className="col-span-2 md:col-span-3">
+                  <div className="space-y-3.5">
+                    <h3 className="text-sm font-semibold text-text-primary tracking-normal">
+                      Your account
+                    </h3>
+                    <ul className="space-y-2.5 text-sm text-text-secondary">
+                      {accountLinks.map((link) => (
+                        <li key={link.label}>
+                          <Link
+                            href={link.href}
+                            className="inline-block cursor-pointer hover:text-text-primary transition-colors"
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
