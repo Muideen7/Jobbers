@@ -186,9 +186,9 @@ className="bg-purple-500 text-gray-600"
 > toggles the whole app's token set at runtime. `ThemeToggler` in
 > `components/layout/ThemeToggler.tsx` flips `document.documentElement`
 > between no class (light) and `.dark`. Dark mode's card surface **is the
-> landing footer colour** (`--color-inverse` = `#2d2f33`) and the page shell
-> sits one step darker (`--color-inverse-sunken` = `#1c1e22`), so the dark
-> app reads as the footer's colour family.
+> landing footer colour** (`--color-inverse` = `#2d2f33`) and the body / page shell
+> uses `#121212` (`--color-background` = `#121212`), providing optimal OLED depth,
+> readability and WCAG AAA text contrast across dark surfaces.
 
 ```css
 /* Stable light-mode sources. `.dark` lightens the accent by mixing these
@@ -211,26 +211,26 @@ className="bg-purple-500 text-gray-600"
 .dark {
   color-scheme: dark;
 
-  /* Surfaces — cards are the footer colour. */
-  --color-background: var(--color-inverse-sunken);
+  /* Surfaces — body/background is Material dark #121212. */
+  --color-background: #121212;
   --color-surface: var(--color-inverse);
   --color-surface-secondary: color-mix(in srgb, var(--color-inverse-foreground) 10%, var(--color-inverse));
   --color-surface-tertiary: var(--color-inverse-deep);
 
-  --color-border: color-mix(in srgb, var(--color-inverse-foreground) 16%, var(--color-inverse-deep));
-  --color-border-light: color-mix(in srgb, var(--color-inverse-foreground) 9%, var(--color-inverse-deep));
-  --color-border-muted: color-mix(in srgb, var(--color-inverse-foreground) 26%, var(--color-inverse-deep));
+  --color-border: color-mix(in srgb, var(--color-inverse-foreground) 20%, var(--color-inverse-deep));
+  --color-border-light: color-mix(in srgb, var(--color-inverse-foreground) 12%, var(--color-inverse-deep));
+  --color-border-muted: color-mix(in srgb, var(--color-inverse-foreground) 28%, var(--color-inverse-deep));
 
   --color-text-primary: var(--color-inverse-foreground);
-  --color-text-secondary: color-mix(in srgb, var(--color-inverse-foreground) 72%, var(--color-inverse-sunken));
-  --color-text-muted: color-mix(in srgb, var(--color-inverse-foreground) 56%, var(--color-inverse-sunken));
-  --color-text-strong: color-mix(in srgb, var(--color-inverse-foreground) 64%, var(--color-inverse-sunken));
-  --color-text-faint: color-mix(in srgb, var(--color-inverse-foreground) 36%, var(--color-inverse-sunken));
-  --color-text-dark: color-mix(in srgb, var(--color-inverse-foreground) 82%, var(--color-inverse-sunken));
-  --color-text-darkest: color-mix(in srgb, var(--color-inverse-foreground) 93%, var(--color-inverse-sunken));
-  --color-text-slate: color-mix(in srgb, var(--color-inverse-foreground) 93%, var(--color-inverse-sunken));
-  --color-text-slate-medium: color-mix(in srgb, var(--color-inverse-foreground) 72%, var(--color-inverse-sunken));
-  --color-chart-axis: color-mix(in srgb, var(--color-inverse-foreground) 56%, var(--color-inverse-sunken));
+  --color-text-secondary: color-mix(in srgb, var(--color-inverse-foreground) 75%, var(--color-background));
+  --color-text-muted: color-mix(in srgb, var(--color-inverse-foreground) 60%, var(--color-background));
+  --color-text-strong: color-mix(in srgb, var(--color-inverse-foreground) 68%, var(--color-background));
+  --color-text-faint: color-mix(in srgb, var(--color-inverse-foreground) 38%, var(--color-background));
+  --color-text-dark: color-mix(in srgb, var(--color-inverse-foreground) 84%, var(--color-background));
+  --color-text-darkest: color-mix(in srgb, var(--color-inverse-foreground) 94%, var(--color-background));
+  --color-text-slate: color-mix(in srgb, var(--color-inverse-foreground) 94%, var(--color-background));
+  --color-text-slate-medium: color-mix(in srgb, var(--color-inverse-foreground) 75%, var(--color-background));
+  --color-chart-axis: color-mix(in srgb, var(--color-inverse-foreground) 60%, var(--color-background));
 
   /* Accent lightens so purple text stays legible on dark surfaces; its light
    * fills flip to dark lavenders so pills keep an accent-on-lavender pairing.

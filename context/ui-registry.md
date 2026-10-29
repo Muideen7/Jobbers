@@ -623,8 +623,8 @@ Last updated: 2026-10-08
   stays happy.
 - The `.dark` class flips the whole token set via the unlayered `.dark { … }`
   block in `app/globals.css` — the component owns **no** colors of its own.
-  See `context/ui-tokens.md` → "Dark mode" for the palette (cards are the
-  footer's `--color-inverse` family).
+  See `context/ui-tokens.md` → "Dark mode" for the palette (body uses `#121212`,
+  cards are the footer's `--color-inverse` family with tuned WCAG AAA/AA text contrast).
 
 ---
 

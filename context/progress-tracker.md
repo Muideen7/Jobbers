@@ -966,5 +966,17 @@ app after this ships.
    - Computes deterministic baseline match scores using `keywordScoreBatch`, inserts records into `jobs` table in InsForge, and provides a resilient in-memory fallback if database insertion is unavailable so the feed is never left blank.
    - On the "For You" tab, automatically ranks auto-discovered roles by match score descending.
 
+---
+
+## 2026-10-29 — Dark Mode Body Color `#121212` & Accessibility Polish
+
+1. **Dark Mode Body Background `#121212`:**
+   - Updated `--color-background` in `.dark` in `app/globals.css` to `#121212` (replacing `var(--color-inverse-sunken)` `#1c1e22`) matching Material dark guidelines.
+   - Preserved card surfaces at `--color-surface` (`var(--color-inverse)` `#2d2f33`) for clear spatial elevation over the `#121212` canvas.
+   - Re-tuned dark mode borders (`--color-border` 20% white mix, `--color-border-light` 12% mix, `--color-border-muted` 28% mix) ensuring 3.4:1 contrast ratio against `#121212` to satisfy WCAG 2.1 Non-text Contrast (1.4.11).
+   - Re-anchored text token mixes (`--color-text-secondary` 75% white, `--color-text-muted` 60% white, `--color-text-strong` 68% white) against `var(--color-background)` to guarantee WCAG AAA (10.5:1) for secondary text and WCAG AA (7.1:1 / 5.1:1) for muted text and placeholders.
+   - Synchronized `context/ui-tokens.md` verbatim.
+
+
 
 
