@@ -40,6 +40,7 @@ export interface Resume {
 export interface Profile {
   id: string;
   full_name: string | null;
+  image?: string | null;
   middle_name?: string | null;
   preferred_name?: string | null;
   email: string | null;

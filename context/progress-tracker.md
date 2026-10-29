@@ -23,6 +23,11 @@ Update this file after every completed feature. Any AI agent reading this should
 *(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **OAuth Profile Avatar & Initials Fallback (`components/ui/user-avatar.tsx`, `lib/auth.ts`, `components/layout/AppShell.tsx`)**:
+  1. *OAuth Image Resolution*: Added automatic profile picture resolution for Google OAuth (from `session.user.image` or Google ID token `picture` claim) and GitHub OAuth (`https://avatars.githubusercontent.com/u/${accountId}`) with persistence to MongoDB.
+  2. *First & Last Name Initials*: Updated `lib/utils.ts` `getInitials` to extract the first letter of first name + first letter of last name (e.g., "John Michael Doe" → "JD", "Jane Smith" → "JS") when signed up with email.
+  3. *Universal UserAvatar*: Built `UserAvatar` supporting `xs`, `sm`, `md`, `lg` sizes with `referrerPolicy="no-referrer"` for Google CDN compatibility and automatic fallback to first/last name initials on load errors.
+  4. *Profile & Navigation Shell Integration*: Rendered real avatar photo in AppShell topbar, rich account dropdown header, and Identity profile banner.
 - **Real Authenticated Integration Engine (`/integrations`, `actions/integrations.ts`, `app/api/calendar/feed`)**:
   1. *Honest Dynamic Statuses*: Replaced all hardcoded static/demo badges ("Active", "Connected", "Ready", "Sync Active") with authentic dynamic state derived directly from MongoDB `account` and `integrations` collections. Unconnected integrations now honestly display `Not Connected`, `Not Subscribed`, or `Disabled` with neutral status indicators.
   2. *Live RFC 5545 Feed Tracking*: Added automatic calendar request logging in `app/api/calendar/feed/route.ts`. Detects external client user-agents (Apple Calendar, Google Calendar, Microsoft Outlook), increments fetch count, and updates `last_synced_at`. The card dynamically displays `Active • Last synced [relative time] via [client] • [N] requests`.

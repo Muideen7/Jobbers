@@ -19,6 +19,7 @@ import { saveProfile } from "@/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { DatePicker } from "@/components/ui/date-picker";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import type { Profile } from "@/types";
 
 type Props = {
@@ -481,6 +482,39 @@ export function IdentityProfileClient({ profile }: Props) {
             {/* TAB 1: PERSONAL */}
             {activeTab === "personal" && (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                {/* Profile Avatar & Identity Source */}
+                <div className="col-span-1 sm:col-span-2 flex items-center gap-4 rounded-2xl border border-border bg-surface-secondary/40 p-4">
+                  <UserAvatar
+                    user={{
+                      name: `${firstName} ${lastName}`.trim() || profile?.full_name,
+                      email: email || profile?.email,
+                      image: profile?.image,
+                    }}
+                    size="lg"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-text-primary">
+                        {`${firstName} ${lastName}`.trim() || profile?.full_name || "Jobber Profile"}
+                      </p>
+                      {profile?.image ? (
+                        <span className="rounded-full bg-success-lightest px-2.5 py-0.5 text-[10px] font-semibold text-success-foreground">
+                          Connected Photo
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-surface-secondary border border-border px-2.5 py-0.5 text-[10px] font-semibold text-text-muted">
+                          Initials Avatar
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {profile?.image
+                        ? "Profile photo imported from your connected Google or GitHub account."
+                        : "Two-letter avatar generated from your first and last name."}
+                    </p>
+                  </div>
+                </div>
+
                 {/* First name */}
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">

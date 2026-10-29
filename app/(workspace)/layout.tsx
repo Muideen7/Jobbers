@@ -27,8 +27,9 @@ export default async function WorkspaceLayout({
       <Suspense>
         <AppShell
           user={{
-            name: profile?.full_name ?? null,
-            email: profile?.email ?? null,
+            name: profile?.full_name || user.name || null,
+            email: profile?.email || user.email || null,
+            image: user.image || profile?.image || null,
           }}
         >
           {children}

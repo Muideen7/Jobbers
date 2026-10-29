@@ -18,6 +18,20 @@ After building any component — update this file with the component name, file 
 
 ## Components
 
+### UserAvatar Component
+
+File: `components/ui/user-avatar.tsx`
+Last updated: 2026-10-29
+
+| Property       | Class / Rule |
+| -------------- | ------------ |
+| Image variant  | `shrink-0 rounded-full object-cover ring-1 ring-border/80` (with `referrerPolicy="no-referrer"` for Google/GitHub CDN URLs) |
+| Fallback init  | `flex shrink-0 items-center justify-center rounded-full bg-accent-muted font-bold text-accent select-none` |
+| Sizes          | `xs` (`h-6 w-6 text-[10px]`), `sm` (`h-8 w-8 text-xs`), `md` (`h-10 w-10 text-sm`), `lg` (`h-14 w-14 text-lg`) |
+
+**Pattern notes:**
+Standardized avatar primitive across AppShell topbar, account menu, and candidate profile. Automatically renders the user's Google or GitHub OAuth profile photo when signed in via OAuth; cleanly falls back to two-letter first and last name initials on image error or email/password registration.
+
 ### Shared StatCard
 
 File: components/shared/StatCard.tsx

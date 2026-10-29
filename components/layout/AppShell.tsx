@@ -28,7 +28,8 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Logo } from "@/components/layout/Logo";
 import { ThemeToggler } from "@/components/layout/ThemeToggler";
 import { useSidebarSummary } from "@/components/layout/useSidebarSummary";
-import { formatDate, getInitials } from "@/lib/utils";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { formatDate } from "@/lib/utils";
 import type { ApplicationStage } from "@/lib/workspace/constants";
 import type { SidebarSummary } from "@/lib/workspace/types";
 
@@ -40,7 +41,11 @@ type NotificationItem = {
 };
 
 type Props = {
-  user: { name: string | null; email: string | null };
+  user: {
+    name: string | null;
+    email: string | null;
+    image?: string | null;
+  };
   children: React.ReactNode;
 };
 
@@ -232,8 +237,6 @@ export function AppShell({ user, children }: Props) {
       cancelled = true;
     };
   }, []);
-
-  const userInitials = getInitials(user.name ?? user.email);
 
   const renderNav = (opts: { collapsed: boolean; onNavigate?: () => void }) => (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-3 py-4">
@@ -466,27 +469,41 @@ export function AppShell({ user, children }: Props) {
             aria-label="Account menu"
             aria-haspopup="menu"
             aria-expanded={openMenu === "account"}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-light text-xs font-bold text-accent cursor-pointer"
+            className="rounded-full ring-offset-background transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
           >
-            {userInitials}
+            <UserAvatar user={user} size="sm" />
           </button>
           {openMenu === "account" && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setOpenMenu(null)} aria-hidden />
-              <div className="absolute right-4 top-14 z-30 w-56 rounded-xl border border-border bg-surface p-1 shadow-card">
+              <div className="absolute right-4 top-14 z-30 w-64 rounded-2xl border border-border bg-surface p-2 shadow-card">
+                <div className="flex items-center gap-3 px-2.5 py-2.5 border-b border-border/70 mb-1">
+                  <UserAvatar user={user} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-text-primary">
+                      {user.name || "Jobber"}
+                    </p>
+                    <p className="truncate text-xs text-text-muted">
+                      {user.email || ""}
+                    </p>
+                  </div>
+                </div>
+
                 <Link
                   href="/profile?tab=account"
                   onClick={closeTransientChrome}
-                  className="block rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
                 >
-                  Account
+                  <User className="h-4 w-4 text-text-muted" />
+                  <span>Account & Profile</span>
                 </Link>
                 <Link
-                  href="/profile?tab=preferences"
+                  href="/settings"
                   onClick={closeTransientChrome}
-                  className="block rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
                 >
-                  Preferences
+                  <Settings2 className="h-4 w-4 text-text-muted" />
+                  <span>Settings</span>
                 </Link>
                 <div className="my-1 border-t border-border" />
                 <LogoutButton

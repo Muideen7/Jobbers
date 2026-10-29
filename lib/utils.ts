@@ -17,7 +17,7 @@ export function getSurname(nameOrEmail: string | null | undefined): string | nul
   return last && last.length > 0 ? last : null;
 }
 
-/** Two-letter avatar initials from a display name or email address. */
+/** Two-letter avatar initials from a display name (first + last name) or email address. */
 export function getInitials(nameOrEmail: string | null | undefined): string {
   const value = (nameOrEmail ?? "").trim();
   if (!value) return "?";
@@ -25,9 +25,15 @@ export function getInitials(nameOrEmail: string | null | undefined): string {
   const localName = value.split("@")[0] ?? "";
   const words = localName.split(/[\s._-]+/).filter(Boolean);
   if (words.length === 0) return "?";
-  if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
+  if (words.length === 1) {
+    const single = words[0] ?? "";
+    return single.length >= 2 ? single.slice(0, 2).toUpperCase() : single.toUpperCase();
+  }
 
-  return `${(words[0] ?? "")[0]}${(words[1] ?? "")[0]}`.toUpperCase();
+  // First letter of first name + First letter of last name
+  const firstInitial = (words[0] ?? "")[0] ?? "";
+  const lastInitial = (words[words.length - 1] ?? "")[0] ?? "";
+  return `${firstInitial}${lastInitial}`.toUpperCase();
 }
 
 export function getMatchScoreColor(score: number): string {

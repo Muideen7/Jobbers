@@ -16,11 +16,16 @@ export default async function ProfilePage() {
   const user = await requireUser();
   let profile = await getUserProfile(user.id);
 
+  if (profile && !profile.image && user.image) {
+    profile.image = user.image;
+  }
+
   if (!profile) {
     profile = {
       id: user.id,
       full_name: user.name || null,
       email: user.email || null,
+      image: user.image || null,
       phone: null,
       location: null,
       current_title: null,

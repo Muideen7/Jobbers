@@ -46,6 +46,37 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
+          if (user?.id) {
+            try {
+              const profilesColl = client.db().collection("profiles");
+              await profilesColl.updateOne(
+                { id: user.id },
+                {
+                  $setOnInsert: {
+                    id: user.id,
+                    full_name: user.name || null,
+                    email: user.email || null,
+                    image: user.image || null,
+                    skills: [],
+                    industries: [],
+                    work_experience: [],
+                    job_titles_seeking: [],
+                    preferred_locations: [],
+                    is_complete: false,
+                    last_jobs_visit_at: null,
+                    created_at: new Date().toISOString(),
+                  },
+                  $set: {
+                    updated_at: new Date().toISOString(),
+                    ...(user.image ? { image: user.image } : {}),
+                  },
+                },
+                { upsert: true },
+              );
+            } catch (pErr) {
+              console.warn("[betterAuth] profile seed warning", pErr);
+            }
+          }
           if (user?.email) {
             sendJobbersEmail({
               to: user.email,
