@@ -41,6 +41,7 @@ export async function deleteAccountAction(): Promise<{ success: boolean; error?:
     const resumesCollection = await getCollection("resumes");
     const runsCollection = await getCollection("agent_runs");
     const logsCollection = await getCollection("agent_logs");
+    const integrationsCollection = await getCollection("integrations");
 
     await Promise.allSettled([
       // Better auth collections: delete by email, id, and _id
@@ -73,6 +74,7 @@ export async function deleteAccountAction(): Promise<{ success: boolean; error?:
       resumesCollection.deleteMany({ user_id: userId }),
       runsCollection.deleteMany({ user_id: userId }),
       logsCollection.deleteMany({ user_id: userId }),
+      integrationsCollection.deleteMany({ user_id: userId }),
     ]);
 
     // 3. Clear all session cookie variants (both HTTP and HTTPS __Secure- on Vercel)

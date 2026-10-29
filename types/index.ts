@@ -309,3 +309,40 @@ export interface Communication {
   created_at: string;
   updated_at: string;
 }
+
+export interface UserIntegration {
+  id: string;
+  user_id: string;
+  provider: "google_calendar" | "ical_feed" | "pipeline_sync" | "email" | "github";
+  connected: boolean;
+  enabled?: boolean;
+  account_identifier?: string | null;
+  last_synced_at?: string | null;
+  sync_count?: number;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationsState {
+  googleCalendar: {
+    connected: boolean;
+    accountEmail?: string | null;
+    lastSyncedAt?: string | null;
+  };
+  icalFeed: {
+    connected: boolean;
+    syncCount: number;
+    lastSyncedAt?: string | null;
+    clientName?: string | null;
+  };
+  pipelineSync: {
+    enabled: boolean;
+    updatedAt?: string | null;
+  };
+  emailService: {
+    connected: boolean;
+    email: string | null;
+    isVerified: boolean;
+  };
+}

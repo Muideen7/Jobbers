@@ -1,38 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Calendar,
   Check,
   CheckCircle2,
+  CircleDashed,
   Copy,
   ExternalLink,
   Laptop,
   Mail,
-  RefreshCw,
   Download,
   Briefcase,
+  ShieldCheck,
+  Unlink,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { IntegrationsState } from "@/types";
+import {
+  togglePipelineAutoSyncAction,
+  disconnectIntegrationAction,
+  markGoogleCalendarSubscribedAction,
+} from "@/actions/integrations";
 
 type Props = {
   interviewCount: number;
   trackedInterviewRolesCount: number;
   appliedRolesCount: number;
   feedUrl: string;
+  initialIntegrations: IntegrationsState;
 };
+
+function formatRelativeTime(isoString: string | null | undefined): string {
+  if (!isoString) return "Never";
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 60) return "Just now";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export function IntegrationsClient({
   interviewCount,
   trackedInterviewRolesCount,
   appliedRolesCount,
   feedUrl,
+  initialIntegrations,
 }: Props) {
+  const [integrations, setIntegrations] =
+    useState<IntegrationsState>(initialIntegrations);
   const [copied, setCopied] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(15);
-  const [autoStageSync, setAutoStageSync] = useState(true);
+  const [showGooglePrompt, setShowGooglePrompt] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   // Webcal protocol for 1-click direct calendar app opening
   const webcalUrl = feedUrl.replace(/^https?:\/\//i, "webcal://");
@@ -44,11 +74,90 @@ export function IntegrationsClient({
   }
 
   function handleLaunchGoogleCalendar() {
-    // Google Calendar Web subscription template
     const gcalUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
       webcalUrl,
     )}`;
     window.open(gcalUrl, "_blank", "noopener,noreferrer");
+    setShowGooglePrompt(true);
+  }
+
+  function handleMarkGoogleSubscribed() {
+    startTransition(async () => {
+      const res = await markGoogleCalendarSubscribedAction();
+      if (res.success) {
+        setIntegrations((prev) => ({
+          ...prev,
+          googleCalendar: {
+            ...prev.googleCalendar,
+            connected: true,
+            lastSyncedAt: new Date().toISOString(),
+          },
+        }));
+        setShowGooglePrompt(false);
+      }
+    });
+  }
+
+  function handleDisconnectGoogle() {
+    startTransition(async () => {
+      const res = await disconnectIntegrationAction("google_calendar");
+      if (res.success) {
+        setIntegrations((prev) => ({
+          ...prev,
+          googleCalendar: {
+            ...prev.googleCalendar,
+            connected: false,
+            lastSyncedAt: null,
+            accountEmail: null,
+          },
+        }));
+        setShowGooglePrompt(false);
+      }
+    });
+  }
+
+  function handleDisconnectIcal() {
+    startTransition(async () => {
+      const res = await disconnectIntegrationAction("ical_feed");
+      if (res.success) {
+        setIntegrations((prev) => ({
+          ...prev,
+          icalFeed: {
+            ...prev.icalFeed,
+            connected: false,
+            syncCount: 0,
+            lastSyncedAt: null,
+            clientName: null,
+          },
+        }));
+      }
+    });
+  }
+
+  function handleTogglePipelineSync() {
+    const nextState = !integrations.pipelineSync.enabled;
+    // Optimistic update
+    setIntegrations((prev) => ({
+      ...prev,
+      pipelineSync: {
+        ...prev.pipelineSync,
+        enabled: nextState,
+      },
+    }));
+
+    startTransition(async () => {
+      const res = await togglePipelineAutoSyncAction(nextState);
+      if (!res.success) {
+        // Rollback
+        setIntegrations((prev) => ({
+          ...prev,
+          pipelineSync: {
+            ...prev.pipelineSync,
+            enabled: !nextState,
+          },
+        }));
+      }
+    });
   }
 
   return (
@@ -91,10 +200,18 @@ export function IntegrationsClient({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
-                <CheckCircle2 className="h-3 w-3" />
-                Active
-              </span>
+
+              {integrations.googleCalendar.connected ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                  <CircleDashed className="h-3 w-3" />
+                  Not Connected
+                </span>
+              )}
             </div>
 
             <p className="mt-4 text-xs text-text-secondary leading-relaxed">
@@ -126,38 +243,83 @@ export function IntegrationsClient({
                   {interviewCount} {interviewCount === 1 ? "round" : "rounds"}
                 </span>
               </div>
+
+              <div className="flex items-center justify-between text-xs border-t border-border/60 pt-2.5">
+                <span className="font-medium text-text-secondary">
+                  Connection Status
+                </span>
+                <span className="font-medium text-text-primary">
+                  {integrations.googleCalendar.connected
+                    ? `Active (${formatRelativeTime(integrations.googleCalendar.lastSyncedAt)})`
+                    : "Not linked"}
+                </span>
+              </div>
             </div>
+
+            {/* Prompt when opening Google Calendar web subscription */}
+            {showGooglePrompt && !integrations.googleCalendar.connected && (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-muted/30 p-3 text-xs">
+                <span className="text-text-primary">
+                  Did you add the calendar in Google Calendar?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleMarkGoogleSubscribed}
+                  disabled={isPending}
+                  className="rounded-lg text-xs font-semibold shrink-0"
+                >
+                  Confirm Connected
+                </Button>
+              </div>
+            )}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
-            <Button
-              type="button"
-              onClick={handleLaunchGoogleCalendar}
-              size="sm"
-              className="rounded-xl font-semibold text-xs"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Subscribe in Google Calendar
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCopyFeed}
-              className="rounded-xl text-xs"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 mr-1.5 text-success" />
-                  Feed Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                  Copy iCal URL
-                </>
-              )}
-            </Button>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-2.5 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={handleLaunchGoogleCalendar}
+                size="sm"
+                className="rounded-xl font-semibold text-xs"
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Subscribe in Google Calendar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyFeed}
+                className="rounded-xl text-xs"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 mr-1.5 text-success" />
+                    Feed Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy iCal URL
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {integrations.googleCalendar.connected && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleDisconnectGoogle}
+                disabled={isPending}
+                className="rounded-xl text-xs text-text-muted hover:text-danger hover:bg-danger/10"
+              >
+                <Unlink className="h-3.5 w-3.5 mr-1" />
+                Disconnect
+              </Button>
+            )}
           </div>
         </div>
 
@@ -178,18 +340,48 @@ export function IntegrationsClient({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
-                <CheckCircle2 className="h-3 w-3" />
-                Ready
-              </span>
+
+              {integrations.icalFeed.connected ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                  <CircleDashed className="h-3 w-3" />
+                  Not Subscribed
+                </span>
+              )}
             </div>
 
             <p className="mt-4 text-xs text-text-secondary leading-relaxed">
               Add your private Jobbers calendar subscription into Apple Calendar (macOS & iOS), Microsoft Outlook, or Thunderbird. Any changes you make on Jobbers sync automatically.
             </p>
 
+            {/* Sync Activity Metadata */}
+            <div className="mt-5 space-y-2.5 rounded-xl border border-border/80 bg-surface-secondary/40 p-3.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-text-secondary">Last Sync</span>
+                <span className="font-medium text-text-primary">
+                  {formatRelativeTime(integrations.icalFeed.lastSyncedAt)}
+                  {integrations.icalFeed.clientName && (
+                    <span className="text-text-muted ml-1">
+                      via {integrations.icalFeed.clientName}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-border/60 pt-2">
+                <span className="font-medium text-text-secondary">Sync Requests</span>
+                <span className="font-medium text-text-primary">
+                  {integrations.icalFeed.syncCount}{" "}
+                  {integrations.icalFeed.syncCount === 1 ? "fetch" : "fetches"}
+                </span>
+              </div>
+            </div>
+
             {/* Subscription URL Box */}
-            <div className="mt-5 rounded-xl border border-border/80 bg-surface-secondary/40 p-3.5">
+            <div className="mt-4 rounded-xl border border-border/80 bg-surface-secondary/40 p-3.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Private Calendar Feed URL
               </label>
@@ -217,29 +409,45 @@ export function IntegrationsClient({
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="rounded-xl font-semibold text-xs"
-            >
-              <a href={webcalUrl}>
-                <Laptop className="h-3.5 w-3.5 mr-1.5" />
-                Open with Calendar App
-              </a>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="ghost"
-              className="rounded-xl text-xs text-text-secondary hover:text-text-primary"
-            >
-              <a href={feedUrl} download="jobbers-interviews.ics">
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download .ics file
-              </a>
-            </Button>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-2.5 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="rounded-xl font-semibold text-xs"
+              >
+                <a href={webcalUrl}>
+                  <Laptop className="h-3.5 w-3.5 mr-1.5" />
+                  Open with Calendar App
+                </a>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className="rounded-xl text-xs text-text-secondary hover:text-text-primary"
+              >
+                <a href={feedUrl} download="jobbers-interviews.ics">
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Download .ics
+                </a>
+              </Button>
+            </div>
+
+            {integrations.icalFeed.connected && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleDisconnectIcal}
+                disabled={isPending}
+                className="rounded-xl text-xs text-text-muted hover:text-danger hover:bg-danger/10"
+              >
+                <Unlink className="h-3.5 w-3.5 mr-1" />
+                Reset Feed
+              </Button>
+            )}
           </div>
         </div>
 
@@ -260,10 +468,18 @@ export function IntegrationsClient({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-accent-muted px-2.5 py-0.5 text-xs font-semibold text-accent">
-                <RefreshCw className="h-3 w-3" />
-                Sync Active
-              </span>
+
+              {integrations.pipelineSync.enabled ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                  <CircleDashed className="h-3 w-3" />
+                  Disabled
+                </span>
+              )}
             </div>
 
             <p className="mt-4 text-xs text-text-secondary leading-relaxed">
@@ -294,12 +510,16 @@ export function IntegrationsClient({
             <span className="text-xs font-medium text-text-secondary">
               Auto-advance stage when interview scheduled
             </span>
-            <input
-              type="checkbox"
-              checked={autoStageSync}
-              onChange={(e) => setAutoStageSync(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-            />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={integrations.pipelineSync.enabled}
+                onChange={handleTogglePipelineSync}
+                disabled={isPending}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-surface-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-accent peer-checked:bg-accent after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+            </label>
           </div>
         </div>
 
@@ -320,10 +540,18 @@ export function IntegrationsClient({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
-                <CheckCircle2 className="h-3 w-3" />
-                Connected
-              </span>
+
+              {integrations.emailService.connected ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success-lightest px-2.5 py-0.5 text-xs font-semibold text-success-foreground">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {integrations.emailService.isVerified ? "Verified" : "Connected"}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                  <CircleDashed className="h-3 w-3" />
+                  Not Linked
+                </span>
+              )}
             </div>
 
             <p className="mt-4 text-xs text-text-secondary leading-relaxed">
@@ -331,17 +559,18 @@ export function IntegrationsClient({
             </p>
 
             <div className="mt-5 space-y-2 rounded-xl border border-border/80 bg-surface-secondary/40 p-3.5 text-xs text-text-secondary">
-              <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-success shrink-0" />
-                <span>Pre-formatted post-interview thank you emails</span>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-text-secondary">Connected Email</span>
+                <span className="font-semibold text-text-primary">
+                  {integrations.emailService.email || "No email linked"}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-success shrink-0" />
-                <span>Overdue reply and follow-up deadline alarms</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-success shrink-0" />
-                <span>One-click copy to clipboard & native mail launch</span>
+              <div className="flex items-center justify-between border-t border-border/60 pt-2">
+                <span className="font-medium text-text-secondary">Account Security</span>
+                <span className="flex items-center gap-1 text-success font-medium">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {integrations.emailService.isVerified ? "Email verified" : "Active session"}
+                </span>
               </div>
             </div>
           </div>

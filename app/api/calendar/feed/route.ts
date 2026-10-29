@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
 import type { Interview } from "@/types";
@@ -40,6 +41,50 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         headers: { "Content-Type": "text/plain" },
       });
     }
+
+    const userAgent = req.headers.get("user-agent") || "";
+    const isGoogle = /Google-Calendar-Importer/i.test(userAgent);
+    const isApple = /MacCalendar|iOS|macOS|CFNetwork|CalendarAgent/i.test(userAgent);
+    const isOutlook = /Outlook|Microsoft/i.test(userAgent);
+
+    const clientName = isGoogle
+      ? "Google Calendar"
+      : isApple
+        ? "Apple Calendar"
+        : isOutlook
+          ? "Microsoft Outlook"
+          : userAgent
+            ? userAgent.slice(0, 40)
+            : "Calendar App";
+
+    const provider = isGoogle ? "google_calendar" : "ical_feed";
+    const nowIso = new Date().toISOString();
+
+    getCollection("integrations")
+      .then((coll) =>
+        coll.updateOne(
+          { user_id: userId, provider },
+          {
+            $set: {
+              connected: true,
+              last_synced_at: nowIso,
+              "metadata.client_name": clientName,
+              "metadata.user_agent": userAgent,
+              updated_at: nowIso,
+            },
+            $inc: { sync_count: 1 },
+            $setOnInsert: {
+              id: randomUUID(),
+              user_id: userId,
+              provider,
+              enabled: true,
+              created_at: nowIso,
+            },
+          },
+          { upsert: true },
+        ),
+      )
+      .catch((err) => console.error("[calendar/feed] failed to log sync", err));
 
     const interviewsColl = await getCollection<Interview>("interviews");
     const interviews = await interviewsColl

@@ -23,6 +23,11 @@ Update this file after every completed feature. Any AI agent reading this should
 *(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Real Authenticated Integration Engine (`/integrations`, `actions/integrations.ts`, `app/api/calendar/feed`)**:
+  1. *Honest Dynamic Statuses*: Replaced all hardcoded static/demo badges ("Active", "Connected", "Ready", "Sync Active") with authentic dynamic state derived directly from MongoDB `account` and `integrations` collections. Unconnected integrations now honestly display `Not Connected`, `Not Subscribed`, or `Disabled` with neutral status indicators.
+  2. *Live RFC 5545 Feed Tracking*: Added automatic calendar request logging in `app/api/calendar/feed/route.ts`. Detects external client user-agents (Apple Calendar, Google Calendar, Microsoft Outlook), increments fetch count, and updates `last_synced_at`. The card dynamically displays `Active • Last synced [relative time] via [client] • [N] requests`.
+  3. *Pipeline Auto-Sync Persistence*: Replaced client-only mock state with persistent MongoDB integration settings via `togglePipelineAutoSyncAction`. `app/api/interviews/route.ts` now checks the user's real `pipeline_sync` setting before auto-advancing applications to the interview stage.
+  4. *Connected Actions & Sweeps*: Added real disconnect, confirm-subscription, and reset actions for calendar feeds, plus integrated `integrations` collection purge into `actions/account.ts` for leak-free account deletion.
 - **Clean Page Header Badges**:
   1. *Integrations Hub (`components/integrations/IntegrationsClient.tsx`)*: Removed the superfluous promotional pill `"Free Calendar & Pipeline Sync"` above `<h1>Integrations</h1>`, cleaned unused `Workflow` icon import, and restored standard heading spacing.
   2. *Live Discovery Jobs (`components/find-jobs/FindJobsClient.tsx`)*: Removed the redundant pill badge `"Live Job Discovery"` above `<h1>Jobs</h1>` for a cleaner, distraction-free workspace header.
