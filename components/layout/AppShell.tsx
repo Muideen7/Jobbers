@@ -325,7 +325,7 @@ export function AppShell({ user, children }: Props) {
   );
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-surface lg:flex lg:flex-col ${

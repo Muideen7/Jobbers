@@ -968,14 +968,14 @@ app after this ships.
 
 ---
 
-## 2026-10-29 — Dark Mode Body Color `#121212` & Accessibility Polish
+## 2026-10-29 — Pure Black `#010101` Dark Mode & Dashboard Slate-Grey Purge
 
-1. **Dark Mode Body Background `#121212`:**
-   - Updated `--color-background` in `.dark` in `app/globals.css` to `#121212` (replacing `var(--color-inverse-sunken)` `#1c1e22`) matching Material dark guidelines.
-   - Preserved card surfaces at `--color-surface` (`var(--color-inverse)` `#2d2f33`) for clear spatial elevation over the `#121212` canvas.
-   - Re-tuned dark mode borders (`--color-border` 20% white mix, `--color-border-light` 12% mix, `--color-border-muted` 28% mix) ensuring 3.4:1 contrast ratio against `#121212` to satisfy WCAG 2.1 Non-text Contrast (1.4.11).
-   - Re-anchored text token mixes (`--color-text-secondary` 75% white, `--color-text-muted` 60% white, `--color-text-strong` 68% white) against `var(--color-background)` to guarantee WCAG AAA (10.5:1) for secondary text and WCAG AA (7.1:1 / 5.1:1) for muted text and placeholders.
-   - Synchronized `context/ui-tokens.md` verbatim.
+1. **Dashboard Root Shell & Pure Black Canvas (`#010101`):**
+   - Corrected `components/layout/AppShell.tsx`: switched workspace root container from `bg-surface` (`#2d2f33` slate grey) to `bg-background` (`#010101`), eliminating the full-screen grey cast across the entire dashboard, jobs, and profile interfaces.
+   - Set `--color-background` in `.dark` to pure pitch black `#010101`.
+   - Elevated cards and navigation sidebar (`--color-surface`) to rich deep black `#0a0a0c` (replacing the legacy `#2d2f33` slate grey) with `#141417` secondary surfaces for inputs and hover states.
+   - Refined dark borders (`--color-border` `#222226`, `--color-border-light` `#161619`) and re-anchored text tokens (`#ededed`, `#a1a1aa`, `#71717a`) to achieve > 18:1 contrast on `#010101` (WCAG AAA).
+   - Synchronized `context/ui-tokens.md` and `context/ui-registry.md`.
 
 
 

@@ -185,10 +185,10 @@ className="bg-purple-500 text-gray-600"
 > invalid at computed-value time), and an **unlayered `.dark`** selector that
 > toggles the whole app's token set at runtime. `ThemeToggler` in
 > `components/layout/ThemeToggler.tsx` flips `document.documentElement`
-> between no class (light) and `.dark`. Dark mode's card surface **is the
-> landing footer colour** (`--color-inverse` = `#2d2f33`) and the body / page shell
-> uses `#121212` (`--color-background` = `#121212`), providing optimal OLED depth,
-> readability and WCAG AAA text contrast across dark surfaces.
+> between no class (light) and `.dark`. In dark mode, the canvas / body uses pure
+> black `#010101` (`--color-background` = `#010101`), and cards/surfaces use elevated deep
+> black `#0a0a0c` (`--color-surface` = `#0a0a0c`), eliminating washed-out slate grey and
+> providing pure OLED contrast with WCAG AAA readability.
 
 ```css
 /* Stable light-mode sources. `.dark` lightens the accent by mixing these
@@ -211,68 +211,69 @@ className="bg-purple-500 text-gray-600"
 .dark {
   color-scheme: dark;
 
-  /* Surfaces — body/background is Material dark #121212. */
-  --color-background: #121212;
-  --color-surface: var(--color-inverse);
-  --color-surface-secondary: color-mix(in srgb, var(--color-inverse-foreground) 10%, var(--color-inverse));
-  --color-surface-tertiary: var(--color-inverse-deep);
+  /* Surfaces — true pitch black background (#010101) & elevated black cards */
+  --color-background: #010101;
+  --color-surface: #0a0a0c;
+  --color-surface-secondary: #141417;
+  --color-surface-tertiary: #0e0e11;
 
-  --color-border: color-mix(in srgb, var(--color-inverse-foreground) 20%, var(--color-inverse-deep));
-  --color-border-light: color-mix(in srgb, var(--color-inverse-foreground) 12%, var(--color-inverse-deep));
-  --color-border-muted: color-mix(in srgb, var(--color-inverse-foreground) 28%, var(--color-inverse-deep));
+  --color-border: #222226;
+  --color-border-light: #161619;
+  --color-border-muted: #2d2d33;
 
-  --color-text-primary: var(--color-inverse-foreground);
-  --color-text-secondary: color-mix(in srgb, var(--color-inverse-foreground) 75%, var(--color-background));
-  --color-text-muted: color-mix(in srgb, var(--color-inverse-foreground) 60%, var(--color-background));
-  --color-text-strong: color-mix(in srgb, var(--color-inverse-foreground) 68%, var(--color-background));
-  --color-text-faint: color-mix(in srgb, var(--color-inverse-foreground) 38%, var(--color-background));
-  --color-text-dark: color-mix(in srgb, var(--color-inverse-foreground) 84%, var(--color-background));
-  --color-text-darkest: color-mix(in srgb, var(--color-inverse-foreground) 94%, var(--color-background));
-  --color-text-slate: color-mix(in srgb, var(--color-inverse-foreground) 94%, var(--color-background));
-  --color-text-slate-medium: color-mix(in srgb, var(--color-inverse-foreground) 75%, var(--color-background));
-  --color-chart-axis: color-mix(in srgb, var(--color-inverse-foreground) 60%, var(--color-background));
+  --color-text-primary: #ededed;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-text-strong: #d4d4d8;
+  --color-text-faint: #3f3f46;
+  --color-text-dark: #e4e4e7;
+  --color-text-darkest: #fafafa;
+  --color-text-slate: #fafafa;
+  --color-text-slate-medium: #a1a1aa;
+  --color-chart-axis: #71717a;
 
   /* Accent lightens so purple text stays legible on dark surfaces; its light
    * fills flip to dark lavenders so pills keep an accent-on-lavender pairing.
    * --color-accent-foreground stays white — ink buttons and pills need it. */
   --color-accent: color-mix(in srgb, var(--color-accent-source) 70%, var(--color-accent-foreground));
   --color-accent-dark: color-mix(in srgb, var(--color-accent-dark-source) 70%, var(--color-accent-foreground));
-  --color-accent-light: color-mix(in srgb, var(--color-accent) 30%, var(--color-inverse));
-  --color-accent-muted: color-mix(in srgb, var(--color-accent) 20%, var(--color-inverse));
+  --color-accent-light: color-mix(in srgb, var(--color-accent) 26%, #0a0a0c);
+  --color-accent-muted: color-mix(in srgb, var(--color-accent) 16%, #0a0a0c);
 
-  /* Pastel surfaces darken with their hue so white primary text stays readable.
-   * The hue share is deliberately between a washed-out tint and a full colour:
-   * enough to read as an actual colour in dark mode, not a standard swatch. */
-  --color-pastel-blue: color-mix(in srgb, var(--color-info) 38%, var(--color-inverse));
-  --color-pastel-mint: color-mix(in srgb, var(--color-success) 36%, var(--color-inverse));
-  --color-pastel-pink: color-mix(in srgb, var(--color-rose) 36%, var(--color-inverse));
-  --color-pastel-lilac: color-mix(in srgb, var(--color-accent) 40%, var(--color-inverse));
-  --color-pastel-cream: color-mix(in srgb, var(--color-amber) 30%, var(--color-inverse));
-  --color-pastel-yellow: color-mix(in srgb, var(--color-amber) 30%, var(--color-inverse));
-  --color-pastel-aqua: color-mix(in srgb, var(--color-success-alt) 34%, var(--color-inverse));
+  /* Pastel surfaces darken with their hue rooted in deep black */
+  --color-pastel-blue: color-mix(in srgb, var(--color-info) 30%, #0a0a0c);
+  --color-pastel-mint: color-mix(in srgb, var(--color-success) 28%, #0a0a0c);
+  --color-pastel-pink: color-mix(in srgb, var(--color-rose) 28%, #0a0a0c);
+  --color-pastel-lilac: color-mix(in srgb, var(--color-accent) 32%, #0a0a0c);
+  --color-pastel-cream: color-mix(in srgb, var(--color-amber) 24%, #0a0a0c);
+  --color-pastel-yellow: color-mix(in srgb, var(--color-amber) 24%, #0a0a0c);
+  --color-pastel-aqua: color-mix(in srgb, var(--color-success-alt) 26%, #0a0a0c);
 
-  /* Decorative fills (bento cards, hero gradients, skyline art) and the warm
-   * secondary shades darken with their hue; success/info light pills keep
-   * their dark text-on-light-fill pairing, which reads in both modes. */
-  --color-peach: color-mix(in srgb, var(--color-amber) 14%, var(--color-inverse));
-  --color-peach-soft: color-mix(in srgb, var(--color-amber) 10%, var(--color-inverse));
-  --color-peach-deep: color-mix(in srgb, var(--color-amber) 18%, var(--color-inverse));
-  --color-peach-line: color-mix(in srgb, var(--color-amber) 26%, var(--color-inverse));
-  --color-rose-soft: color-mix(in srgb, var(--color-rose) 16%, var(--color-inverse));
-  --color-violet-glow: color-mix(in srgb, var(--color-accent) 16%, var(--color-inverse));
-  --color-violet-border: color-mix(in srgb, var(--color-accent) 34%, var(--color-inverse));
-  --color-violet-panel: color-mix(in srgb, var(--color-accent) 20%, var(--color-inverse));
-  --color-lavender: color-mix(in srgb, var(--color-accent) 18%, var(--color-inverse));
-  --color-lavender-soft: color-mix(in srgb, var(--color-accent) 12%, var(--color-inverse));
-  --color-art-line: color-mix(in srgb, var(--color-inverse-foreground) 9%, var(--color-inverse-deep));
-  --color-art-fill: color-mix(in srgb, var(--color-inverse-foreground) 18%, var(--color-inverse-deep));
-  --color-art-fill-strong: color-mix(in srgb, var(--color-inverse-foreground) 30%, var(--color-inverse-deep));
+  /* Decorative fills (bento cards, hero gradients, skyline art) */
+  --color-peach: color-mix(in srgb, var(--color-amber) 12%, #0a0a0c);
+  --color-peach-soft: color-mix(in srgb, var(--color-amber) 8%, #0a0a0c);
+  --color-peach-deep: color-mix(in srgb, var(--color-amber) 16%, #0a0a0c);
+  --color-peach-line: color-mix(in srgb, var(--color-amber) 22%, #0a0a0c);
+  --color-rose-soft: color-mix(in srgb, var(--color-rose) 14%, #0a0a0c);
+  --color-violet-glow: color-mix(in srgb, var(--color-accent) 14%, #0a0a0c);
+  --color-violet-border: color-mix(in srgb, var(--color-accent) 28%, #0a0a0c);
+  --color-violet-panel: color-mix(in srgb, var(--color-accent) 18%, #0a0a0c);
+  --color-lavender: color-mix(in srgb, var(--color-accent) 16%, #0a0a0c);
+  --color-lavender-soft: color-mix(in srgb, var(--color-accent) 10%, #0a0a0c);
+  --color-art-line: #18181b;
+  --color-art-fill: #1f1f23;
+  --color-art-fill-strong: #27272a;
 
   /* shadcn/ui semantic aliases track the surfaces they stand for. */
   --color-foreground: var(--color-text-primary);
-  --color-card: var(--color-inverse);
+  --color-card: var(--color-surface);
   --color-card-foreground: var(--color-text-primary);
-  --color-popover: var(--color-inverse);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text-primary);
+  --color-secondary: var(--color-surface-secondary);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-muted: var(--color-surface-secondary);
+}
   --color-popover-foreground: var(--color-text-primary);
   --color-secondary: var(--color-surface-secondary);
   --color-secondary-foreground: var(--color-text-primary);
