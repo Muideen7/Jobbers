@@ -23,6 +23,9 @@ Update this file after every completed feature. Any AI agent reading this should
 *(Bottom sidebar action: **Settings (`/settings`)**)*
 
 ### Summary of Revamp Work Done:
+- **Clean Page Header Badges**:
+  1. *Integrations Hub (`components/integrations/IntegrationsClient.tsx`)*: Removed the superfluous promotional pill `"Free Calendar & Pipeline Sync"` above `<h1>Integrations</h1>`, cleaned unused `Workflow` icon import, and restored standard heading spacing.
+  2. *Live Discovery Jobs (`components/find-jobs/FindJobsClient.tsx`)*: Removed the redundant pill badge `"Live Job Discovery"` above `<h1>Jobs</h1>` for a cleaner, distraction-free workspace header.
 - **Account Deletion Full Sweep & Session Erase (`/settings`, `actions/account.ts`, `lib/betterAuth.ts`)**:
   1. *Better Auth deleteUser*: Enabled `user: { deleteUser: { enabled: true } }` in Better Auth configuration.
   2. *Triple User Key Cascade*: Purges user by `email`, `_id`, and `id` in `user`, and `userId` (both as `ObjectId` and string) in `account` and `session`.

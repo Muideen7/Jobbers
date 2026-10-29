@@ -11,7 +11,6 @@ import {
   Laptop,
   Mail,
   RefreshCw,
-  Workflow,
   Download,
   Briefcase,
 } from "lucide-react";
@@ -57,13 +56,7 @@ export function IntegrationsClient({
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-5 items-center gap-1.5 rounded-full bg-accent-muted px-2 text-[11px] font-semibold text-accent">
-              <Workflow className="h-3 w-3" />
-              Free Calendar & Pipeline Sync
-            </span>
-          </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
             Integrations
           </h1>
           <p className="mt-1 text-sm text-text-secondary">

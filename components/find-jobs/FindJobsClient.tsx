@@ -463,13 +463,7 @@ export function FindJobsClient({
       <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-lavender/40 via-surface to-peach-soft/30 p-5 sm:p-6 shadow-card">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="flex h-5 items-center gap-1 rounded-full bg-accent-muted px-2 text-[11px] font-semibold text-accent">
-                <Target className="h-3 w-3" />
-                Live Job Discovery
-              </span>
-            </div>
-            <h1 className="mt-1.5 text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
+            <h1 className="text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
               Jobs
             </h1>
             <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
